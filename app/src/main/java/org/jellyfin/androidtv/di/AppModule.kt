@@ -87,8 +87,8 @@ val appModule = module {
 
 			// Add client info
 			val clientName = buildString {
-				append("Jellyfin for Android TV")
-				if (BuildConfig.DEBUG) append(" (debug)")
+				append("jBreakTV for Android TV")
+				if (BuildConfig.DEBUG) append(" (FarFromHome)")
 			}
 			clientInfo = ClientInfo(clientName, BuildConfig.VERSION_NAME)
 			deviceInfo = get(defaultDeviceInfo)

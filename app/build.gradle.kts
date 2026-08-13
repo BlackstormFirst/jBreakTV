@@ -14,7 +14,7 @@ android {
 		targetSdk = libs.versions.android.targetSdk.get().toInt()
 
 		// Release version
-		applicationId = namespace
+		applicationId = "jBreakTV"
 		versionName = project.getVersionName()
 		versionCode = getVersionCode(versionName!!)
 	}
@@ -98,7 +98,7 @@ android {
 	}
 }
 
-base.archivesName.set("jellyfin-androidtv-v${project.getVersionName()}")
+base.archivesName.set("jBreakTV-v${project.getVersionName()}")
 
 tasks.register("versionTxt") {
 	val path = layout.buildDirectory.asFile.get().resolve("version.txt")

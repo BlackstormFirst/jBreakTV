@@ -36,8 +36,8 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 		}
 
 		item {
-			val heading = "Jellyfin app version"
-			val caption = "jellyfin-androidtv ${BuildConfig.VERSION_NAME} ${BuildConfig.BUILD_TYPE}"
+			val heading = "jBreakTV app version"
+			val caption = "jBreakTV ${BuildConfig.VERSION_NAME} ${BuildConfig.BUILD_TYPE}"
 			ListButton(
 				leadingContent = { Icon(painterResource(R.drawable.ic_jellyfin), contentDescription = null) },
 				headingContent = { Text(heading) },

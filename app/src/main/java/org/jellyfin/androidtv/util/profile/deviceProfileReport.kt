@@ -7,6 +7,7 @@ import android.util.Range
 import android.view.Display
 import android.view.Surface
 import androidx.core.content.ContextCompat
+import androidx.media3.common.MimeTypes
 import kotlinx.serialization.json.Json
 import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.constant.Codec
@@ -18,6 +19,7 @@ import org.jellyfin.androidtv.util.appendItem
 import org.jellyfin.androidtv.util.appendSection
 import org.jellyfin.androidtv.util.appendValue
 import org.jellyfin.androidtv.util.buildMarkdown
+import org.jellyfin.androidtv.util.profile.codec.AudioPassthroughCapabilities
 import org.jellyfin.sdk.api.client.util.ApiSerializer
 import org.jellyfin.sdk.model.ServerVersion
 import kotlin.time.Duration.Companion.nanoseconds
@@ -63,9 +65,9 @@ fun createDeviceProfileReport(
 ) = buildMarkdown {
 	// Header
 	appendLine("---")
-	appendLine("client: Jellyfin for Android TV")
+	appendLine("client: jBreakTV for Android TV")
 	appendLine("client_version: ${BuildConfig.VERSION_NAME}")
-	appendLine("client_repository: https://github.com/jellyfin/jellyfin-androidtv")
+	appendLine("client_repository: https://github.com/BlackstormFirst/jbreaktv")
 	appendLine("type: media_capabilities_report")
 	appendLine("format: markdown")
 	appendLine("---")
@@ -162,6 +164,17 @@ fun createDeviceProfileReport(
 
 			appendLine()
 		}
+	}
+
+	appendDetails("Audio passthrough capabilities") {
+		val audioTest = AudioPassthroughCapabilities(context)
+		appendLine("***AC3 (2.0)***: ${audioTest.isPassthroughAudioAvailable(MimeTypes.AUDIO_AC3)}")
+		appendLine("***EAC3 (2.0)***: ${audioTest.isPassthroughAudioAvailable(MimeTypes.AUDIO_E_AC3)}")
+		appendLine("***EAC3-JOC (2.0)***: ${audioTest.isPassthroughAudioAvailable(MimeTypes.AUDIO_E_AC3_JOC)}")
+		appendLine("***DTS (2.0)***: ${audioTest.isPassthroughAudioAvailable(MimeTypes.AUDIO_DTS)}")
+		appendLine("***DTS-HD (2.0)***: ${audioTest.isPassthroughAudioAvailable(MimeTypes.AUDIO_DTS_HD)}")
+		appendLine("***TrueHD (2.0)***: ${audioTest.isPassthroughAudioAvailable(MimeTypes.AUDIO_TRUEHD)}")
+		appendLine()
 	}
 
 	appendDetails("Known media types") {

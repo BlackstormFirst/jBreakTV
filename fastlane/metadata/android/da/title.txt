@@ -1,1 +1,1 @@
-Jellyfin for Android TV
+jBreakTV for Android TV
