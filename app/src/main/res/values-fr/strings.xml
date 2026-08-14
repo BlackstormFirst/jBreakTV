@@ -682,4 +682,19 @@
     <string name="truehd_atmos">TrueHD Atmos</string>
     <string name="bitstream_eac3">Flux audio Dolby Digital Plus</string>
     <string name="bitstream_dts">Flux audio Dolby Theater System</string>
+    <string name="subtitle_mode">Mode des sous-titres</string>
+    <string name="use_user_profile">Utilise les préférences de votre profil</string>
+    <string name="subtitle_mode_default">Défaut</string>
+    <string name="subtitle_mode_smart">Intelligent</string>
+    <string name="subtitle_mode_only_forced">Forcés seulement</string>
+    <string name="subtitle_mode_always">Toujours</string>
+    <string name="subtitle_mode_none">Aucun</string>
+    <string name="preferred_subtitle_language">Langue sous-titres préférée</string>
+    <string name="preferred_audio_language">Langue audio préférée</string>
+    <string name="override_user_profile_settings">Paramètres du profil utilisateur distant</string>
+    <string name="profile_specific_settings">Paramètres du profil utilisateur</string>
+    <string name="profile_specific_settings_from_server">Paramètres du profil utilisateur sur le serveur</string>
+    <string name="override_user_profile_settings_summary">Ecraser vos paramètres du profil utilisateur</string>
+    <string name="any_language">N\'importe quelle langue</string>
+    <string name="always_default_audio_stream">Utiliser le flux audio par défaut quelle que soit la langue.</string>
 </resources>

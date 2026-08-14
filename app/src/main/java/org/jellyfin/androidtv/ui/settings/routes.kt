@@ -3,6 +3,7 @@ package org.jellyfin.androidtv.ui.settings
 import org.jellyfin.androidtv.ui.navigation.RouteComposable
 import org.jellyfin.androidtv.ui.settings.screen.SettingsDeveloperScreen
 import org.jellyfin.androidtv.ui.settings.screen.SettingsMainScreen
+import org.jellyfin.androidtv.ui.settings.screen.SettingsUserServerPrefsScreen
 import org.jellyfin.androidtv.ui.settings.screen.SettingsTelemetryScreen
 import org.jellyfin.androidtv.ui.settings.screen.about.SettingsAboutScreen
 import org.jellyfin.androidtv.ui.settings.screen.authentication.SettingsAuthenticationAutoSignInScreen
@@ -108,6 +109,8 @@ object Routes {
 	const val ABOUT = "/about"
 	const val LICENSES = "/licenses"
 	const val LICENSE = "/license/{artifactId}"
+
+	const val USERSERVERPREFS = "/userserverprefs"
 }
 
 val routes = mapOf<String, RouteComposable>(
@@ -281,5 +284,8 @@ val routes = mapOf<String, RouteComposable>(
 		SettingsLicenseScreen(
 			artifactId = context.parameters["artifactId"]!!
 		)
+	},
+	Routes.USERSERVERPREFS to {
+		SettingsUserServerPrefsScreen()
 	},
 )

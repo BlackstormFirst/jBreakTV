@@ -66,6 +66,15 @@ fun SettingsMainScreen() {
 
 		item {
 			ListButton(
+				leadingContent = { Icon(painterResource(R.drawable.ic_users), contentDescription = null) },
+				headingContent = { Text(stringResource(R.string.override_user_profile_settings)) },
+				onClick = { router.push(Routes.USERSERVERPREFS) },
+				modifier = Modifier.focusKey(Routes.USERSERVERPREFS),
+			)
+		}
+
+		item {
+			ListButton(
 				leadingContent = { Icon(painterResource(R.drawable.ic_error), contentDescription = null) },
 				headingContent = { Text(stringResource(R.string.pref_telemetry_category)) },
 				onClick = { router.push(Routes.TELEMETRY) },
