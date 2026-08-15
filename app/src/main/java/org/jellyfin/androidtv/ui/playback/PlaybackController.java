@@ -635,7 +635,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         setDefaultAudioIndex(response);
-        int bSubIndex = getBestSubtitleIndex(response.getMediaSource());
+        var bSubIndex = getBestSubtitleIndex(response.getMediaSource());
         var mSubIndex = mCurrentOptions.getSubtitleStreamIndex();
         PlaybackControllerHelperKt.setSubtitleIndex(this, bSubIndex, (mSubIndex == null || !Objects.equals(mSubIndex, bSubIndex)));
         Timber.i("default audio index set to %s remote default %s", mDefaultAudioIndex, response.getMediaSource().getDefaultAudioStreamIndex());
@@ -1009,6 +1009,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             Timber.d("Best subtitle found on server side");
             matchingIndex = info.getDefaultSubtitleStreamIndex();
         }
+        if(matchingIndex == null) matchingIndex = -1;
         Timber.i("Best subtitle found on index: %d for media: '%s'", matchingIndex, info.getName());
         return matchingIndex;
     }
