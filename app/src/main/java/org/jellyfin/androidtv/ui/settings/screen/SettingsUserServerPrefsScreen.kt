@@ -22,19 +22,37 @@ import org.koin.compose.koinInject
 import androidx.compose.runtime.mutableIntStateOf
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userApi
+import org.jellyfin.androidtv.preference.UserSettingPreferences
+import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 
 @Composable
 fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 	val context = LocalContext.current
 	val router = LocalRouter.current
 	val apiClient = koinInject<ApiClient>()
+	val userSettingPreferences = koinInject<UserSettingPreferences>()
+
+	//var subtitleModeTitle = stringResource()
+
+	//var subtitleModeTitle by remember { mutableIntStateOf(R.string.loading) }
+	//var userLangPrefs by remember { mutableStateOf<String?>(null)}
+	//var userSubPrefs by remember { mutableStateOf<String?>(null)}
+	//var userAlwaysUseAudioDefault by remember { mutableStateOf<Boolean?>(false)}
+
+	//var subtitleModeTitle by rememberPreference(userSettingPreferences, UserSettingPreferences.subMode)
+	//var userLangPrefs by rememberPreference(userSettingPreferences, UserSettingPreferences.audioLangRemoteSetting)
+	//var userSubPrefs by rememberPreference(userSettingPreferences, UserSettingPreferences.subLangRemoteSetting)
+	//var userAlwaysUseAudioDefault by rememberPreference(userSettingPreferences, UserSettingPreferences.userAlwaysUseAudioDefault)
+
+	var subtitleModeTitle by remember { mutableIntStateOf(userSettingPreferences[UserSettingPreferences.subMode]) }
+	var userLangPrefs by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.audioLangRemoteSetting])}
+	var userSubPrefs by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.subLangRemoteSetting])}
+	var userAlwaysUseAudioDefault by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.userAlwaysUseAudioDefault])}
 
 
-	var subtitleModeTitle by remember { mutableIntStateOf(R.string.loading) }
-	var userLangPrefs by remember { mutableStateOf<String?>(null)}
-	var userSubPrefs by remember { mutableStateOf<String?>(null)}
-	var userAlwaysUseAudioDefault by remember { mutableStateOf<Boolean?>(false)}
+	//var userAlwaysUseAudioDefault by remember(mutableStateOf())
 
+	/*
 	LaunchedEffect(Unit) {
 		runCatching {
 			apiClient.userApi.getCurrentUser().content.configuration
@@ -51,6 +69,7 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 			userAlwaysUseAudioDefault = config?.playDefaultAudioTrack
 		}
 	}
+	*/
 	if (userLangPrefs == "") userLangPrefs = stringResource(R.string.any_language)
 	if (userSubPrefs == "") userSubPrefs = stringResource(R.string.any_language)
 
@@ -66,7 +85,7 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 			//var audioLanguage by rememberPreference(userPreferences, UserPreferences.audioLanguageFromServer)
 			ListButton(
 				headingContent = { Text(stringResource(R.string.preferred_audio_language)) },
-				captionContent = { Text(userLangPrefs.toString()) },
+				captionContent = { Text(userLangPrefs) },
 				onClick = { },
 				modifier = Modifier.focusKey(""),
 			)
@@ -75,7 +94,7 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 		item {
 			ListButton(
 				headingContent = { Text(stringResource(R.string.always_default_audio_stream)) },
-				trailingContent = { Checkbox( checked = userAlwaysUseAudioDefault == true) },
+				trailingContent = { Checkbox( checked = userAlwaysUseAudioDefault) },
 				onClick = { },
 				modifier = Modifier.focusKey(""),
 				enabled = false
@@ -86,7 +105,7 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 			//var subtitleLanguage by rememberPreference(userPreferences, UserPreferences.audioLanguageFromServer)
 			ListButton(
 				headingContent = { Text(stringResource(R.string.preferred_subtitle_language)) },
-				captionContent = { Text(userSubPrefs.toString()) },
+				captionContent = { Text(userSubPrefs) },
 				onClick = { },
 				modifier = Modifier.focusKey(""),
 			)

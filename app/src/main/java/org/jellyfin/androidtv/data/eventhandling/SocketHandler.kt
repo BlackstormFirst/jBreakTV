@@ -14,6 +14,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.data.model.DataRefreshService
+import org.jellyfin.androidtv.preference.PreferencesRepository
+import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
@@ -24,6 +26,7 @@ import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.extensions.sessionApi
+import org.jellyfin.sdk.api.client.extensions.userApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.sockets.subscribe
 import org.jellyfin.sdk.api.sockets.subscribeGeneralCommand
@@ -36,12 +39,18 @@ import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.PlayMessage
 import org.jellyfin.sdk.model.api.PlaystateCommand
 import org.jellyfin.sdk.model.api.PlaystateMessage
+import org.jellyfin.sdk.model.api.SessionsMessage
+import org.jellyfin.sdk.model.api.UserDataChangedMessage
+import org.jellyfin.sdk.model.api.UserUpdatedMessage
 import org.jellyfin.sdk.model.extensions.get
 import org.jellyfin.sdk.model.extensions.getValue
 import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import timber.log.Timber
 import java.time.Instant
+import java.time.Duration
 import java.util.UUID
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 class SocketHandler(
 	private val context: Context,
@@ -54,6 +63,7 @@ class SocketHandler(
 	private val itemLauncher: ItemLauncher,
 	private val playbackHelper: PlaybackHelper,
 	private val lifecycle: Lifecycle,
+	private val preferencesRepository: PreferencesRepository,
 ) {
 	init {
 		lifecycle.coroutineScope.launch(Dispatchers.IO) {
@@ -95,6 +105,9 @@ class SocketHandler(
 		}
 	}
 
+	var lastRefresh: Instant? = null
+	val minRefreshInterval: Duration = Duration.ofSeconds(15)
+
 	private fun subscribe(coroutineScope: CoroutineScope) = api.webSocket.apply {
 		// Library
 		subscribe<LibraryChangedMessage>()
@@ -108,6 +121,27 @@ class SocketHandler(
 
 		subscribe<PlaystateMessage>()
 			.onEach { message -> onPlayStateMessage(message) }
+			.launchIn(coroutineScope)
+
+		subscribe<UserDataChangedMessage>()
+			.onEach { message ->
+				Timber.d("Received UserDataChangedMessage")
+				if (message.data?.userId == api.userApi.getCurrentUser().content.id){
+					preferencesRepository.refreshServerUserSettings()
+				}
+			}
+			.launchIn(coroutineScope)
+
+		subscribe<SessionsMessage>()
+			.onEach { message ->
+				Timber.d("Received SessionsMessage")
+				val now = Instant.now()
+				val elapsed = lastRefresh?.let { Duration.between(it, now) }
+				if (elapsed == null || elapsed > minRefreshInterval){
+					lastRefresh = now
+					preferencesRepository.refreshServerUserSettings()
+				}
+			}
 			.launchIn(coroutineScope)
 
 		subscribeGeneralCommand(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)

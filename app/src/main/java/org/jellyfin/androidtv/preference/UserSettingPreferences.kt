@@ -1,10 +1,18 @@
 package org.jellyfin.androidtv.preference
 
+import androidx.compose.runtime.setValue
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.preference.store.DisplayPreferencesStore
+import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
+import org.jellyfin.preference.Preference
+import org.jellyfin.preference.booleanPreference
 import org.jellyfin.preference.enumPreference
 import org.jellyfin.preference.intPreference
+import org.jellyfin.preference.stringPreference
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.SubtitlePlaybackMode
+import org.jellyfin.sdk.model.api.UserConfiguration
 
 class UserSettingPreferences(
 	api: ApiClient,
@@ -16,7 +24,10 @@ class UserSettingPreferences(
 	companion object {
 		val skipBackLength = intPreference("skipBackLength", 10_000)
 		val skipForwardLength = intPreference("skipForwardLength", 30_000)
-
+		var audioLangRemoteSetting = stringPreference("audioLangRemoteSetting", "")
+		var subLangRemoteSetting = stringPreference("subLangRemoteSetting", "")
+		var subMode = intPreference("subMode", R.string.subtitle_mode_none)
+		var userAlwaysUseAudioDefault = booleanPreference("userAlwaysUseAudioDefault", false)
 		val homesection0 = enumPreference("homesection0", HomeSectionType.LIBRARY_TILES_SMALL)
 		val homesection1 = enumPreference("homesection1", HomeSectionType.RESUME)
 		val homesection2 = enumPreference("homesection2", HomeSectionType.RESUME_AUDIO)
@@ -46,4 +57,18 @@ class UserSettingPreferences(
 		get() = homesections
 			.map(::get)
 			.filterNot { it == HomeSectionType.NONE }
+
+	fun userServerRemoteSettings(configuration: UserConfiguration?) {
+		userAlwaysUseAudioDefault = booleanPreference("userAlwaysUseAudioDefault", configuration?.playDefaultAudioTrack ?: false)
+		audioLangRemoteSetting = stringPreference("audioLangRemoteSetting", configuration?.audioLanguagePreference ?: "")
+		subLangRemoteSetting = stringPreference("subLangRemoteSetting", configuration?.subtitleLanguagePreference ?: "")
+		val subtitleModeTitle = when (configuration?.subtitleMode) {
+			SubtitlePlaybackMode.DEFAULT -> R.string.subtitle_mode_default
+			SubtitlePlaybackMode.ALWAYS -> R.string.subtitle_mode_always
+			SubtitlePlaybackMode.ONLY_FORCED -> R.string.subtitle_mode_only_forced
+			SubtitlePlaybackMode.SMART -> R.string.subtitle_mode_smart
+			else -> R.string.subtitle_mode_none
+		}
+		subMode = intPreference("subMode", subtitleModeTitle)
+	}
 }

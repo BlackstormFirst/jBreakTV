@@ -5,12 +5,15 @@ import static org.koin.java.KoinJavaComponent.inject;
 
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.res.Resources;
 import android.os.Handler;
 import android.view.Display;
 import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
+import androidx.compose.ui.res.StringResources_androidKt;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.data.compat.PlaybackException;
@@ -44,6 +47,7 @@ import org.jellyfin.sdk.model.api.PlayMethod;
 import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod;
 import org.jellyfin.sdk.model.serializer.UUIDSerializerKt;
 import org.koin.java.KoinJavaComponent;
+import android.content.res.Resources;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -719,6 +723,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     private Integer getBestAudioIndex(MediaSourceInfo info) {
+        var userAudioLangRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getAudioLangRemoteSetting());
+        var userAudioAlwaysDefaultRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getUserAlwaysUseAudioDefault());
+        Timber.i("Remote user audio lang settings: %s", userAudioLangRemoteSetting);
+        Timber.i("Remote user audio always default settings: %s", userAudioAlwaysDefaultRemoteSetting);
         if (info != null && info.getMediaStreams() != null) {
             String lastAudioLanguage = videoQueueManager.getValue().getLastPlayedAudioLanguageIsoCode();
             String lastAudioCodec = videoQueueManager.getValue().getLastPlayedAudioCodec();
@@ -728,6 +736,20 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 Boolean lastAudioDefaultState = videoQueueManager.getValue().getLastPlayedAudioDefaultState();
                 Boolean lastAudioHearingImpairedState = videoQueueManager.getValue().getLastPlayedAudioHearingImpairedState();
                 Integer matchingIndex = null;
+
+                if (!userAudioLangRemoteSetting.equals(lastAudioLanguage)){
+                    for (MediaStream stream : allAudioStreams) {
+                        if (userAudioLangRemoteSetting.equals(stream.getLanguage())
+                                && lastAudioCodec.equals(stream.getCodec())
+                                && lastAudioDefaultState.equals(stream.isDefault())
+                                && lastAudioHearingImpairedState.equals(stream.isHearingImpaired())
+                        ) {
+                            Timber.d("Best smart audio found ! (lang+all)");
+                            matchingIndex = stream.getIndex();
+                            break;
+                        }
+                    }
+                }
 
                 // find the exact audio stream with the requested language, codec & indicators
                 for (MediaStream stream : allAudioStreams) {
@@ -885,6 +907,13 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         //}
         // get subtitle info - prefer saved language preference over server default
         Integer matchingIndex = null;
+        var userAudioLangRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getAudioLangRemoteSetting());
+        var userAudioAlwaysDefaultRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getUserAlwaysUseAudioDefault());
+        var userSubLangRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getSubLangRemoteSetting());
+        var userSubMode = userPreferences.getValue().get(UserSettingPreferences.Companion.getSubMode());
+        var userSubModeTitle = getFragment().getString(userSubMode);
+        Timber.i("Remote user sub lang settings: %s", userSubLangRemoteSetting);
+        Timber.i("Remote user sub mod settings: %s", userSubModeTitle);
         String lastSubtitleLanguage = videoQueueManager.getValue().getLastPlayedSubtitleLanguageIsoCode();
         if (lastSubtitleLanguage != null) {
             if (lastSubtitleLanguage.isEmpty()) {

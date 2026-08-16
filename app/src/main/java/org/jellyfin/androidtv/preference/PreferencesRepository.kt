@@ -2,6 +2,8 @@ package org.jellyfin.androidtv.preference
 
 import kotlinx.coroutines.runBlocking
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.extensions.userApi
+import timber.log.Timber
 import kotlin.collections.set
 
 /**
@@ -23,6 +25,12 @@ class PreferencesRepository(
 		if (store.shouldUpdate) runBlocking { store.update() }
 
 		return store
+	}
+
+	suspend fun refreshServerUserSettings() {
+		Timber.i("Refresh Server User Settings.")
+		val configuration = api.userApi.getCurrentUser().content.configuration
+		userSettingPreferences.userServerRemoteSettings(configuration)
 	}
 
 	suspend fun onSessionChanged() {
