@@ -52,7 +52,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Maximum bitrate in megabit for playback.
 		 */
-		var maxBitrate = stringPreference("pref_max_bitrate", "100")
+		var maxBitrate = stringPreference("pref_max_bitrate", "200")
 
 		/**
 		 * Auto-play next item
@@ -62,13 +62,13 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Enable the next up screen or not
 		 */
-		var nextUpBehavior = enumPreference("next_up_behavior", NextUpBehavior.EXTENDED)
+		var nextUpBehavior = enumPreference("next_up_behavior", NextUpBehavior.MINIMAL)
 
 		/**
 		 * Next up timeout before playing next item
 		 * Stored in milliseconds
 		 */
-		var nextUpTimeout = intPreference("next_up_timeout", 1000 * 7)
+		var nextUpTimeout = intPreference("next_up_timeout", 1000 * 1)
 
 		/**
 		 * Duration in seconds to subtract from resume time
@@ -162,7 +162,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Show additional debug information
 		 */
-		var debuggingEnabled = booleanPreference("pref_enable_debug", false)
+		var debuggingEnabled = booleanPreference("pref_enable_debug", true)
 
 		/**
 		 * Use playback rewrite module for video
@@ -227,12 +227,12 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Age rating used to filter items in the screensaver. Use -1 to disable (omits parameter from requests).
 		 */
-		var screensaverAgeRatingMax = intPreference("screensaver_agerating_max", 13)
+		var screensaverAgeRatingMax = intPreference("screensaver_agerating_max", -1)
 
 		/**
 		 * Whether items shown in the screensaver are required to have an age rating set.
 		 */
-		var screensaverAgeRatingRequired = booleanPreference("screensaver_agerating_required", true)
+		var screensaverAgeRatingRequired = booleanPreference("screensaver_agerating_required", false)
 
 		/**
 		 * Delay when starting video playback after loading the video player.
@@ -247,6 +247,9 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 			defaultValue = mapOf(
 				MediaSegmentType.INTRO to MediaSegmentAction.ASK_TO_SKIP,
 				MediaSegmentType.OUTRO to MediaSegmentAction.ASK_TO_SKIP,
+				MediaSegmentType.COMMERCIAL to MediaSegmentAction.ASK_TO_SKIP,
+				MediaSegmentType.RECAP to MediaSegmentAction.ASK_TO_SKIP,
+				MediaSegmentType.PREVIEW to MediaSegmentAction.ASK_TO_SKIP,
 			).toMediaSegmentActionsString()
 		)
 
@@ -258,7 +261,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Enable libass.
 		 */
-		var assDirectPlay = booleanPreference("libass_enabled", false)
+		var assDirectPlay = booleanPreference("libass_enabled", true)
 
 		/**
 		 * Always burn in subtitles when transcoding.
