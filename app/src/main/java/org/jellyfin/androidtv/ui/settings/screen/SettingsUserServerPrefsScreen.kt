@@ -2,7 +2,6 @@ package org.jellyfin.androidtv.ui.settings.screen
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -17,13 +16,12 @@ import org.jellyfin.androidtv.ui.navigation.focus.focusKey
 import org.jellyfin.androidtv.ui.settings.composable.SettingsColumn
 import org.jellyfin.androidtv.ui.base.form.Checkbox
 import org.jellyfin.androidtv.ui.navigation.LocalRouter
-import org.jellyfin.sdk.model.api.SubtitlePlaybackMode
 import org.koin.compose.koinInject
 import androidx.compose.runtime.mutableIntStateOf
 import org.jellyfin.sdk.api.client.ApiClient
-import org.jellyfin.sdk.api.client.extensions.userApi
 import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
+import timber.log.Timber
 
 @Composable
 fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
@@ -31,13 +29,6 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 	val router = LocalRouter.current
 	val apiClient = koinInject<ApiClient>()
 	val userSettingPreferences = koinInject<UserSettingPreferences>()
-
-	//var subtitleModeTitle = stringResource()
-
-	//var subtitleModeTitle by remember { mutableIntStateOf(R.string.loading) }
-	//var userLangPrefs by remember { mutableStateOf<String?>(null)}
-	//var userSubPrefs by remember { mutableStateOf<String?>(null)}
-	//var userAlwaysUseAudioDefault by remember { mutableStateOf<Boolean?>(false)}
 
 	//var subtitleModeTitle by rememberPreference(userSettingPreferences, UserSettingPreferences.subMode)
 	//var userLangPrefs by rememberPreference(userSettingPreferences, UserSettingPreferences.audioLangRemoteSetting)
@@ -48,9 +39,6 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 	var userLangPrefs by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.audioLangRemoteSetting])}
 	var userSubPrefs by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.subLangRemoteSetting])}
 	var userAlwaysUseAudioDefault by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.userAlwaysUseAudioDefault])}
-
-
-	//var userAlwaysUseAudioDefault by remember(mutableStateOf())
 
 	/*
 	LaunchedEffect(Unit) {
@@ -70,6 +58,9 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 		}
 	}
 	*/
+	//Timber.i("Val lang: '%s'", userLangPrefs)
+	//Timber.i("Val subs: '%s'", userSubPrefs)
+
 	if (userLangPrefs == "") userLangPrefs = stringResource(R.string.any_language)
 	if (userSubPrefs == "") userSubPrefs = stringResource(R.string.any_language)
 

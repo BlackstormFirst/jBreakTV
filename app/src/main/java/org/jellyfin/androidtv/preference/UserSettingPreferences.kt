@@ -1,11 +1,8 @@
 package org.jellyfin.androidtv.preference
 
-import androidx.compose.runtime.setValue
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.preference.store.DisplayPreferencesStore
-import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
-import org.jellyfin.preference.Preference
 import org.jellyfin.preference.booleanPreference
 import org.jellyfin.preference.enumPreference
 import org.jellyfin.preference.intPreference
@@ -24,8 +21,8 @@ class UserSettingPreferences(
 	companion object {
 		val skipBackLength = intPreference("skipBackLength", 10_000)
 		val skipForwardLength = intPreference("skipForwardLength", 30_000)
-		var audioLangRemoteSetting = stringPreference("audioLangRemoteSetting", "")
-		var subLangRemoteSetting = stringPreference("subLangRemoteSetting", "")
+		var audioLangRemoteSetting = stringPreference("audioLangRemoteSettings", "")
+		var subLangRemoteSetting = stringPreference("subLangRemoteSettings", "")
 		var subMode = intPreference("subMode", R.string.subtitle_mode_none)
 		var userAlwaysUseAudioDefault = booleanPreference("userAlwaysUseAudioDefault", false)
 		val homesection0 = enumPreference("homesection0", HomeSectionType.LIBRARY_TILES_SMALL)
@@ -60,8 +57,8 @@ class UserSettingPreferences(
 
 	fun userServerRemoteSettings(configuration: UserConfiguration?) {
 		userAlwaysUseAudioDefault = booleanPreference("userAlwaysUseAudioDefault", configuration?.playDefaultAudioTrack ?: false)
-		audioLangRemoteSetting = stringPreference("audioLangRemoteSetting", configuration?.audioLanguagePreference ?: "")
-		subLangRemoteSetting = stringPreference("subLangRemoteSetting", configuration?.subtitleLanguagePreference ?: "")
+		audioLangRemoteSetting = stringPreference("audioLangRemoteSettings", configuration?.audioLanguagePreference ?: "")
+		subLangRemoteSetting = stringPreference("subLangRemoteSettings", configuration?.subtitleLanguagePreference ?: "")
 		val subtitleModeTitle = when (configuration?.subtitleMode) {
 			SubtitlePlaybackMode.DEFAULT -> R.string.subtitle_mode_default
 			SubtitlePlaybackMode.ALWAYS -> R.string.subtitle_mode_always

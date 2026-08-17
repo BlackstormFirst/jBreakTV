@@ -691,10 +691,10 @@
     <string name="subtitle_mode_none">Aucun</string>
     <string name="preferred_subtitle_language">Langue sous-titres préférée</string>
     <string name="preferred_audio_language">Langue audio préférée</string>
-    <string name="override_user_profile_settings">Paramètres du profil utilisateur distant</string>
+    <string name="override_user_profile_settings">Paramètres distants du profil utilisateur</string>
     <string name="profile_specific_settings">Paramètres du profil utilisateur</string>
-    <string name="profile_specific_settings_from_server">Paramètres du profil utilisateur sur le serveur</string>
-    <string name="override_user_profile_settings_summary">Ecraser vos paramètres du profil utilisateur</string>
+    <string name="profile_specific_settings_from_server">Paramètres distants de utilisateur</string>
+    <string name="override_user_profile_settings_summary">Ecraser vos paramètres distants</string>
     <string name="any_language">N\'importe quelle langue</string>
     <string name="always_default_audio_stream">Utiliser le flux audio par défaut quelle que soit la langue.</string>
 </resources>

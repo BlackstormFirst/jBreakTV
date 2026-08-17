@@ -683,8 +683,8 @@
     <string name="preferred_audio_language">Preferred audio language</string>
     <string name="override_user_profile_settings">Remote user profile settings</string>
     <string name="profile_specific_settings">User Profile Settings</string>
-    <string name="profile_specific_settings_from_server">User profile settings from server</string>
-    <string name="override_user_profile_settings_summary">Override your user profile settings from the server</string>
+    <string name="profile_specific_settings_from_server">User remote settings</string>
+    <string name="override_user_profile_settings_summary">Override your user profile remote settings</string>
     <string name="any_language">Any language</string>
     <string name="always_default_audio_stream">Always use the default audio stream regardless of the language.</string>
 </resources>

@@ -15,7 +15,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.preference.PreferencesRepository
-import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
@@ -39,9 +38,7 @@ import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.PlayMessage
 import org.jellyfin.sdk.model.api.PlaystateCommand
 import org.jellyfin.sdk.model.api.PlaystateMessage
-import org.jellyfin.sdk.model.api.SessionsMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
-import org.jellyfin.sdk.model.api.UserUpdatedMessage
 import org.jellyfin.sdk.model.extensions.get
 import org.jellyfin.sdk.model.extensions.getValue
 import org.jellyfin.sdk.model.serializer.toUUIDOrNull
@@ -49,8 +46,6 @@ import timber.log.Timber
 import java.time.Instant
 import java.time.Duration
 import java.util.UUID
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.seconds
 
 class SocketHandler(
 	private val context: Context,
@@ -111,7 +106,10 @@ class SocketHandler(
 	private fun subscribe(coroutineScope: CoroutineScope) = api.webSocket.apply {
 		// Library
 		subscribe<LibraryChangedMessage>()
-			.onEach { message -> message.data?.let(::onLibraryChanged) }
+			.onEach { message ->
+				message.data?.let(::onLibraryChanged)
+				preferencesRepository.refreshServerUserSettings()
+			}
 			.launchIn(coroutineScope)
 
 		// Media playback
@@ -131,18 +129,27 @@ class SocketHandler(
 				}
 			}
 			.launchIn(coroutineScope)
-
+/*
 		subscribe<SessionsMessage>()
 			.onEach { message ->
 				Timber.d("Received SessionsMessage")
-				val now = Instant.now()
-				val elapsed = lastRefresh?.let { Duration.between(it, now) }
-				if (elapsed == null || elapsed > minRefreshInterval){
-					lastRefresh = now
+				//val now = Instant.now()
+				//val elapsed = lastRefresh?.let { Duration.between(it, now) }
+				//if (elapsed == null || elapsed > minRefreshInterval){
+				//	lastRefresh = now
 					preferencesRepository.refreshServerUserSettings()
-				}
+				//}
 			}
 			.launchIn(coroutineScope)
+ */
+
+/*
+		subscribeAll()
+			.onEach { message ->
+				Timber.i("Received type: %s", message.messageType)
+			}
+			.launchIn(coroutineScope)
+ */
 
 		subscribeGeneralCommand(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)
 			.onEach { message ->
