@@ -4,13 +4,16 @@ import android.content.Context
 import androidx.lifecycle.ProcessLifecycleOwner
 import coil3.ImageLoader
 import coil3.annotation.ExperimentalCoilApi
+import coil3.disk.DiskCache
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
+import coil3.memory.MemoryCache
 import coil3.network.NetworkFetcher
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.serviceLoaderEnabled
 import coil3.svg.SvgDecoder
 import coil3.util.Logger
+import okio.Path.Companion.toOkioPath
 import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.UserRepository
@@ -73,6 +76,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.jellyfin.sdk.Jellyfin as JellyfinSdk
+import org.jellyfin.androidtv.preference.UserPreferences
 
 val defaultDeviceInfo = named("defaultDeviceInfo")
 
@@ -122,7 +126,24 @@ val appModule = module {
 	}
 
 	single {
+		val userPreferences = get<UserPreferences>()
+		var diskMaxCacheSize = userPreferences[UserPreferences.diskMaxCacheSize]
+		var memoryMaxCachePercent = userPreferences[UserPreferences.memoryMaxCachePercent]
+		val maxSizeFallback: Long = 32
 		ImageLoader.Builder(androidContext()).apply {
+			diskCache {
+				DiskCache.Builder()
+					.directory(androidContext().cacheDir.resolve("image_cache").toOkioPath())
+					.maxSizeBytes(diskMaxCacheSize * 1024 * 1024)
+					.build()
+			}
+			memoryCache {
+				MemoryCache.Builder()
+					.maxSizePercent(androidContext(), (memoryMaxCachePercent / 100).toDouble())
+					.maxSizeBytes(maxSizeFallback * 1024 * 1024) // fallback to minimum
+					.build()
+			}
+
 			serviceLoaderEnabled(false)
 			logger(CoilTimberLogger(if (BuildConfig.DEBUG) Logger.Level.Warn else Logger.Level.Error))
 

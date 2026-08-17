@@ -691,10 +691,12 @@
     <string name="subtitle_mode_none">Aucun</string>
     <string name="preferred_subtitle_language">Langue sous-titres préférée</string>
     <string name="preferred_audio_language">Langue audio préférée</string>
-    <string name="override_user_profile_settings">Paramètres distants du profil utilisateur</string>
+    <string name="override_user_profile_settings">Paramètres distants</string>
     <string name="profile_specific_settings">Paramètres du profil utilisateur</string>
-    <string name="profile_specific_settings_from_server">Paramètres distants de utilisateur</string>
+    <string name="profile_specific_settings_from_server">Paramètres distants de l\'utilisateur</string>
     <string name="override_user_profile_settings_summary">Ecraser vos paramètres distants</string>
     <string name="any_language">N\'importe quelle langue</string>
     <string name="always_default_audio_stream">Utiliser le flux audio par défaut quelle que soit la langue.</string>
+    <string name="image_disk_cache_size">Taille du cache disque des images</string>
+    <string name="image_memory_cache_size">Taille du cache memoire des images</string>
 </resources>

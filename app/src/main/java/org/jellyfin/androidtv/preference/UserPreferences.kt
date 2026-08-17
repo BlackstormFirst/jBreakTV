@@ -277,6 +277,10 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 * Enable the use of software-based codecs.
 		 */
 		var softwareCodecsEnabled = booleanPreference("software_codecs_enabled", true)
+
+		var diskMaxCacheSize = longPreference("diskMaxCacheSize", 250L)
+
+		var memoryMaxCachePercent = intPreference("memoryMaxCachePercent", 25)
 	}
 
 	init {
