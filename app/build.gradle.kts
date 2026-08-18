@@ -14,6 +14,7 @@ android {
 		targetSdk = libs.versions.android.targetSdk.get().toInt()
 
 		// Release version
+		//applicationId = "com.github.blackstormfirst.jbreaktv"
 		applicationId = "jBreakTV"
 		versionName = project.getVersionName()
 		versionCode = getVersionCode(versionName!!)
@@ -67,7 +68,7 @@ android {
 
 			buildConfigField("boolean", "DEVELOPMENT", "false")
 
-			signingConfig = signingConfigs.findByName("release")
+			//signingConfig = signingConfigs.findByName("release")
 		}
 
 		debug {
@@ -80,7 +81,8 @@ android {
 			resValue("string", "app_search_suggest_intent_data", "content://${namespace + applicationIdSuffix}.content/intent")
 
 			// Set flavored application name
-			resValue("string", "app_name", "@string/app_name_debug")
+			//resValue("string", "app_name", "@string/app_name_debug")
+			resValue("string", "app_name", "@string/app_name_release")
 
 			buildConfigField("boolean", "DEVELOPMENT", (defaultConfig.versionCode!! < 100).toString())
 		}
@@ -98,7 +100,7 @@ android {
 	}
 }
 
-base.archivesName.set("jBreakTV-v${project.getVersionName()}")
+base.archivesName.set("jBreakTV-${project.getVersionName()}")
 
 tasks.register("versionTxt") {
 	val path = layout.buildDirectory.asFile.get().resolve("version.txt")

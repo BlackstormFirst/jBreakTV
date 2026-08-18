@@ -17,6 +17,9 @@
     <!-- Search permissions (voice to text) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Updates permissions (updater) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Device feature requirements -->
     <uses-feature
         android:name="android.software.leanback"
@@ -84,6 +87,16 @@
             <meta-data
                 android:name="org.jellyfin.androidtv.SessionInitializer"
                 android:value="androidx.startup" />
+        </provider>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_file_paths" />
         </provider>
 
         <provider

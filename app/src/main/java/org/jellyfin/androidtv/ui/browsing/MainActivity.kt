@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -33,6 +34,11 @@ import org.jellyfin.androidtv.util.applyTheme
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import timber.log.Timber
+import org.jellyfin.androidtv.util.updater.CustomUpdateChecker
+import org.jellyfin.androidtv.util.updater.UpdateResult
+import org.jellyfin.androidtv.util.updater.ApkInstaller
+import org.jellyfin.androidtv.preference.UserPreferences
+import org.jellyfin.androidtv.preference.PreferencesRepository
 
 class MainActivity : FragmentActivity() {
 	private val navigationRepository by inject<NavigationRepository>()
@@ -40,6 +46,9 @@ class MainActivity : FragmentActivity() {
 	private val userRepository by inject<UserRepository>()
 	private val interactionTrackerViewModel by viewModel<InteractionTrackerViewModel>()
 	private val workManager by inject<WorkManager>()
+	private val userPreferences by inject<UserPreferences>()
+	private val preferencesRepository by inject<PreferencesRepository>()
+	private var hasCheckUpdateThisSession = false
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		applyTheme()
@@ -86,6 +95,34 @@ class MainActivity : FragmentActivity() {
 		applyTheme()
 
 		interactionTrackerViewModel.activityPaused = false
+
+		// UserConfig: Refresh user remote settings
+		lifecycleScope.launch {
+			preferencesRepository.refreshServerUserSettings()
+		}
+
+		if(hasCheckUpdateThisSession) return
+		// AutoUpdater: Vérifier si l'utilisateur a activé la vérification automatique dans ses préférences
+		lifecycleScope.launch {
+			hasCheckUpdateThisSession = true
+			val isAutoUpdateEnabled = userPreferences[UserPreferences.autoUpdateEnabled] // selon ta gestion de préférences
+			if (isAutoUpdateEnabled) {
+				val checker = CustomUpdateChecker(this@MainActivity)
+				val result = checker.checkForUpdate("https://home2.vlzone.com/jbreaktv/app-update.json")
+
+				if (result is UpdateResult.Available) {
+					// Déclencher le téléchargement direct ou afficher un dialogue d'avertissement
+					val installer = ApkInstaller(this@MainActivity)
+					installer.downloadAndInstall(
+						result.downloadUrl,
+						onProgress = { progress ->
+							// Progression optionnelle
+						},
+						onCancel = { hasCheckUpdateThisSession = true }
+					)
+				}
+			}
+		}
 	}
 
 	private fun validateAuthentication(): Boolean {

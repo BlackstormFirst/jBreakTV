@@ -281,6 +281,8 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		var diskMaxCacheSize = longPreference("diskMaxCacheSize", 250L)
 
 		var memoryMaxCachePercent = intPreference("memoryMaxCachePercent", 25)
+
+		var autoUpdateEnabled = booleanPreference("autoUpdateEnabled", false)
 	}
 
 	init {

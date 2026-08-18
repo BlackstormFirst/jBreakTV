@@ -85,7 +85,7 @@ fun SettingsMainScreen() {
 
 		item {
 			ListButton(
-				leadingContent = { Icon(painterResource(R.drawable.ic_jellyfin), contentDescription = null) },
+				leadingContent = { Icon(painterResource(R.drawable.ic_info), contentDescription = null) },
 				headingContent = { Text(stringResource(R.string.pref_about_title)) },
 				onClick = { router.push(Routes.ABOUT) },
 				modifier = Modifier.focusKey(Routes.ABOUT),

@@ -5,16 +5,11 @@ import static org.koin.java.KoinJavaComponent.inject;
 
 import android.app.AlertDialog;
 import android.content.DialogInterface;
-import android.content.res.Resources;
 import android.os.Handler;
 import android.view.Display;
 import android.view.WindowManager;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.StringRes;
-import androidx.compose.ui.res.StringResources_androidKt;
-
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.data.compat.PlaybackException;
 import org.jellyfin.androidtv.data.compat.StreamInfo;
@@ -45,10 +40,8 @@ import org.jellyfin.sdk.model.api.MediaStream;
 import org.jellyfin.sdk.model.api.MediaStreamType;
 import org.jellyfin.sdk.model.api.PlayMethod;
 import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod;
-import org.jellyfin.sdk.model.api.SubtitlePlaybackMode;
 import org.jellyfin.sdk.model.serializer.UUIDSerializerKt;
 import org.koin.java.KoinJavaComponent;
-import android.content.res.Resources;
 
 import java.time.Duration;
 import java.time.Instant;
