@@ -18,17 +18,17 @@ class LibraryPreferences(
 	api = api,
 ) {
 	companion object {
-		val posterSize = enumPreference("PosterSize", PosterSize.MED)
+		val posterSize = enumPreference("PosterSize", PosterSize.LARGE)
 		val imageType = enumPreference("ImageType", ImageType.POSTER)
-		val gridDirection = enumPreference("GridDirection", GridDirection.HORIZONTAL)
-		val enableSmartScreen = booleanPreference("SmartScreen", false)
+		val gridDirection = enumPreference("GridDirection", GridDirection.VERTICAL)
+		val enableSmartScreen = booleanPreference("SmartScreen", true)
 
 		// Filters
 		val filterFavoritesOnly = booleanPreference("FilterFavoritesOnly", false)
 		val filterUnwatchedOnly = booleanPreference("FilterUnwatchedOnly", false)
 
 		// Item sorting
-		val sortBy = enumPreference("SortBy", ItemSortBy.SORT_NAME)
-		val sortOrder = enumPreference("SortOrder", SortOrder.ASCENDING)
+		val sortBy = enumPreference("SortBy", ItemSortBy.DATE_LAST_CONTENT_ADDED)
+		val sortOrder = enumPreference("SortOrder", SortOrder.DESCENDING)
 	}
 }
