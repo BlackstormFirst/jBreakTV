@@ -45,6 +45,7 @@ class MediaInfoCardView @JvmOverloads constructor(
 			mediaStream.bitRate?.let { addRow("Bitrate", NumberFormat.getInstance().format((it / 1024).toLong()) + " kbps") }
 			if (mediaStream.isDefault) addRow("Default")
 			if (mediaStream.isForced) addRow("Forced")
+			if (mediaStream.isHearingImpaired) addRow("Hearing Impaired (SDH)")
 			if (mediaStream.isExternal) addRow("External")
 		}
 	}
