@@ -89,6 +89,18 @@ fun SettingsCustomizationScreen() {
 			)
 		}
 
+		item {
+			var displayCirclePersonCards by rememberPreference(userPreferences, UserPreferences.displayCirclePersonCards)
+
+			ListButton(
+				headingContent = { Text(stringResource(R.string.pref_actor_thumbnails)) },
+				trailingContent = { Checkbox(checked = displayCirclePersonCards) },
+				captionContent = { Text(stringResource(R.string.pref_actor_thumbnails_desc)) },
+				onClick = { displayCirclePersonCards = !displayCirclePersonCards },
+				modifier = Modifier.focusKey("display_circle_person_cards")
+			)
+		}
+
 		item { ListSection(headingContent = { Text(stringResource(R.string.pref_browsing)) }) }
 
 		item {

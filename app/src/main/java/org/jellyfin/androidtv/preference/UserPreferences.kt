@@ -283,6 +283,8 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		var memoryMaxCachePercent = intPreference("memoryMaxCachePercent", 25)
 
 		var autoUpdateEnabled = booleanPreference("autoUpdateEnabled", false)
+
+		var displayCirclePersonCards = booleanPreference("displayCirclePersonCards", true)
 	}
 
 	init {

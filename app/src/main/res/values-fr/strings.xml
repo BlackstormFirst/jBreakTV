@@ -699,4 +699,6 @@
     <string name="always_default_audio_stream">Utiliser le flux audio par défaut quelle que soit la langue.</string>
     <string name="image_disk_cache_size">Taille du cache disque des images</string>
     <string name="image_memory_cache_size">Taille du cache memoire des images</string>
+    <string name="pref_actor_thumbnails">Forme des vignettes d\'acteurs</string>
+    <string name="pref_actor_thumbnails_desc">Affichage circulaire (ronds) des artistes</string>
 </resources>

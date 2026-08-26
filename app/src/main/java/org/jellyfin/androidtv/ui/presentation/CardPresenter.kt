@@ -53,6 +53,10 @@ import org.jellyfin.design.Tokens
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.compose.koinInject
+import org.jellyfin.androidtv.preference.UserPreferences
+import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 
 class CardPresenter(
 	val showInfo: Boolean,
@@ -137,7 +141,7 @@ private data class BaseRowItemDisplayConfig(
 	val scaleType: ImageView.ScaleType? = null,
 )
 
-private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean): BaseRowItemDisplayConfig = when (baseRowType) {
+private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean, displayCirclePersonCards: Boolean): BaseRowItemDisplayConfig = when (baseRowType) {
 	BaseRowType.BaseItem -> {
 		val preferSeriesPoster = this is BaseItemDtoBaseRowItem && preferSeriesPoster
 		val primaryAspectRatio = baseItem?.primaryImageAspectRatio?.toFloat()
@@ -258,7 +262,11 @@ private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Bo
 	)
 
 	BaseRowType.Person -> BaseRowItemDisplayConfig(
-		aspectRatio = ImageHelper.ASPECT_RATIO_7_9.toFloat(),
+		aspectRatio = if (displayCirclePersonCards) {
+			1.0f
+		} else {
+			ImageHelper.ASPECT_RATIO_7_9.toFloat()
+		},
 		image = getImage(imageType),
 		iconRes = R.drawable.ic_user,
 	)
@@ -288,10 +296,12 @@ private fun CardViewHolderContent(
 ) {
 	val context = LocalContext.current
 	val localDensity = LocalDensity.current
+	val userPreferences = koinInject<UserPreferences>()
+	val displayCirclePersonCards by rememberPreference(userPreferences,UserPreferences.displayCirclePersonCards)
 
 	val title = remember(item, context) { item?.getCardName(context) }
 	val subtitle = remember(item, context) { item?.getSubText(context) }
-	val displayConfig = remember(item, imageType, uniformAspect) { item?.getDisplayConfig(imageType, uniformAspect) }
+	val displayConfig = remember(item, imageType, uniformAspect) { item?.getDisplayConfig(imageType, uniformAspect, displayCirclePersonCards) }
 	if (item == null || displayConfig == null) return
 
 	val image = displayConfig.image
@@ -305,6 +315,12 @@ private fun CardViewHolderContent(
 	}
 
 	val usePreview = displayConfig.overrideShowInfo ?: showInfo
+
+	// Détermination si l'élément courant est une personne
+	val isPersonItem = item.baseRowType == BaseRowType.Person ||
+		item.baseItem?.type == BaseItemKind.PERSON
+
+	val isCircular = isPersonItem && displayCirclePersonCards
 
 	val card = @Composable {
 		ItemCard(
@@ -355,7 +371,7 @@ private fun CardViewHolderContent(
 								Box(
 									modifier = Modifier
 										.fillMaxWidth()
-										.background(Tokens.Color.colorBluegrey900.copy(alpha = 0.6f), JellyfinTheme.shapes.extraSmall),
+										.background(Tokens.Color.colorBluegrey900.copy(alpha = 0.6f), JellyfinTheme.shapes.small),
 								) {
 									Text(
 										text = title,
@@ -375,6 +391,7 @@ private fun CardViewHolderContent(
 			},
 			modifier = Modifier
 				.size(size)
+				.then(if (isCircular) Modifier.clip(CircleShape) else Modifier)
 		)
 	}
 

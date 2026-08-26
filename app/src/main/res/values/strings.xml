@@ -689,4 +689,7 @@
     <string name="always_default_audio_stream">Always use the default audio stream regardless of the language.</string>
     <string name="image_disk_cache_size">Images disk cache size</string>
     <string name="image_memory_cache_size">Imags memory cache size</string>
+    <string name="image_memory_cache_size">Images memory cache size</string>
+    <string name="pref_actor_thumbnails">Actor thumbnails shape</string>
+    <string name="pref_actor_thumbnails_desc">Circular (round) display of artists</string>
 </resources>
