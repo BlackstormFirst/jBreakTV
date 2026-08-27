@@ -108,7 +108,7 @@ class SocketHandler(
 		subscribe<LibraryChangedMessage>()
 			.onEach { message ->
 				message.data?.let(::onLibraryChanged)
-				preferencesRepository.refreshServerUserSettings()
+				//preferencesRepository.refreshServerUserSettings()
 			}
 			.launchIn(coroutineScope)
 
@@ -122,12 +122,14 @@ class SocketHandler(
 			.launchIn(coroutineScope)
 
 		subscribe<UserDataChangedMessage>()
+			/*
 			.onEach { message ->
 				Timber.d("Received UserDataChangedMessage")
 				if (message.data?.userId == api.userApi.getCurrentUser().content.id){
 					preferencesRepository.refreshServerUserSettings()
 				}
 			}
+			 */
 			.launchIn(coroutineScope)
 /*
 		subscribe<SessionsMessage>()
