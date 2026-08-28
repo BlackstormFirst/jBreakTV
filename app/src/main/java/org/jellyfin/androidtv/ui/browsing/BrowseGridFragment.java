@@ -2,6 +2,9 @@ package org.jellyfin.androidtv.ui.browsing;
 
 import static org.koin.java.KoinJavaComponent.inject;
 
+import static java.util.Collections.sort;
+
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.DisplayMetrics;
@@ -11,9 +14,13 @@ import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.PopupWindow;
+import android.widget.ScrollView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -33,6 +40,8 @@ import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.constant.ChangeTriggerType;
 import org.jellyfin.androidtv.constant.CustomMessage;
 import org.jellyfin.androidtv.constant.Extras;
+import org.jellyfin.androidtv.auth.repository.Session;
+import org.jellyfin.androidtv.auth.repository.SessionRepository;
 import org.jellyfin.androidtv.constant.GridDirection;
 import org.jellyfin.androidtv.constant.ImageType;
 import org.jellyfin.androidtv.constant.PosterSize;
@@ -64,11 +73,19 @@ import org.jellyfin.sdk.model.api.BaseItemKind;
 import org.jellyfin.sdk.model.api.CollectionType;
 import org.jellyfin.sdk.model.api.ItemSortBy;
 import org.jellyfin.sdk.model.api.SortOrder;
+import org.jellyfin.sdk.model.api.ItemFilter;
+import org.jellyfin.sdk.model.api.VideoType;
+import org.jellyfin.sdk.model.api.request.GetItemsRequest;
 
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import kotlin.Lazy;
@@ -118,6 +135,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     private final Lazy<ItemLauncher> itemLauncher = inject(ItemLauncher.class);
     private final Lazy<KeyProcessor> keyProcessor = inject(KeyProcessor.class);
     private final Lazy<ApiClient> api = inject(ApiClient.class);
+    private final Lazy<SessionRepository> sessionRepository = inject(SessionRepository.class);
 
     private int mCardsScreenEst = 0;
     private int mCardsScreenStride = 0;
@@ -202,6 +220,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         createGrid();
         loadGrid();
         addTools();
+        mHandler.postDelayed(() -> fetchLibraryGenres(FILTER_CATEGORY_ALL), 800);
     }
 
     @Override
@@ -706,6 +725,8 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     private ImageButton mUnwatchedButton;
     private ImageButton mFavoriteButton;
     private ImageButton mLetterButton;
+    private ImageButton mFilterButton;
+    private FilterOptions mFilterOptions = new FilterOptions();
 
     private void updateDisplayPrefs() {
         CoroutineUtils.runOnLifecycle(getLifecycle(), (coroutineScope, continuation) -> {
@@ -769,11 +790,21 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
                     mAdapter.setFilters(filters);
                     mAdapter.Retrieve();
                     updateDisplayPrefs();
+                    fetchLibraryGenres(FILTER_CATEGORY_ALL);
                 }
             });
             mUnwatchedButton.setContentDescription(getString(R.string.lbl_unwatched));
             binding.toolBar.addView(mUnwatchedButton);
         }
+
+        mFilterButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
+        mFilterButton.setImageResource(R.drawable.ic_filter); // Remplacer par la ressource d'icône souhaitée
+        mFilterButton.setFocusable(true);
+        mFilterButton.setMaxHeight(size);
+        mFilterButton.setAdjustViewBounds(true);
+        mFilterButton.setOnClickListener(v -> showFilterPopupWindow(v));
+        mFilterButton.setContentDescription(getString(R.string.filters));
+        binding.toolBar.addView(mFilterButton);
 
         mFavoriteButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
         mFavoriteButton.setImageResource(R.drawable.ic_heart);
@@ -791,6 +822,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
                 mAdapter.setFilters(filters);
                 mAdapter.Retrieve();
                 updateDisplayPrefs();
+                fetchLibraryGenres(FILTER_CATEGORY_ALL);
             }
         });
         mFavoriteButton.setContentDescription(getString(R.string.lbl_favorite));
@@ -826,6 +858,430 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
             mSettingsButton.setContentDescription(getString(R.string.lbl_settings));
             binding.toolBar.addView(mSettingsButton);
             BrowseGridFragmentHelperKt.addSettings(BrowseGridFragment.this, binding.settings, mFolder.getId(), mFolder.getDisplayPreferencesId(), settingsVisible);
+        }
+    }
+
+    private PopupWindow mFilterPopup = null;
+    private LinearLayout mFilterContainer = null;
+
+    // Affichage du menu déroulant sous forme de PopupWindow
+    private void showFilterPopupWindow(View anchorView) {
+        PopupEmptyBinding popupBinding = PopupEmptyBinding.inflate(getLayoutInflater());
+        mCheckBoxMap.clear();
+
+        android.util.DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+        float density = displayMetrics.density;
+
+        // 1. Définition de la taille de la fenêtre modale (70% de la hauteur écran, 320dp de largeur)
+        int maxHeight = (int) (displayMetrics.heightPixels * 0.70);
+        int popupWidth = (int) (220 * density);
+
+        // 2. Créer le ScrollView parent pour gérer le défilement D-Pad
+        android.widget.ScrollView scrollView = new ScrollView(requireContext()) {
+            @Override
+            public boolean dispatchKeyEvent(KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    if (mFilterPopup != null) {
+                        mFilterPopup.dismiss();
+                        return true;
+                    }
+                }
+                return super.dispatchKeyEvent(event);
+            }
+        };
+        scrollView.setFocusable(false); // Le focus doit aller directement aux éléments enfants (CheckBox/Header)
+        scrollView.setFocusableInTouchMode(false);
+        scrollView.setVerticalScrollBarEnabled(true);
+
+        // 3. Conteneur vertical des filtres
+        android.widget.LinearLayout container = new LinearLayout(requireContext());
+        container.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int padding = (int) (16 * density);
+        container.setPadding(padding, padding, padding, padding);
+        container.setBackgroundColor(0xFF202020);
+        mFilterContainer = container;
+
+        populateFilterMenu(container);
+
+        // Imbrication des vues
+        scrollView.addView(container);
+
+        // 4. Création du PopupWindow avec dimensions contraintes
+        mFilterPopup = new PopupWindow(
+                scrollView,
+                popupWidth,
+                maxHeight,
+                true
+        );
+
+        mFilterPopup.setElevation(10.0f);
+        mFilterPopup.setOnDismissListener(() -> {
+            mFilterPopup = null;
+            mFilterContainer = null;
+        });
+
+        // Fermeture sur D-Pad Gauche
+        scrollView.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                mFilterPopup.dismiss();
+                return true;
+            }
+            return false;
+        });
+
+        // Calcul de l'alignement à droite sous le bouton d'ancrage
+        int xOffset = -popupWidth + anchorView.getWidth();
+        mFilterPopup.showAsDropDown(anchorView, xOffset, 10);
+    }
+
+    private boolean mAudioSectionAdded = false;
+    private boolean mGenreSectionAdded = false;
+    private boolean mTypeSectionAdded = false;
+
+    private void populateFilterMenu(LinearLayout container) {
+        container.removeAllViews();
+        mCheckBoxMap.clear();
+        mAudioSectionAdded = false;
+        mGenreSectionAdded = false;
+        mTypeSectionAdded = false;
+
+        boolean hideMetadataFilters = false;
+        if (mRowDef.getQuery() != null) {
+            Boolean isMissing = mRowDef.getQuery().isMissing();
+            Boolean isUnaired = mRowDef.getQuery().isUnaired();
+            if ((isMissing != null && isMissing) || (isUnaired != null && isUnaired)) {
+                hideMetadataFilters = true;
+            }
+        }
+
+        if (mAvailableGenres.isEmpty() && mAvailableAudio.isEmpty() && !hideMetadataFilters) {
+            TextView loadingText = new TextView(requireContext());
+            loadingText.setText("Chargement des filtres...");
+            loadingText.setTextColor(Color.GRAY);
+            loadingText.setPadding(20, 20, 20, 20);
+            container.addView(loadingText);
+            fetchLibraryGenres(FILTER_CATEGORY_ALL);
+            return;
+        }
+
+        // Section Audio
+        if (!hideMetadataFilters && !mAvailableAudio.isEmpty()) {
+            String[] audioArray = mAvailableAudio.toArray(new String[0]);
+            addExpandableFilterCategory(container, "Audio", audioArray, mAudioCounts, mSelectedAudio, (item, isChecked) -> {
+                if (isChecked) mSelectedAudio.add(item);
+                else mSelectedAudio.remove(item);
+                applyUpdatedFilters(FILTER_CATEGORY_AUDIO);
+            });
+            mAudioSectionAdded = true;
+        }
+
+        // Section Genre
+        if (!hideMetadataFilters && !mAvailableGenres.isEmpty()) {
+            String[] genresArray = mAvailableGenres.toArray(new String[0]);
+            addExpandableFilterCategory(container, getString(R.string.lbl_genres), genresArray, mGenreCounts, mSelectedGenres, (item, isChecked) -> {
+                if (isChecked) mSelectedGenres.add(item);
+                else mSelectedGenres.remove(item);
+                applyUpdatedFilters(FILTER_CATEGORY_GENRE);
+            });
+            mGenreSectionAdded = true;
+        }
+
+        // Section Media Type
+        if (!hideMetadataFilters && mFolder.getCollectionType() == CollectionType.MOVIES) {
+            List<String> typeList = new ArrayList<>(Arrays.asList("4K", "HD", "SD", "3D"));
+            for (VideoType vt : VideoType.values()) {
+                if (vt != VideoType.VIDEO_FILE) {
+                    typeList.add(vt.getSerialName());
+                }
+            }
+            String[] typeArray = typeList.toArray(new String[0]);
+            addExpandableFilterCategory(container, "Type", typeArray, mResolutionCounts, mSelectedTypes, (item, isChecked) -> {
+                if (isChecked) mSelectedTypes.add(item);
+                else mSelectedTypes.remove(item);
+                applyUpdatedFilters(FILTER_CATEGORY_TYPE);
+            });
+            mTypeSectionAdded = true;
+        }
+    }
+
+    private final Set<String> mSelectedGenres = new HashSet<>();
+    private final Set<String> mSelectedAudio = new HashSet<>();
+    private final Set<String> mSelectedTypes = new HashSet<>();
+
+    private final Map<String, CheckBox> mCheckBoxMap = new HashMap<>();
+
+    // Construction des catégories dépliables avec cases à cocher
+    private void addExpandableFilterCategory(
+            android.widget.LinearLayout parent,
+            String categoryTitle,
+            String[] options,
+            Map<String, Integer> counts,
+            java.util.Set<String> selectedItems,
+            OnFilterCheckChangeListener listener
+    ) {
+        android.widget.TextView header = new TextView(requireContext());
+        header.setText("▶ " + categoryTitle);
+        header.setTextSize(16);
+        header.setTextColor(0xFFFFFFFF);
+        header.setPadding(20, 12, 20, 12);
+        header.setFocusable(true);
+        header.setClickable(true);
+
+        // Changement de couleur au focus D-Pad
+        header.setOnFocusChangeListener((v, hasFocus) -> {
+            v.setBackgroundColor(hasFocus ? 0xFF4D4D4D : Color.TRANSPARENT);
+        });
+
+        LinearLayout childContainer = new LinearLayout(requireContext());
+        childContainer.setOrientation(LinearLayout.VERTICAL);
+        childContainer.setPadding(30, 0, 0, 0);
+        childContainer.setVisibility(View.GONE);
+
+        header.setOnClickListener(v -> {
+            boolean isVisible = childContainer.getVisibility() == View.VISIBLE;
+            childContainer.setVisibility(isVisible ? View.GONE : View.VISIBLE);
+            header.setText((isVisible ? "▶ " : "▼ ") + categoryTitle);
+        });
+
+        header.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT) {
+                if (mFilterPopup != null) {
+                    mFilterPopup.dismiss();
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        for (String option : options) {
+            CheckBox checkBox = new CheckBox(requireContext());
+            mCheckBoxMap.put(option, checkBox);
+            int count = (counts != null && counts.containsKey(option)) ? counts.get(option) : 0;
+            checkBox.setText(option + " (" + count + ")");
+            checkBox.setTextColor(count > 0 ? Color.WHITE : Color.GRAY);
+            checkBox.setEnabled(count > 0 || selectedItems.contains(option));
+            checkBox.setPadding(16, 10, 16, 10);
+            checkBox.setFocusable(true);
+            checkBox.setChecked(selectedItems.contains(option));
+
+            checkBox.setOnKeyListener((v, keyCode, event) -> {
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_LEFT) {
+                    if (mFilterPopup != null) {
+                        mFilterPopup.dismiss();
+                        return true;
+                    }
+                }
+                return false;
+            });
+
+            // Changement de couleur au focus D-Pad
+            checkBox.setOnFocusChangeListener((v, hasFocus) -> {
+                v.setBackgroundColor(hasFocus ? 0xFF4D4D4D : Color.TRANSPARENT);
+            });
+
+            checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (listener != null) {
+                    listener.onCheckedChanged(option, isChecked);
+                }
+            });
+            childContainer.addView(checkBox);
+        }
+
+        parent.addView(header);
+        parent.addView(childContainer);
+    }
+
+    // Interface pour le callback des cases à cocher
+    private interface OnFilterCheckChangeListener {
+        void onCheckedChanged(String item, boolean isChecked);
+    }
+
+    // Application des filtres et rechargement de la grille
+    private void applyUpdatedFilters(int sourceCategory) {
+        List<String> genresList = new ArrayList<>(mSelectedGenres);
+        List<String> audioList = new ArrayList<>(mSelectedAudio);
+
+        Boolean is4k = mSelectedTypes.contains("4K") ? true : null;
+        Boolean isHd = mSelectedTypes.contains("HD") ? true : null;
+        if (mSelectedTypes.contains("SD")) {
+            is4k = false;
+            isHd = false;
+        }
+        Boolean is3d = mSelectedTypes.contains("3D") ? true : null;
+
+        List<VideoType> videoTypesList = new ArrayList<>();
+        if (mSelectedTypes.contains("DVD")) videoTypesList.add(VideoType.DVD);
+        if (mSelectedTypes.contains("ISO")) videoTypesList.add(VideoType.ISO);
+        if (mSelectedTypes.contains("BD") || mSelectedTypes.contains("Blu-ray")) videoTypesList.add(VideoType.BLU_RAY);
+
+        List<String> tagsList = new ArrayList<>();
+
+        org.jellyfin.sdk.model.api.request.GetItemsRequest newRequest = FilterLoader.createFilteredGridRequest(
+                mFolder,
+                genresList,
+                audioList,
+                is4k,
+                isHd,
+                is3d,
+                videoTypesList.isEmpty() ? null : videoTypesList,
+                tagsList.isEmpty() ? null : tagsList
+        );
+
+        setRowDef(new BrowseRowDef("", newRequest, CHUNK_SIZE_MINIMUM, false, true));
+        loadGrid();
+        setStatusText(mainTitle);
+
+        // Dynamic update of counts in the menu with a slight delay to prioritize the grid
+        mHandler.postDelayed(() -> fetchLibraryGenres(sourceCategory), 800);
+    }
+
+    private static final int FILTER_CATEGORY_ALL = 0;
+    private static final int FILTER_CATEGORY_AUDIO = 1;
+    private static final int FILTER_CATEGORY_GENRE = 2;
+    private static final int FILTER_CATEGORY_TYPE = 3;
+
+    // Variable pour stocker les genres récupérés du serveur
+    private List<String> mAvailableGenres = new ArrayList<>();
+    private Map<String, Integer> mGenreCounts = new HashMap<>();
+    private List<String> mAvailableAudio = new ArrayList<>();
+    private Map<String, Integer> mAudioCounts = new HashMap<>();
+    private Map<String, Integer> mResolutionCounts = new HashMap<>();
+
+    // Méthode d'appel au SDK Jellyfin pour charger les genres
+    private void fetchLibraryGenres(int excludedCategory) {
+        if (mParentId == null) return;
+
+        UUID userId = null;
+        Session session = sessionRepository.getValue().getCurrentSession().getValue();
+        if (session != null) {
+            userId = session.getUserId();
+        }
+
+        GetItemsRequest baseRequest = BrowsingUtils.createBrowseGridItemsRequest(mFolder);
+        List<BaseItemKind> includeItemTypes = null;
+        if (baseRequest.getIncludeItemTypes() != null) {
+            includeItemTypes = new ArrayList<>(baseRequest.getIncludeItemTypes());
+        }
+
+        final List<BaseItemKind> finalIncludeItemTypes = includeItemTypes;
+        final UUID finalUserId = userId;
+
+        // Prepare current context for intersection counts
+        List<String> currentGenres = new ArrayList<>(mSelectedGenres);
+        List<String> currentAudio = new ArrayList<>(mSelectedAudio);
+        Boolean is4k = mSelectedTypes.contains("4K") ? true : null;
+        Boolean isHd = mSelectedTypes.contains("HD") ? true : null;
+        if (mSelectedTypes.contains("SD")) { is4k = false; isHd = false; }
+        Boolean is3d = mSelectedTypes.contains("3D") ? true : null;
+        List<VideoType> videoTypesList = new ArrayList<>();
+        if (mSelectedTypes.contains("DVD")) videoTypesList.add(VideoType.DVD);
+        if (mSelectedTypes.contains("ISO")) videoTypesList.add(VideoType.ISO);
+        if (mSelectedTypes.contains("BD") || mSelectedTypes.contains("Blu-ray")) videoTypesList.add(VideoType.BLU_RAY);
+
+        List<ItemFilter> itemFilters = new ArrayList<>(mAdapter.getFilters().getFilters());
+
+        // Fetch Audio with intersection counts (apply Genre/Type filters)
+        if (excludedCategory != FILTER_CATEGORY_AUDIO) {
+            FilterLoader.loadAudioLanguages(
+                    api.getValue(),
+                    mParentId,
+                    finalUserId,
+                    finalIncludeItemTypes,
+                    currentGenres, is4k, isHd, is3d,
+                    videoTypesList.isEmpty() ? null : videoTypesList,
+                    itemFilters,
+                    languages -> {
+                        mAudioCounts = languages;
+                        // Only update list if it was empty
+                        if (mAvailableAudio.isEmpty()) {
+                            mAvailableAudio = new ArrayList<>(languages.keySet());
+                            sort(mAvailableAudio);
+                        }
+                        updateMenuLabels(languages);
+                    }
+            );
+        }
+
+        // Fetch Genres with intersection counts (apply Audio/Type filters)
+        if (excludedCategory != FILTER_CATEGORY_GENRE) {
+            FilterLoader.loadGenres(
+                    api.getValue(),
+                    mParentId,
+                    finalUserId,
+                    finalIncludeItemTypes,
+                    currentAudio, is4k, isHd, is3d,
+                    videoTypesList.isEmpty() ? null : videoTypesList,
+                    itemFilters,
+                    genres -> {
+                        mGenreCounts = genres;
+                        // Only update list if it was empty (initial load)
+                        if (mAvailableGenres.isEmpty()) {
+                            mAvailableGenres = new ArrayList<>(genres.keySet());
+                            sort(mAvailableGenres);
+                        }
+                        updateMenuLabels(genres);
+                    }
+            );
+        }
+
+        // Fetch Resolutions with intersection counts (apply Genre/Audio filters)
+        if (excludedCategory != FILTER_CATEGORY_TYPE && mFolder.getCollectionType() == CollectionType.MOVIES) {
+            FilterLoader.loadResolutionCounts(
+                    api.getValue(),
+                    mParentId,
+                    finalUserId,
+                    finalIncludeItemTypes,
+                    currentGenres,
+                    currentAudio,
+                    itemFilters,
+                    counts -> {
+                        mResolutionCounts = counts;
+                        updateMenuLabels(counts);
+                    }
+            );
+        }
+    }
+
+    private void updateMenuLabels(Map<String, Integer> counts) {
+        if (mFilterPopup == null || mFilterContainer == null) return;
+
+        // Check if we need to repopulate because a new section is available
+        boolean shouldRepopulate = false;
+
+        // If showing loading text
+        if (mFilterContainer.getChildCount() > 0 && mFilterContainer.getChildAt(0) instanceof TextView) {
+            String text = ((TextView)mFilterContainer.getChildAt(0)).getText().toString();
+            if (text.equals("Chargement des filtres...")) {
+                if (!mAvailableGenres.isEmpty() || !mAvailableAudio.isEmpty()) {
+                    shouldRepopulate = true;
+                }
+            }
+        }
+
+        // If audio data just arrived but section is not in menu
+        if (!mAudioSectionAdded && !mAvailableAudio.isEmpty()) shouldRepopulate = true;
+        // If genre data just arrived but section is not in menu
+        if (!mGenreSectionAdded && !mAvailableGenres.isEmpty()) shouldRepopulate = true;
+
+        if (shouldRepopulate) {
+            populateFilterMenu(mFilterContainer);
+            return;
+        }
+
+        // Global update using the latest stored counts for all categories
+        for (Map.Entry<String, CheckBox> entry : mCheckBoxMap.entrySet()) {
+            String name = entry.getKey();
+            CheckBox cb = entry.getValue();
+
+            // Search for the count in the three maps, default to 0 if not found
+            Integer count = mGenreCounts.get(name);
+            if (count == null) count = mAudioCounts.get(name);
+            if (count == null) count = mResolutionCounts.get(name);
+
+            int finalCount = (count != null) ? count : 0;
+            cb.setText(name + " (" + finalCount + ")");
+            cb.setTextColor(finalCount > 0 ? Color.WHITE : Color.GRAY);
+            cb.setEnabled(finalCount > 0 || cb.isChecked());
         }
     }
 
