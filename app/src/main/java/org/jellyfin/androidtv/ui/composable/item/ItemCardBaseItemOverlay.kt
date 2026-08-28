@@ -49,10 +49,24 @@ fun ItemCardBaseItemOverlay(
 		modifier = Modifier.align(Alignment.TopStart),
 	)
 
-	WatchIndicator(
-		item = item,
+	Box(
 		modifier = Modifier.align(Alignment.TopEnd)
-	)
+	) {
+		WatchIndicator(
+			item = item,
+		)
+	}
+
+	if (item.userData?.isFavorite == true) {
+		Icon(
+			imageVector = ImageVector.vectorResource(R.drawable.ic_heart),
+			contentDescription = null,
+			tint = Tokens.Color.colorRed500,
+			modifier = Modifier
+				.align(Alignment.BottomEnd)
+				.size(20.dp)
+		)
+	}
 
 	Column(
 		modifier = Modifier.align(Alignment.BottomCenter),
@@ -72,7 +86,6 @@ private fun StateIndicator(
 	item: BaseItemDto,
 	modifier: Modifier = Modifier,
 ) {
-	val isFavorited = item.userData?.isFavorite == true
 	val isRecording = item.timerId?.takeIf { item.type == BaseItemKind.LIVE_TV_PROGRAM || item.type == BaseItemKind.PROGRAM } != null
 	val isRecordingActive = item.seriesTimerId != null && isRecording
 
@@ -85,17 +98,7 @@ private fun StateIndicator(
 				imageVector = ImageVector.vectorResource(R.drawable.ic_record_series),
 				contentDescription = null,
 				tint = if (isRecordingActive) Tokens.Color.colorRed600 else Tokens.Color.colorGrey100,
-				modifier = modifier
-					.size(24.dp)
-			)
-		}
-
-		if (isFavorited) {
-			Icon(
-				imageVector = ImageVector.vectorResource(R.drawable.ic_heart),
-				contentDescription = null,
-				tint = Tokens.Color.colorRed500,
-				modifier = modifier
+				modifier = Modifier
 					.size(24.dp)
 			)
 		}
