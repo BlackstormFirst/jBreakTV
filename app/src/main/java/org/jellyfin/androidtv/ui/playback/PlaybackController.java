@@ -1264,6 +1264,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         wasSeeking = false;
         burningSubs = false;
         mCurrentStreamInfo = null;
+        currentSkipPos = 0;
+        if (mHandler != null) {
+            mHandler.removeCallbacks(skipRunnable);
+        }
     }
 
     public void next() {
