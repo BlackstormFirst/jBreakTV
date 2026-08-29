@@ -15,6 +15,7 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -179,6 +180,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		mediaManager.addAudioEventListener(this)
 	}
 
+	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+		super.onViewCreated(view, savedInstanceState)
+		// Optimization for vertical scrolling: prevent rows from being unloaded immediately
+		verticalGridView?.setItemViewCacheSize(10)
+	}
+
 	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
 		if (event?.action != KeyEvent.ACTION_UP) return false
 		return keyProcessor.handleKey(keyCode, currentItem, activity)
@@ -264,6 +271,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	private inner class ItemViewSelectedListener : OnItemViewSelectedListener {
+		private var backgroundJob: Job? = null
+
 		override fun onItemSelected(
 			itemViewHolder: Presenter.ViewHolder?,
 			item: Any?,
@@ -272,7 +281,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		) {
 			if (item !is BaseRowItem) {
 				currentItem = null
-				//fill in default background
+				backgroundJob?.cancel()
 				backgroundService.clearBackgrounds()
 			} else {
 				currentItem = item
@@ -281,7 +290,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				val itemRowAdapter = row.adapter as? ItemRowAdapter
 				itemRowAdapter?.loadMoreItemsIfNeeded(itemRowAdapter.indexOf(item))
 
-				backgroundService.setBackground(item.baseItem)
+				// Delay background update to avoid jank during navigation
+				backgroundJob?.cancel()
+				backgroundJob = lifecycleScope.launch {
+					delay(500)
+					backgroundService.setBackground(item.baseItem)
+				}
 			}
 		}
 	}

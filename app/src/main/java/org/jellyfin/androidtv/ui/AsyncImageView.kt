@@ -12,7 +12,9 @@ import androidx.core.view.doOnAttach
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import coil3.ImageLoader
+import coil3.asDrawable
 import coil3.asImage
+import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.target
@@ -68,6 +70,17 @@ class AsyncImageView @JvmOverloads constructor(
 		aspectRatio: Double = 1.0,
 		blurHashResolution: Int = 32,
 	) = doOnAttach {
+		// 1. Quick memory cache check to avoid BlurHash decoding and flickering
+		if (url != null) {
+			val cacheKey = MemoryCache.Key(url)
+			val cachedImage = imageLoader.memoryCache?.get(cacheKey)?.image
+			if (cachedImage != null) {
+				loadJob?.cancel()
+				this.setImageDrawable(cachedImage.asDrawable(resources))
+				return@doOnAttach
+			}
+		}
+
 		// Cancel the previous load if still running
 		loadJob?.cancel()
 

@@ -253,6 +253,10 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         mGridView.setHorizontalSpacing(mGridItemSpacingHorizontal);
         mGridView.setVerticalSpacing(mGridItemSpacingVertical);
         mGridView.setFocusable(true);
+
+        // Optimization for vertical scrolling fluidity: increase cache to prevent aggressive recycling
+        mGridView.setItemViewCacheSize(20);
+
         binding.rowsFragment.removeAllViews();
         binding.rowsFragment.addView(mGridViewHolder.view);
 
