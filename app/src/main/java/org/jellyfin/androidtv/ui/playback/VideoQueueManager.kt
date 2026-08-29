@@ -15,6 +15,7 @@ class VideoQueueManager {
 	private var _lastPlayedSubtitleHearingImpairedState: Boolean = false
 	private var _lastPlayedSubtitleLanguageIsoCode: String? = null
 	private var _lastPlayedSubtitleTitle: String? = null
+	private var _lastPlayedVideoDefaultState: Boolean? = null
 
 	fun setCurrentVideoQueue(items: List<BaseItemDto>?) {
 		if (items.isNullOrEmpty()) return clearVideoQueue()
@@ -62,6 +63,14 @@ class VideoQueueManager {
 
 	fun setLastPlayedAudioLanguageIsoCode(isoCode: String) {
 		_lastPlayedAudioLanguageIsoCode = isoCode
+	}
+
+	fun getLastPlayedVideoDefaultState(): Boolean? {
+		return _lastPlayedVideoDefaultState
+	}
+
+	fun setLastPlayedVideoDefaultState(state: Boolean?) {
+		_lastPlayedVideoDefaultState = state
 	}
 
 	fun getLastPlayedSubtitleCodec(): String? {
@@ -125,5 +134,6 @@ class VideoQueueManager {
 		_lastPlayedSubtitleHearingImpairedState = false
 		_lastPlayedSubtitleLanguageIsoCode = null
 		_lastPlayedSubtitleTitle = null
+		_lastPlayedVideoDefaultState = null
 	}
 }

@@ -258,6 +258,7 @@
     <string name="lbl_tv_channel_status">%1$d sur %2$d canaux</string>
     <string name="lbl_subtitle_track">Choisir la piste de sous-titres</string>
     <string name="lbl_audio_track">Choisir la piste audio</string>
+    <string name="lbl_video_track">Choisir la piste vidéo</string>
     <string name="lbl_pause">Pause</string>
     <string name="lbl_playback_control_ends">Se termine à %1$s</string>
     <string name="lbl_sign_in">Veuillez vous connecter</string>

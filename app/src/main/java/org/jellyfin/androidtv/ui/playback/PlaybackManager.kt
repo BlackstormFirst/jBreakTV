@@ -16,6 +16,7 @@ import org.jellyfin.sdk.api.client.extensions.videosApi
 import org.jellyfin.sdk.model.api.PlayMethod
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
 import org.jellyfin.sdk.model.api.PlaybackInfoResponse
+import timber.log.Timber
 
 private fun createStreamInfo(
 	api: ApiClient,
@@ -33,6 +34,8 @@ private fun createStreamInfo(
 
 	if (source == null) return@apply
 
+	Timber.d("PlaybackManager: Creating stream info. Video stream index: ${options.videoStreamIndex}")
+
 	if (options.enableDirectPlay && source.supportsDirectPlay) {
 		playMethod = PlayMethod.DIRECT_PLAY
 		container = source.container
@@ -45,17 +48,28 @@ private fun createStreamInfo(
 				static = true,
 				tag = source.eTag,
 				liveStreamId = source.liveStreamId,
+				videoStreamIndex = options.videoStreamIndex,
 			)
 		}
 	} else if (options.enableDirectStream && source.supportsDirectStream) {
 		playMethod = PlayMethod.DIRECT_STREAM
 		container = source.transcodingContainer
 		mediaUrl = api.createUrl(requireNotNull(source.transcodingUrl), ignorePathParameters = true)
+		// Bypass: Force server to understand and set another index than 0 through the url
+		if (options.videoStreamIndex != null) {
+			mediaUrl += "&VideoStreamIndex=${options.videoStreamIndex}"
+		}
 	} else if (source.supportsTranscoding) {
 		playMethod = PlayMethod.TRANSCODE
 		container = source.transcodingContainer
 		mediaUrl = api.createUrl(requireNotNull(source.transcodingUrl), ignorePathParameters = true)
+		// Bypass: Force server to understand and set another index than 0 through the url
+		if (options.videoStreamIndex != null) {
+			mediaUrl += "&VideoStreamIndex=${options.videoStreamIndex}"
+		}
 	}
+
+	Timber.d("PlaybackManager: Final media URL for $playMethod: $mediaUrl")
 }
 
 class PlaybackManager(
@@ -67,6 +81,7 @@ class PlaybackManager(
 		startTimeTicks: Long,
 		callback: Response<StreamInfo>,
 	) = lifecycleOwner.lifecycleScope.launch {
+		Timber.d("PlaybackManager: Requesting stream info for item ${options.itemId} at $startTimeTicks. Video index: ${options.videoStreamIndex}")
 		getVideoStreamInfoInternal(options, startTimeTicks).fold(
 			onSuccess = { callback.onResponse(it) },
 			onFailure = { callback.onError(Exception(it)) },
@@ -80,6 +95,7 @@ class PlaybackManager(
 		startTimeTicks: Long,
 		callback: Response<StreamInfo>
 	) = lifecycleOwner.lifecycleScope.launch {
+		Timber.d("PlaybackManager: Refreshing stream due to change. New video index: ${options.videoStreamIndex}")
 		if (stream.playSessionId != null && stream.playMethod != PlayMethod.DIRECT_PLAY) {
 			withContext(Dispatchers.IO) {
 				api.hlsSegmentApi.stopEncodingProcess(api.deviceInfo.id, stream.playSessionId)

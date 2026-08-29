@@ -203,6 +203,7 @@
     <string name="lbl_stretch">Stretch</string>
     <string name="lbl_fit">Normal</string>
     <string name="lbl_audio_track">Select audio track</string>
+    <string name="lbl_video_track">Select video track</string>
     <string name="lbl_playback_speed">Playback speed</string>
     <string name="lbl_quality_profile">Quality profile</string>
     <string name="lbl_subtitle_track">Select subtitle track</string>

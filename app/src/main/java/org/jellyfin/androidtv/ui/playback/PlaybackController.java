@@ -83,6 +83,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     protected VideoOptions mCurrentOptions;
     private int mDefaultAudioIndex = -1;
+    private int mDefaultVideoIndex = -1;
     protected boolean burningSubs = false;
 
     // The server does not update the subtitle delivery method when alwaysBurnInSubtitleWhenTranscoding
@@ -223,6 +224,21 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     public boolean isLiveTv() {
         return isLiveTv;
+    }
+
+    public int getVideoStreamIndex() {
+        if (mCurrentOptions != null && mCurrentOptions.getVideoStreamIndex() != null)
+            return mCurrentOptions.getVideoStreamIndex();
+
+        if (mCurrentStreamInfo != null && mCurrentStreamInfo.getMediaSource() != null && mCurrentStreamInfo.getMediaSource().getMediaStreams() != null) {
+            for (MediaStream stream : mCurrentStreamInfo.getMediaSource().getMediaStreams()) {
+                if (stream.getType() == MediaStreamType.VIDEO && stream.isDefault()) {
+                    return stream.getIndex();
+                }
+            }
+        }
+
+        return -1;
     }
 
     public int getSubtitleStreamIndex() {
@@ -521,6 +537,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (playbackRetries > 0 || (isLiveTv && !directStreamLiveTv)) internalOptions.setEnableDirectPlay(false);
         if (playbackRetries > 1) internalOptions.setEnableDirectStream(false);
         MediaSourceInfo currentMediaSource = getCurrentMediaSource();
+        internalOptions.setVideoStreamIndex(getBestVideoIndex(currentMediaSource));
         if (forcedSubtitleIndex != null) {
             internalOptions.setSubtitleStreamIndex(forcedSubtitleIndex);
         }else{
@@ -545,7 +562,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             TvManager.setLastLiveTvChannel(item.getId());
             //internal/exo player
             Timber.i("Using internal player for Live TV");
-            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<StreamInfo>(mFragment.getLifecycle()) {
+            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<>(mFragment.getLifecycle()) {
                 @Override
                 public void onResponse(StreamInfo response) {
                     if (!isActive()) return;
@@ -562,7 +579,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 }
             });
         } else {
-            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<StreamInfo>(mFragment.getLifecycle()) {
+            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<>(mFragment.getLifecycle()) {
                 @Override
                 public void onResponse(StreamInfo internalResponse) {
                     if (!isActive()) return;
@@ -613,9 +630,6 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             return;
         }
 
-        Timber.d("reset audio stream index to null");
-        mCurrentOptions.setAudioStreamIndex(null); // reset audio stream index to allow auto selection on new item
-
         mStartPosition = position;
         mCurrentStreamInfo = response;
         mCurrentOptions.setMediaSourceId(response.getMediaSource().getId());
@@ -632,6 +646,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             return;
         }
 
+        setDefaultVideoIndex(response);
         setDefaultAudioIndex(response);
         var bSubIndex = getBestSubtitleIndex(response.getMediaSource());
         var mSubIndex = mCurrentOptions.getSubtitleStreamIndex();
@@ -1117,18 +1132,99 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         return matchingIndex;
     }
 
+    private void setDefaultVideoIndex(StreamInfo info) {
+        if (mDefaultVideoIndex == -1) {
+            Integer bestIndex = getBestVideoIndex(info.getMediaSource());
+            if (bestIndex != null) mDefaultVideoIndex = bestIndex;
+            Timber.d("default video index set to %s", mDefaultVideoIndex);
+        }
+        if (mCurrentOptions != null && mDefaultVideoIndex != -1) {
+            mCurrentOptions.setVideoStreamIndex(mDefaultVideoIndex);
+        }
+    }
+
+    private Integer getBestVideoIndex(MediaSourceInfo info) {
+        if (info != null && info.getMediaStreams() != null) {
+            Boolean lastVideoDefaultState = videoQueueManager.getValue().getLastPlayedVideoDefaultState();
+            List<MediaStream> allVideoStreams = info.getMediaStreams().stream().filter(stream -> stream.getType() == MediaStreamType.VIDEO).toList();
+            if (allVideoStreams != null) {
+                if (lastVideoDefaultState != null) {
+                    for (MediaStream stream : allVideoStreams) {
+                        if (lastVideoDefaultState.equals(stream.isDefault())) {
+                            return stream.getIndex();
+                        }
+                    }
+                }
+                // fallback to server default
+                for (MediaStream stream : allVideoStreams) {
+                    if (stream.isDefault()) {
+                        return stream.getIndex();
+                    }
+                }
+                // last resort: first video stream
+                if (!allVideoStreams.isEmpty()) return allVideoStreams.get(0).getIndex();
+            }
+        }
+        return null;
+    }
+
     private void setDefaultAudioIndex(StreamInfo info) {
-        if (mDefaultAudioIndex != -1)
+        if (mDefaultAudioIndex == -1) {
+            Integer lastChosenLanguage = getBestAudioIndex(info.getMediaSource());
+            Integer bestGuess = bestGuessAudioTrack(info.getMediaSource());
+
+            if (lastChosenLanguage != null)
+                mDefaultAudioIndex = lastChosenLanguage;
+            else if (bestGuess != null)
+                mDefaultAudioIndex = bestGuess;
+            Timber.d("default audio index set to %s", mDefaultAudioIndex);
+        }
+        if (mCurrentOptions != null && mDefaultAudioIndex != -1) {
+            mCurrentOptions.setAudioStreamIndex(mDefaultAudioIndex);
+        }
+    }
+
+    public void switchVideoStream(int index) {
+        if (!(isPlaying() || isPaused()) || index < 0)
             return;
 
-        Integer lastChosenLanguage = getBestAudioIndex(info.getMediaSource());
-        Integer bestGuess = bestGuessAudioTrack(info.getMediaSource());
+        MediaSourceInfo currentMediaSource = getCurrentMediaSource();
+        if (currentMediaSource == null
+                || currentMediaSource.getMediaStreams() == null
+                || index >= currentMediaSource.getMediaStreams().size()) {
+            return;
+        }
 
-        if (lastChosenLanguage != null)
-            mDefaultAudioIndex = lastChosenLanguage;
-        else if (bestGuess != null)
-            mDefaultAudioIndex = bestGuess;
-        Timber.d("default audio index set to %s", mDefaultAudioIndex);
+        MediaStream currentMediaStream = currentMediaSource.getMediaStreams().get(index);
+        videoQueueManager.getValue().setLastPlayedVideoDefaultState(currentMediaStream.isDefault());
+
+        int currVideoIndex = getVideoStreamIndex();
+        Timber.i("trying to switch video stream from %s to %s", currVideoIndex, index);
+        if (currVideoIndex == index) {
+            Timber.d("skipping setting video stream, already set to requested index %s", index);
+            if (mCurrentOptions.getVideoStreamIndex() == null || mCurrentOptions.getVideoStreamIndex() != index) {
+                Timber.i("setting mCurrentOptions video stream index from %s to %s", mCurrentOptions.getVideoStreamIndex(), index);
+                mCurrentOptions.setVideoStreamIndex(index);
+            }
+            return;
+        }
+
+        // get current timestamp first
+        refreshCurrentPosition();
+
+        if (!isTranscoding() && mVideoManager.setExoPlayerTrack(index, MediaStreamType.VIDEO, currentMediaSource.getMediaStreams())) {
+            mCurrentOptions.setMediaSourceId(currentMediaSource.getId());
+            mCurrentOptions.setVideoStreamIndex(index);
+            mDefaultVideoIndex = index;
+        } else {
+            startSpinner();
+            mCurrentOptions.setMediaSourceId(currentMediaSource.getId());
+            mCurrentOptions.setVideoStreamIndex(index);
+            stop();
+            mDefaultVideoIndex = index;
+            playInternal(getCurrentlyPlayingItem(), mCurrentPosition, mCurrentOptions);
+            mPlaybackState = PlaybackState.BUFFERING;
+        }
     }
 
     public void switchAudioStream(int index) {
@@ -1168,11 +1264,13 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (!isTranscoding() && mVideoManager.setExoPlayerTrack(index, MediaStreamType.AUDIO, currentMediaSource.getMediaStreams())) {
             mCurrentOptions.setMediaSourceId(currentMediaSource.getId());
             mCurrentOptions.setAudioStreamIndex(index);
+            mDefaultAudioIndex = index;
         } else {
             startSpinner();
             mCurrentOptions.setMediaSourceId(currentMediaSource.getId());
             mCurrentOptions.setAudioStreamIndex(index);
             stop();
+            mDefaultAudioIndex = index;
             playInternal(getCurrentlyPlayingItem(), mCurrentPosition, mCurrentOptions);
             mPlaybackState = PlaybackState.BUFFERING;
         }
@@ -1259,6 +1357,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     private void clearPlaybackSessionOptions() {
         Timber.d("Clear Playback Session Options.");
         mDefaultAudioIndex = -1;
+        mDefaultVideoIndex = -1;
         mSeekPosition = -1;
         finishedInitialSeek = false;
         wasSeeking = false;
@@ -1608,6 +1707,18 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 eligibleAudioTrack = getCurrentMediaSource().getDefaultAudioStreamIndex();
             }
             switchAudioStream(eligibleAudioTrack);
+
+            // Correctif Direct Play : On force la piste vidéo au démarrage car ExoPlayer ignore
+            // souvent la sélection initiale lors de l'ouverture d'un fichier brut.
+            if (mCurrentStreamInfo.getPlayMethod() == PlayMethod.DIRECT_PLAY) {
+                int eligibleVideoTrack = mDefaultVideoIndex;
+                if (mCurrentOptions != null && mCurrentOptions.getVideoStreamIndex() != null) {
+                    eligibleVideoTrack = mCurrentOptions.getVideoStreamIndex();
+                }
+                if (eligibleVideoTrack != -1) {
+                    mVideoManager.setExoPlayerTrack(eligibleVideoTrack, MediaStreamType.VIDEO, getCurrentMediaSource().getMediaStreams());
+                }
+            }
         }
     }
 

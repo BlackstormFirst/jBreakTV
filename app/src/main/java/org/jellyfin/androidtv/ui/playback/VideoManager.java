@@ -496,10 +496,19 @@ public class VideoManager {
     }
 
     public boolean setExoPlayerTrack(int index, @Nullable org.jellyfin.sdk.model.api.MediaStreamType streamType, @Nullable List<org.jellyfin.sdk.model.api.MediaStream> allStreams) {
-        if (!isInitialized() || allStreams == null || allStreams.isEmpty() || streamType != org.jellyfin.sdk.model.api.MediaStreamType.SUBTITLE && streamType != org.jellyfin.sdk.model.api.MediaStreamType.AUDIO)
+        if (!isInitialized() || allStreams == null || allStreams.isEmpty() || (streamType != org.jellyfin.sdk.model.api.MediaStreamType.SUBTITLE && streamType != org.jellyfin.sdk.model.api.MediaStreamType.AUDIO && streamType != org.jellyfin.sdk.model.api.MediaStreamType.VIDEO))
             return false;
 
-        int chosenTrackType = streamType == org.jellyfin.sdk.model.api.MediaStreamType.SUBTITLE ? C.TRACK_TYPE_TEXT : C.TRACK_TYPE_AUDIO;
+        int chosenTrackType;
+        if (streamType == org.jellyfin.sdk.model.api.MediaStreamType.SUBTITLE) {
+            chosenTrackType = C.TRACK_TYPE_TEXT;
+        } else if (streamType == org.jellyfin.sdk.model.api.MediaStreamType.AUDIO) {
+            chosenTrackType = C.TRACK_TYPE_AUDIO;
+        } else if (streamType == org.jellyfin.sdk.model.api.MediaStreamType.VIDEO) {
+            chosenTrackType = C.TRACK_TYPE_VIDEO;
+        } else {
+            return false;
+        }
 
         // Make sure the index is present
         Optional<MediaStream> candidateOptional = allStreams.stream().filter(stream -> stream.getIndex() == index && !stream.isExternal() && stream.getType() == streamType).findFirst();

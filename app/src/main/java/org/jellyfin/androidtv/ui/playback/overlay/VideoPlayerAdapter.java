@@ -108,6 +108,11 @@ public class VideoPlayerAdapter extends PlayerAdapter {
         return StreamHelper.getAudioStreams(playbackController.getCurrentMediaSource()).size() > 1;
     }
 
+    public boolean hasMultiVideo() {
+        if (playbackController.getCurrentStreamInfo() == null) return false;
+        return playbackController.getCurrentStreamInfo().getSelectableStreams(org.jellyfin.sdk.model.api.MediaStreamType.VIDEO).size() > 1;
+    }
+
     boolean hasNextItem() {
         return playbackController.hasNextItem();
     }
