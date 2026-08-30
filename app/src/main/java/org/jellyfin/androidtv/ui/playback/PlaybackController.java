@@ -630,6 +630,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             return;
         }
 
+        Timber.d("reset audio and video stream index to null");
+        mCurrentOptions.setVideoStreamIndex(null);
+        mCurrentOptions.setAudioStreamIndex(null); // reset audio stream index to allow auto selection on new item
+
         mStartPosition = position;
         mCurrentStreamInfo = response;
         mCurrentOptions.setMediaSourceId(response.getMediaSource().getId());
@@ -985,7 +989,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 return -1;
             } else if (info.getMediaStreams() != null) {
                 // find the best matching subtitle stream
-                String currentAudioStreamIsoCode = (mCurrentOptions.getAudioStreamIndex() != null) ? info.getMediaStreams().get(mCurrentOptions.getAudioStreamIndex()).getLanguage() : null;
+                //String currentAudioStreamIsoCode = (mCurrentOptions.getAudioStreamIndex() != null) ? info.getMediaStreams().get(mCurrentOptions.getAudioStreamIndex()).getLanguage() : null;
                 String lastAudioLanguageIsoCode = videoQueueManager.getValue().getLastPlayedAudioLanguageIsoCode();
                 String lastSubtitleCodec = videoQueueManager.getValue().getLastPlayedSubtitleCodec();
                 Boolean lastSubtitleDefaultState = videoQueueManager.getValue().getLastPlayedSubtitleDefaultState();
@@ -1343,7 +1347,6 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         mFragment = null;
         mVideoManager = null;
         resetPlayerErrors();
-        videoQueueManager.getValue().clearVideoQueue();
     }
 
     public void endPlayback() {
