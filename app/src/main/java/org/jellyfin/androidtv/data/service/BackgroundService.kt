@@ -109,9 +109,19 @@ class BackgroundService(
 		loadBackgroundsJob?.cancel()
 		loadBackgroundsJob = scope.launch(Dispatchers.IO) {
 			_backgrounds = backdropUrls.mapNotNull { url ->
-				imageLoader.execute(
-					request = ImageRequest.Builder(context).data(url).build()
-				).image?.toBitmap()?.asImageBitmap()
+				val request = ImageRequest.Builder(context)
+					.data(url)
+					.apply {
+						// On Android versions older than 12 (API 31), Modifier.blur() is not supported in Compose.
+						// As a workaround, we downscale the image significantly during loading.
+						// When scaled back up to fill the screen, the bilinear filtering creates a natural blur effect.
+						if (android.os.Build.VERSION.SDK_INT < 31 && _blurBackground.value) {
+							size(240, 135)
+						}
+					}
+					.build()
+
+				imageLoader.execute(request).image?.toBitmap()?.asImageBitmap()
 			}
 
 			// Go to first background
