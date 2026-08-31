@@ -651,10 +651,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         setDefaultVideoIndex(response);
-        setDefaultAudioIndex(response);
         var bSubIndex = getBestSubtitleIndex(response.getMediaSource());
         var mSubIndex = mCurrentOptions.getSubtitleStreamIndex();
         PlaybackControllerHelperKt.setSubtitleIndex(this, bSubIndex, (mSubIndex == null || !Objects.equals(mSubIndex, bSubIndex)));
+        setDefaultAudioIndex(response);
         Timber.i("default audio index set to %s remote default %s", mDefaultAudioIndex, response.getMediaSource().getDefaultAudioStreamIndex());
         Timber.i("default sub index set to %s remote default %s", mSubIndex, response.getMediaSource().getDefaultSubtitleStreamIndex());
 
@@ -1007,20 +1007,32 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                     if (matchingIndex == null) {
                         if (userSubMode.equals(R.string.subtitle_mode_smart)){
                             if (!userAudioLangRemoteSetting.equals(lastAudioLanguageIsoCode)){
+                                for (MediaStream stream : allSubtitleStreams) {
+                                    if (userSubLangRemoteSetting.equals(stream.getLanguage())
+                                            && lastSubtitleDefaultState.equals(stream.isDefault())
+                                            && stream.isForced()
+                                            && lastSubtitleCodec.equals(stream.getCodec())
+                                            && lastSubtitleHearingImpairedState.equals(stream.isHearingImpaired())
+                                    ) {
+                                        Timber.d("Best smart subtitle found ! (lang+all)");
+                                        matchingIndex = stream.getIndex();
+                                        break;
+                                    }
+                                }
                                 if (matchingIndex == null) {
-                                        for (MediaStream stream : allSubtitleStreams) {
-                                            if (userSubLangRemoteSetting.equals(stream.getLanguage())
-                                                    && lastSubtitleDefaultState.equals(stream.isDefault())
-                                                    && stream.isForced()
-                                                    && lastSubtitleCodec.equals(stream.getCodec())
-                                                    && lastSubtitleHearingImpairedState.equals(stream.isHearingImpaired())
-                                            ) {
-                                                Timber.d("Best smart subtitle found ! (lang+all)");
-                                                matchingIndex = stream.getIndex();
-                                                break;
-                                            }
+                                    for (MediaStream stream : allSubtitleStreams) {
+                                        if (userSubLangRemoteSetting.equals(stream.getLanguage())
+                                                && stream.isForced()
+                                                && lastSubtitleCodec.equals(stream.getCodec())
+                                                && lastSubtitleHearingImpairedState.equals(stream.isHearingImpaired())
+                                        ) {
+                                            Timber.d("Best smart subtitle found ! (lang+forced+SDH)");
+                                            matchingIndex = stream.getIndex();
+                                            break;
                                         }
-                                }else{
+                                    }
+                                }
+                                else{
                                     Timber.d("Best smart subtitle found ! (subs disabled)");
                                     matchingIndex = -1;
                                 }
