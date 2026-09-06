@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.settings.screen.about
 
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.os.Build
 import androidx.compose.runtime.Composable
@@ -34,6 +35,7 @@ import org.jellyfin.androidtv.util.updater.CustomUpdateChecker
 import org.jellyfin.androidtv.util.updater.UpdateResult
 import org.jellyfin.androidtv.util.updater.ApkInstaller
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 	val context = LocalContext.current
@@ -78,10 +80,10 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 		item {
 			ListButton(
 				leadingContent = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
-				headingContent = { Text("Mises à jour automatiques") },
+				headingContent = { Text(stringResource(R.string.pref_auto_updates)) },
 				trailingContent = { Checkbox(checked = autoUpdateEnabled) },
 				captionContent = {
-					Text(if (autoUpdateEnabled) "Recherche au démarrage activée." else "Recherche au démarrage désactivée.")
+					Text(if (autoUpdateEnabled) stringResource(R.string.pref_auto_updates_enabled) else stringResource(R.string.pref_auto_updates_disabled))
 				},
 				onClick = {
 					scope.launch {
@@ -94,13 +96,13 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 		item {
 			ListButton(
 				leadingContent = { Icon(painterResource(R.drawable.ic_update), contentDescription = null) },
-				headingContent = { Text("Vérifier les mises à jour") },
+				headingContent = { Text(stringResource(R.string.lbl_check_updates)) },
 				captionContent = {
 					when {
-						downloadProgress != null -> Text("Téléchargement: $downloadProgress%")
-						isChecking -> Text("Vérification en cours...")
+						downloadProgress != null -> Text(stringResource(R.string.lbl_downloading) + ": $downloadProgress%")
+						isChecking -> Text(stringResource(R.string.lbl_checking))
 						updateStatusText.isNotEmpty() -> Text(updateStatusText)
-						else -> Text("Rechercher une nouvelle version sur le serveur.")
+						else -> Text(stringResource(R.string.lbl_check_new_release))
 					}
 				},
 				onClick = {
@@ -112,7 +114,7 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 							val checker = CustomUpdateChecker(context)
 							when (val result = checker.checkForUpdate(updateUrl)) {
 								is UpdateResult.Available -> {
-									updateStatusText = "Nouvelle version ${result.newVersion} trouvée. Téléchargement..."
+									updateStatusText = context.getString(R.string.lbl_new_release) + " ${result.newVersion} " + context.getString(R.string.lbl_found) + ". " + context.getString(R.string.lbl_downloading) + "..."
 									isChecking = false
 
 									val installer = ApkInstaller(context)
@@ -124,17 +126,17 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 										onComplete = {
 											downloadProgress = null
 											isChecking = false
-											updateStatusText = "Installation terminée."
+											updateStatusText = context.getString(R.string.lbl_install) + " " + context.getString(R.string.lbl_completed) + "."
 										},
 										onError = {
 											downloadProgress = null
 											isChecking = false
-											updateStatusText = "Téléchargement échoué."
+											updateStatusText = context.getString(R.string.lbl_downloading) + " " + context.getString(R.string.lbl_failed) + "."
 										},
 										onCancel = {
 											downloadProgress = null
 											isChecking = false
-											updateStatusText = "Téléchargement annulé."
+											updateStatusText = context.getString(R.string.lbl_downloading) + " " + context.getString(R.string.lbl_canceled) + "."
 										}
 									)
 								}
@@ -142,18 +144,18 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 
 								is UpdateResult.UpToDate -> {
 									isChecking = false
-									updateStatusText = "L'application est déjà à jour."
+									updateStatusText = context.getString(R.string.lbl_app_already_uptodate)
 								}
 
 								is UpdateResult.Error -> {
 									isChecking = false
-									updateStatusText = "Erreur : ${result.message}"
+									updateStatusText = context.getString(R.string.lbl_error) + " : ${result.message}"
 									//updateStatusText = "Erreur de connexion."
 								}
 
 								UpdateResult.NoApkFound -> {
 									isChecking = false
-									updateStatusText = "Aucun fichier d'installation trouvé."
+									updateStatusText = context.getString(R.string.lbl_update_file_not_found)
 								}
 							}
 						}

@@ -960,7 +960,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
 
         if (mAvailableGenres.isEmpty() && mAvailableAudio.isEmpty() && !hideMetadataFilters) {
             TextView loadingText = new TextView(requireContext());
-            loadingText.setText("Chargement des filtres...");
+            loadingText.setText(getString(R.string.lbl_loading_filters));
             loadingText.setTextColor(Color.GRAY);
             loadingText.setPadding(20, 20, 20, 20);
             container.addView(loadingText);
@@ -971,7 +971,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         // Section Audio
         if (!hideMetadataFilters && !mAvailableAudio.isEmpty()) {
             String[] audioArray = mAvailableAudio.toArray(new String[0]);
-            addExpandableFilterCategory(container, "Audio", audioArray, mAudioCounts, mSelectedAudio, (item, isChecked) -> {
+            addExpandableFilterCategory(container, getString(R.string.lbl_filter_audio), audioArray, mAudioCounts, mSelectedAudio, (item, isChecked) -> {
                 if (isChecked) mSelectedAudio.add(item);
                 else mSelectedAudio.remove(item);
                 applyUpdatedFilters(FILTER_CATEGORY_AUDIO);
@@ -999,7 +999,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
                 }
             }
             String[] typeArray = typeList.toArray(new String[0]);
-            addExpandableFilterCategory(container, "Type", typeArray, mResolutionCounts, mSelectedTypes, (item, isChecked) -> {
+            addExpandableFilterCategory(container, getString(R.string.lbl_filter_media_type), typeArray, mResolutionCounts, mSelectedTypes, (item, isChecked) -> {
                 if (isChecked) mSelectedTypes.add(item);
                 else mSelectedTypes.remove(item);
                 applyUpdatedFilters(FILTER_CATEGORY_TYPE);
@@ -1255,7 +1255,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         // If showing loading text
         if (mFilterContainer.getChildCount() > 0 && mFilterContainer.getChildAt(0) instanceof TextView) {
             String text = ((TextView)mFilterContainer.getChildAt(0)).getText().toString();
-            if (text.equals("Chargement des filtres...")) {
+            if (text.equals(getString(R.string.lbl_loading_filters))) {
                 if (!mAvailableGenres.isEmpty() || !mAvailableAudio.isEmpty()) {
                     shouldRepopulate = true;
                 }

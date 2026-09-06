@@ -702,4 +702,25 @@
     <string name="image_memory_cache_size">Taille du cache memoire des images</string>
     <string name="pref_actor_thumbnails">Forme des vignettes d\'acteurs</string>
     <string name="pref_actor_thumbnails_desc">Affichage circulaire (ronds) des artistes</string>
+    <string name="pref_auto_updates_disabled">Recherche au démarrage désactivée</string>
+    <string name="lbl_check_updates">Vérifier les mises à jour</string>
+    <string name="pref_auto_updates">Mises à jour automatiques</string>
+    <string name="pref_auto_updates_enabled">Recherche au démarrage activée</string>
+    <string name="lbl_check_new_release">Rechercher une nouvelle version</string>
+    <string name="lbl_downloading">Téléchargement</string>
+    <string name="lbl_checking">Vérification en cours…</string>
+    <string name="lbl_error">Erreur</string>
+    <string name="lbl_new_release">Nouvelle version</string>
+    <string name="lbl_found">trouvé</string>
+    <string name="lbl_app_already_uptodate">L\'application est déjà à jour.</string>
+    <string name="lbl_update_file_not_found">Aucun fichier d\'installation trouvé.</string>
+    <string name="lbl_loading_filters">Chargement des filtres…</string>
+    <string name="lbl_filter_audio">Audio</string>
+    <string name="lbl_filter_media_type">Type</string>
+    <string name="lbl_install">Installation</string>
+    <string name="lbl_canceled">annulé</string>
+    <string name="lbl_failed">échoué</string>
+    <string name="lbl_completed">terminée</string>
+
+
 </resources>
