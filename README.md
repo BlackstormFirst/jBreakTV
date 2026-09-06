@@ -1,46 +1,29 @@
-<h1 align="center">Jellyfin for Android TV</h1>
-<h3 align="center">Part of the <a href="https://jellyfin.org">Jellyfin Project</a></h3>
+<h1 align="center">jBreakTV for Android TV</h1>
+<h3 align="center">Based on a fork of <a href="https://github.com/jellyfin/jellyfin-androidtv">Jellyfin Android TV</a></h3>
 
 ---
+<p>
+jBreakTV is an alternative of the original Jellyfin client for Android TV, Nvidia Shield, and Amazon Fire TV devices.
 
-<p align="center">
-<img alt="Logo banner" src="https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/banner-logo-solid.svg?sanitize=true"/>
-<br/><br/>
-<a href="https://github.com/jellyfin/jellyfin-androidtv">
-<img alt="GPL 2.0 License" src="https://img.shields.io/github/license/jellyfin/jellyfin-androidtv.svg"/>
-</a>
-<a href="https://github.com/jellyfin/jellyfin-androidtv/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/jellyfin/jellyfin-androidtv.svg"/>
-</a>
-<a href="https://translate.jellyfin.org/projects/jellyfin-android/jellyfin-androidtv/">
-<img alt="Translation Status" src="https://translate.jellyfin.org/widgets/jellyfin-android/-/jellyfin-androidtv/svg-badge.svg"/>
-</a>
-<br/>
-<a href="https://opencollective.com/jellyfin">
-<img alt="Donate" src="https://img.shields.io/opencollective/all/jellyfin.svg?label=backers"/>
-</a>
-<a href="https://features.jellyfin.org">
-<img alt="Feature Requests" src="https://img.shields.io/badge/fider-vote%20on%20features-success.svg"/>
-</a>
-<a href="https://matrix.to/#/+jellyfin:matrix.org">
-<img alt="Chat on Matrix" src="https://img.shields.io/matrix/jellyfin:matrix.org.svg?logo=matrix"/>
-</a>
-<br/>
-<a href="https://play.google.com/store/apps/details?id=org.jellyfin.androidtv">
-<img width="153" alt="Jellyfin on Google Play" src="https://jellyfin.org/images/store-icons/google-play.png"/>
-</a>
-<a href="https://www.amazon.com/gp/aw/d/B07TX7Z725">
-<img width="153" alt="Jellyfin on Amazon Appstore" src="https://jellyfin.org/images/store-icons/amazon.png"/>
-</a>
-<a href="https://f-droid.org/en/packages/org.jellyfin.androidtv/">
-<img width="153" alt="Jellyfin on F-Droid" src="https://jellyfin.org/images/store-icons/fdroid.png"/>
-</a>
-<br/>
-<a href="https://repo.jellyfin.org/releases/client/androidtv/">Download archive</a>
+As a fork, it retains core features and merging capabilities while introducing additional features and fixes.
+
+Here are some of the improvements:
+- Playback Index Manager (Added support for multiple video tracks in the player and improved fallback handling for audio and subtitles)
+- Server-side audio and subtitle option management (the client now checks the user's audio and subtitles preferences on the server; two modes —DEFAULT and SMART— are currently supported for subtitles, determining behavior when switching between episodes)
+- Images Cache Management (optimizations and new options to manage the image loader's memory and disk cache; changes take effect only after a full restart of the application or the TV)
+- Library Filtering (Added filtering by Genre across libraries and by Type for movie libraries, as well as a workaround for audio filtering using Tags)
+- Navigation fluidity on the home page has also been improved.
+- Option to change actor thumbnails to a circular shape in the customization menu.
+- Download/Update Manager (For use while the app is not on the Play Store)
+
+
+The application is currently provided in Debug mode; a properly signed version will soon be available for your devices.
+
+Note that some code modifications were developed with AI assistance to analyze the relevance and impact of the changes, though the final modifications remain the choice and decision of the developers.
+
+Special thanks to the contributors of the Jellyfin, Jellyfin SDK Kotlin, and Jellyfin Android TV projects, whose work made the creation of this fork possible.
+
 </p>
-
-Jellyfin for Android TV is a Jellyfin client for Android TV, Nvidia Shield, and Amazon Fire TV devices. We welcome all contributions and pull
-requests! If you have a larger feature in mind please open an issue so we can discuss the implementation before you start. 
 
 ## Building
 
@@ -54,24 +37,3 @@ PATH, then use the Gradle wrapper (`./gradlew`) to build the project with the `a
 
 The task will create an APK file in the `/app/build/outputs/apk/debug` directory. This APK file uses a different app-id from our stable
 builds and can be manually installed to your device.
-
-## Branching
-
-The `master` branch is the primary development branch and the target for all pull requests. It is **unstable** and may contain breaking
-changes or unresolved bugs. For production deployments and forks, always use the latest `release-x.y.z` branch. Do not base production work
-or long-lived forks on `master`.
-
-Release branches are created at the start of a beta cycle and are kept up to date with each published release. Maintainers will cherry-pick
-selected changes into release branches as needed for backports. These branches are reused for subsequent patch releases.
-
-## Translating
-
-Translations can be improved very easily from our [Weblate](https://translate.jellyfin.org/projects/jellyfin-android/jellyfin-androidtv)
-instance. Look through the following graphic to see if your native language could use some work! We cannot accept changes to translation
-files via pull requests.
-
-<p align="center">
-<a href="https://translate.jellyfin.org/engage/jellyfin-android/">
-<img alt="Detailed Translation Status" src="https://translate.jellyfin.org/widgets/jellyfin-android/-/jellyfin-androidtv/multi-auto.svg"/>
-</a>
-</p>
