@@ -18,7 +18,8 @@ class VideoQueueManager {
 	private var _lastPlayedVideoDefaultState: Boolean? = null
 
 	fun setCurrentVideoQueue(items: List<BaseItemDto>?) {
-		if (items.isNullOrEmpty()) return clearVideoQueue()
+		clearVideoQueue()
+		if (items.isNullOrEmpty()) return
 
 		_currentVideoQueue = items.toMutableList()
 		_currentMediaPosition = 0

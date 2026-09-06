@@ -1359,6 +1359,9 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         mFragment = null;
         mVideoManager = null;
         resetPlayerErrors();
+        if (closeActivity) {
+            videoQueueManager.getValue().clearVideoQueue();
+        }
     }
 
     public void endPlayback() {
