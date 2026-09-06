@@ -89,8 +89,11 @@ class InteractionTrackerViewModel(
 	}
 
 	fun notifyInteraction(canCancel: Boolean, userInitiated: Boolean) {
-		// Cancel pending screensaver timer (if any)
-		timer?.cancel()
+		// Only reset the timer for user-initiated interactions or when state changes
+		if (userInitiated || activityPaused || locks > 0) {
+			timer?.cancel()
+			timer = null
+		}
 
 		// If watching episodes, reset episode count and watch time
 		if (isWatchingEpisodes && userInitiated) {
@@ -103,8 +106,8 @@ class InteractionTrackerViewModel(
 			_screensaverVisible.value = false
 		}
 
-		// Create new timer to show screensaver when enabled
-		if (inAppEnabled && !activityPaused && locks == 0) {
+		// Create new timer to show screensaver when enabled and not already running
+		if (inAppEnabled && !activityPaused && locks == 0 && (timer == null || timer?.isActive == false)) {
 			timer = viewModelScope.launch {
 				delay(timeout)
 				_screensaverVisible.value = true
