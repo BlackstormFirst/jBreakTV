@@ -15,6 +15,7 @@ import org.jellyfin.androidtv.preference.constant.BufferLength
 import org.jellyfin.androidtv.ui.browsing.MainActivity
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
+import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
 import org.jellyfin.androidtv.util.AndroidVersion
@@ -38,6 +39,7 @@ import org.jellyfin.androidtv.ui.playback.PlaybackManager as LegacyPlaybackManag
 val playbackModule = module {
 	single { LegacyPlaybackManager(get()) }
 	single { VideoQueueManager() }
+	single { PlaybackIndexManager() }
 	single<MediaManager> { RewriteMediaManager(get(), get()) }
 
 	single { PlaybackLauncher(get(), get(), get(), get()) }
