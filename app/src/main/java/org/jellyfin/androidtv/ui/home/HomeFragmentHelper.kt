@@ -58,7 +58,8 @@ class HomeFragmentHelper(
 			imageTypeLimit = 1,
 			limit = ITEM_LIMIT_NEXT_UP,
 			enableResumable = false,
-			fields = ItemRepository.browseFields
+			fields = ItemRepository.nextUpFields,
+			enableTotalRecordCount = false
 		)
 
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_next_up), query, arrayOf(ChangeTriggerType.TvPlayback)))

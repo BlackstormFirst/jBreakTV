@@ -129,8 +129,13 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 				// Add rows in order
 				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+				delay(100)
 				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
-				for (row in rows) row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+				delay(100)
+				for (row in rows) {
+					row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+					delay(100)
+				}
 
 				// Wire up Live TV sibling rows so the On Now row removes the buttons row when empty
 				@Suppress("UNCHECKED_CAST")
@@ -293,7 +298,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				// Delay background update to avoid jank during navigation
 				backgroundJob?.cancel()
 				backgroundJob = lifecycleScope.launch {
-					delay(500)
+					delay(200)
 					backgroundService.setBackground(item.baseItem)
 				}
 			}

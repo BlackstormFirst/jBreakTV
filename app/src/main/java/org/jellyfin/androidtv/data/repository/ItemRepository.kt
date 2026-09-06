@@ -25,13 +25,20 @@ object ItemRepository {
 
 	// Lighter field set for home screen rows - excludes heavy fields like
 	// MediaSources, MediaStreams, Chapters, Trickplay that aren't needed for display.
+	// Overview and Genres are also excluded here to speed up home screen loading
+	// for large libraries, as they are not shown on home cards.
 	// Full item data is fetched when user selects an item.
 	val browseFields = setOf(
 		ItemFields.CAN_DELETE,
 		ItemFields.CHILD_COUNT,
 		ItemFields.DATE_CREATED,
-		ItemFields.GENRES,
-		ItemFields.OVERVIEW,
+		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
+	)
+
+	// Even lighter field set for Next Up - excludes ChildCount as it's not needed for episodes.
+	val nextUpFields = setOf(
+		ItemFields.CAN_DELETE,
+		ItemFields.DATE_CREATED,
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
 	)
 }
