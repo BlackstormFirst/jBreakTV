@@ -3,6 +3,7 @@ package org.jellyfin.androidtv.ui.composable.compat
 import android.content.Context
 import android.view.View
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -19,7 +20,7 @@ import org.koin.compose.koinInject
 
 @Composable
 fun AppNavigationHost(
-	modifier: Modifier = Modifier,
+	modifier: Modifier = Modifier.fillMaxSize(),
 	navigationRepository: NavigationRepository = koinInject(),
 ) {
 	val factory = remember { AppNavigationHostViewFactory() }

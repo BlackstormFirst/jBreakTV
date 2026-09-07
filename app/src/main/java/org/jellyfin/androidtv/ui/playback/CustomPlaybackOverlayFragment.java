@@ -681,12 +681,22 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
             Utils.showToast(requireContext(), R.string.msg_cannot_play_time);
             return;
         }
+
+        if (leanbackOverlayFragment != null) {
+            mIsVisible = false;
+            leanbackOverlayFragment.setShouldShowOverlay(true);
+            leanbackOverlayFragment.showControlsOverlay(true);
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
         if (mItemsToPlay == null || mItemsToPlay.isEmpty()) return;
+
+        if (playbackControllerContainer.getValue().getPlaybackController() != null) {
+            playbackControllerContainer.getValue().getPlaybackController().pause();
+        }
 
         setPlayPauseActionState(0);
 
@@ -701,15 +711,6 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
 
         if (leanbackOverlayFragment != null)
             leanbackOverlayFragment.setOnKeyInterceptListener(null);
-
-        // end playback from here if this fragment belongs to the current session.
-        // if it doesn't, playback has already been stopped elsewhere, and the references to this have been replaced
-        if (playbackControllerContainer.getValue().getPlaybackController() != null && playbackControllerContainer.getValue().getPlaybackController().getFragment() == this) {
-            Timber.i("this fragment belongs to the current session, ending it");
-            playbackControllerContainer.getValue().getPlaybackController().endPlayback();
-        }
-
-        closePlayer();
     }
 
     public void show() {
@@ -1333,6 +1334,12 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     @Override
     public void onDestroy() {
         super.onDestroy();
+
+        // end playback from here if this fragment belongs to the current session.
+        if (playbackControllerContainer.getValue().getPlaybackController() != null && playbackControllerContainer.getValue().getPlaybackController().getFragment() == this) {
+            Timber.i("Destroying fragment: ending playback session");
+            playbackControllerContainer.getValue().getPlaybackController().endPlayback();
+        }
 
         // Show system bars
         WindowCompat.setDecorFitsSystemWindows(requireActivity().getWindow(), true);

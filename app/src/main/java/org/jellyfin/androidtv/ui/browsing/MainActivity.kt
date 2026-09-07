@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.activity.compose.setContent
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
@@ -76,12 +79,14 @@ class MainActivity : FragmentActivity() {
 				ProvideLocalInteractionTracker(
 					interactionTracker = { interactionTrackerViewModel.notifyInteraction(false, userInitiated = true) }
 				) {
-					AppBackground()
-					AppNavigationHost(
-						navigationRepository = navigationRepository,
-					)
-					InAppScreensaver()
-					MainActivitySettings()
+					Box(modifier = Modifier.fillMaxSize()) {
+						AppBackground()
+						AppNavigationHost(
+							navigationRepository = navigationRepository,
+						)
+						InAppScreensaver()
+						MainActivitySettings()
+					}
 				}
 			}
 		}
@@ -102,21 +107,21 @@ class MainActivity : FragmentActivity() {
 		}
 
 		if(hasCheckUpdateThisSession) return
-		// AutoUpdater: Vérifier si l'utilisateur a activé la vérification automatique dans ses préférences
+		// AutoUpdater: Check if user enable auto update
 		lifecycleScope.launch {
 			hasCheckUpdateThisSession = true
-			val isAutoUpdateEnabled = userPreferences[UserPreferences.autoUpdateEnabled] // selon ta gestion de préférences
+			val isAutoUpdateEnabled = userPreferences[UserPreferences.autoUpdateEnabled]
 			if (isAutoUpdateEnabled) {
 				val checker = CustomUpdateChecker(this@MainActivity)
 				val result = checker.checkForUpdate("https://home2.vlzone.com/jbreaktv/app-update.json")
 
 				if (result is UpdateResult.Available) {
-					// Déclencher le téléchargement direct ou afficher un dialogue d'avertissement
+					// Start download or display warning
 					val installer = ApkInstaller(this@MainActivity)
 					installer.downloadAndInstall(
 						result.downloadUrl,
 						onProgress = { progress ->
-							// Progression optionnelle
+							// Optional progress
 						},
 						onCancel = { hasCheckUpdateThisSession = true }
 					)
@@ -146,11 +151,7 @@ class MainActivity : FragmentActivity() {
 		super.onStop()
 
 		workManager.enqueue(OneTimeWorkRequestBuilder<LeanbackChannelWorker>().build())
-
-		lifecycleScope.launch(Dispatchers.IO) {
-			Timber.i("MainActivity stopped")
-			sessionRepository.restoreSession(destroyOnly = true)
-		}
+		Timber.i("MainActivity stopped")
 	}
 
 	// Forward key events to fragments

@@ -40,7 +40,7 @@ private class HistoryEntry(
 			name = Class.forName(parcel.readString()!!) as Class<out Fragment>,
 			arguments = parcel.readBundle(this::class.java.classLoader)!!,
 			fragment = null,
-			savedState = ParcelCompat.readParcelable(parcel, this::class.java.classLoader, Fragment.SavedState::class.java)!!,
+			savedState = ParcelCompat.readParcelable(parcel, this::class.java.classLoader, Fragment.SavedState::class.java),
 		)
 
 		override fun newArray(size: Int): Array<HistoryEntry?> = arrayOfNulls(size)
@@ -57,6 +57,10 @@ class DestinationFragmentView @JvmOverloads constructor(
 		private const val BUNDLE_HISTORY = "history"
 	}
 
+	init {
+		layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+	}
+
 	private val fragmentManager by lazy {
 		FragmentManager.findFragmentManager(this)
 	}
@@ -64,6 +68,7 @@ class DestinationFragmentView @JvmOverloads constructor(
 	private val container by lazy {
 		FragmentContainerView(context).also { view ->
 			view.id = R.id.container
+			view.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
 			addView(view)
 		}
 	}
@@ -120,8 +125,10 @@ class DestinationFragmentView @JvmOverloads constructor(
 		if (history.isEmpty()) return
 
 		// Update the top-most history entry with state from current fragment
-		val fragment = requireNotNull(fragmentManager.findFragmentByTag(FRAGMENT_TAG_CONTENT))
-		history[history.size - 1].savedState = fragmentManager.saveFragmentInstanceState(fragment)
+		val fragment = fragmentManager.findFragmentByTag(FRAGMENT_TAG_CONTENT)
+		if (fragment != null) {
+			history[history.size - 1].savedState = fragmentManager.saveFragmentInstanceState(fragment)
+		}
 	}
 
 	@SuppressLint("CommitTransaction")

@@ -18,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.work.WorkManager
 import androidx.work.await
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -123,6 +124,7 @@ class StartupActivity : FragmentActivity() {
 				Timber.i("CurrentUser changed to ${currentUser?.id} while waiting for startup.")
 
 				lifecycleScope.launch {
+					delay(1000)
 					openNextActivity()
 				}
 			} else {
@@ -175,11 +177,15 @@ class StartupActivity : FragmentActivity() {
 			}.getOrNull()
 			// Other item is requested
 			itemId != null -> Destinations.itemDetails(itemId)
-			// No destination requested, use default
+			// No destination requested
 			else -> null
 		}
 
-		navigationRepository.reset(destination, true)
+		if (destination != null) {
+			navigationRepository.reset(destination, true)
+		} else if (!navigationRepository.canGoBack) {
+			navigationRepository.reset(null, true)
+		}
 
 		val intent = Intent(this, MainActivity::class.java)
 		// Clear navigation history

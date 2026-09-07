@@ -677,6 +677,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         PlaybackControllerHelperKt.applyMediaSegments(this, item, () -> {
+            if (mFragment == null) return null;
             // Set video start delay
             long videoStartDelay = userPreferences.getValue().get(UserPreferences.Companion.getVideoStartDelay());
             if (videoStartDelay > 0) {
@@ -900,7 +901,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             mPlaybackState = PlaybackState.IDLE;
 
             if (mVideoManager != null && mVideoManager.isPlaying()) mVideoManager.stopPlayback();
-            if (getCurrentlyPlayingItem() != null && mCurrentStreamInfo != null) {
+            if (getCurrentlyPlayingItem() != null && mCurrentStreamInfo != null && mFragment != null) {
                 Long mbPos = mCurrentPosition * 10000;
                 reportingHelper.getValue().reportStopped(mFragment, getCurrentlyPlayingItem(), mCurrentStreamInfo, mbPos);
             }
@@ -1136,13 +1137,17 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     private void startReportLoop() {
-        if (mCurrentStreamInfo == null) return;
+        if (mCurrentStreamInfo == null || mFragment == null) return;
 
         stopReportLoop();
         reportingHelper.getValue().reportProgress(mFragment, this, getCurrentlyPlayingItem(), getCurrentStreamInfo(), mCurrentPosition * 10000, false);
         mReportLoop = new Runnable() {
             @Override
             public void run() {
+                if (mFragment == null) {
+                    stopReportLoop();
+                    return;
+                }
                 if (isPlaying()) {
                     refreshCurrentPosition();
                     long currentTime = isLiveTv ? getTimeShiftedProgress() : mCurrentPosition;
@@ -1159,11 +1164,15 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     private void startPauseReportLoop() {
         stopReportLoop();
-        if (mCurrentStreamInfo == null) return;
+        if (mCurrentStreamInfo == null || mFragment == null) return;
         reportingHelper.getValue().reportProgress(mFragment, this, getCurrentlyPlayingItem(), mCurrentStreamInfo, mCurrentPosition * 10000, true);
         mReportLoop = new Runnable() {
             @Override
             public void run() {
+                if (mFragment == null) {
+                    stopReportLoop();
+                    return;
+                }
                 BaseItemDto currentItem = getCurrentlyPlayingItem();
                 if (currentItem == null) {
                     // Loop was called while nothing was playing!
@@ -1258,7 +1267,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (mPlaybackState == PlaybackState.BUFFERING) {
             if (mFragment != null) {
                 mFragment.setFadingEnabled(true);
-                mFragment.leanbackOverlayFragment.setShouldShowOverlay(false);
+                mFragment.leanbackOverlayFragment.setShouldShowOverlay(true);
             }
 
             mPlaybackState = PlaybackState.PLAYING;

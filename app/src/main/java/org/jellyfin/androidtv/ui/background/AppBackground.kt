@@ -68,27 +68,30 @@ fun AppBackground() {
 	val enabled by backgroundService.enabled.collectAsState()
 
 	if (enabled) {
-		AnimatedContent(
-			targetState = currentBackground,
-			transitionSpec = {
-				val duration = (BackgroundService.TRANSITION_DURATION.inWholeMilliseconds / 2).toInt()
-				fadeIn(tween(durationMillis = duration)) togetherWith fadeOut(snap(delayMillis = duration))
-			},
-			label = "BackgroundTransition",
-		) { background ->
-			if (background != null) {
-				Image(
-					bitmap = background,
-					contentDescription = null,
-					alignment = Alignment.Center,
-					contentScale = ContentScale.Crop,
-					colorFilter = ColorFilter.tint(colorResource(R.color.background_filter), BlendMode.SrcAtop),
-					modifier = Modifier
-						.fillMaxSize()
-						.then(if (blurBackground) Modifier.blur(10.dp) else Modifier)
-				)
-			} else {
-				AppThemeBackground()
+		Box(modifier = Modifier.fillMaxSize()) {
+			AnimatedContent(
+				targetState = currentBackground,
+				transitionSpec = {
+					val duration = (BackgroundService.TRANSITION_DURATION.inWholeMilliseconds / 2).toInt()
+					fadeIn(tween(durationMillis = duration)) togetherWith fadeOut(snap(delayMillis = duration))
+				},
+				label = "BackgroundTransition",
+				modifier = Modifier.fillMaxSize()
+			) { background ->
+				if (background != null) {
+					Image(
+						bitmap = background,
+						contentDescription = null,
+						alignment = Alignment.Center,
+						contentScale = ContentScale.Crop,
+						colorFilter = ColorFilter.tint(colorResource(R.color.background_filter), BlendMode.SrcAtop),
+						modifier = Modifier
+							.fillMaxSize()
+							.then(if (blurBackground) Modifier.blur(10.dp) else Modifier)
+					)
+				} else {
+					AppThemeBackground()
+				}
 			}
 		}
 	}
