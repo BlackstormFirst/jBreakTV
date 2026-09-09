@@ -31,7 +31,7 @@ import org.jellyfin.androidtv.ui.settings.util.copyAction
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.base.form.Checkbox
 import org.koin.compose.koinInject
-import org.jellyfin.androidtv.util.updater.CustomUpdateChecker
+import org.jellyfin.androidtv.util.updater.UpdateCheck
 import org.jellyfin.androidtv.util.updater.UpdateResult
 import org.jellyfin.androidtv.util.updater.ApkInstaller
 
@@ -50,7 +50,7 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 	var updateStatusText by remember { mutableStateOf("") }
 	var downloadProgress by remember { mutableStateOf<Int?>(null) }
 
-	val updateUrl = "https://home2.vlzone.com/jbreaktv/app-update.json"
+	// val updateUrl = "https://home2.vlzone.com/jbreaktv/app-update.json"
 
 	SettingsColumn {
 		if (launchedFromLogin) item {
@@ -111,8 +111,8 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 						updateStatusText = ""
 
 						scope.launch {
-							val checker = CustomUpdateChecker(context)
-							when (val result = checker.checkForUpdate(updateUrl)) {
+							val checker = UpdateCheck(context)
+							when (val result = checker.checkForUpdate("BlackstormFirst", "jBreakTV")) {
 								is UpdateResult.Available -> {
 									updateStatusText = context.getString(R.string.lbl_new_release) + " ${result.newVersion} " + context.getString(R.string.lbl_found) + ". " + context.getString(R.string.lbl_downloading) + "..."
 									isChecking = false

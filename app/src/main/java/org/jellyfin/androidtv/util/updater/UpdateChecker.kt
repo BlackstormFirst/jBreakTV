@@ -12,37 +12,61 @@ class UpdateCheck(private val context: Context) {
 
 	suspend fun checkForUpdate(repoOwner: String, repoName: String): UpdateResult = withContext(Dispatchers.IO) {
 		try {
-			val url = URL("https://api/github.com/repos/$repoOwner/$repoName/release/latest")
-			val connection = url.openConnection() as HttpURLConnection
-			connection.requestMethod = "GET"
-			connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+			// On tente d'abord de récupérer la "dernière" release officielle
+			val response = fetchFromApi("https://api.github.com/repos/$repoOwner/$repoName/releases/latest")
 
-			if (connection.responseCode == 200) {
-				val responseText = connection.inputStream.bufferedReader().use { it.readText() }
-				val release = json.decodeFromString<GitHubRelease>(responseText)
-
-				val currentVersion = getAppVersionName(context)
-				val latestVersion = release.tagName.removePrefix("v").trim()
-
-				if (isVersionNewer(currentVersion, latestVersion)) {
-					val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
-					if (apkAsset != null) {
-						UpdateResult.Available(
-							newVersion = latestVersion,
-							downloadUrl = apkAsset.downloadUrl,
-							releaseNotes = release.body ?: ""
-						)
-					} else {
-						UpdateResult.NoApkFound
+			// Si 404, on tente de récupérer toutes les releases et on prend la première (plus récente)
+			if (response == null) {
+				val allReleasesJson = fetchFromApi("https://api.github.com/repos/$repoOwner/$repoName/releases")
+				if (allReleasesJson != null) {
+					val releases = json.decodeFromString<List<GitHubRelease>>(allReleasesJson)
+					if (releases.isNotEmpty()) {
+						return@withContext processRelease(releases.first())
 					}
-				} else {
-					UpdateResult.UpToDate
 				}
-			} else {
-				UpdateResult.Error("Code retour HTTP : ${connection.responseCode}")
+				return@withContext UpdateResult.NoApkFound
 			}
+
+			val release = json.decodeFromString<GitHubRelease>(response)
+			return@withContext processRelease(release)
+
 		} catch (e: Exception) {
 			UpdateResult.Error(e.localizedMessage ?: "Erreur réseau inconnue")
+		}
+	}
+
+	private fun fetchFromApi(urlString: String): String? {
+		val url = URL(urlString)
+		val connection = url.openConnection() as HttpURLConnection
+		connection.requestMethod = "GET"
+		connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+		connection.connectTimeout = 5000
+		connection.readTimeout = 5000
+
+		return if (connection.responseCode == 200) {
+			connection.inputStream.bufferedReader().use { it.readText() }
+		} else {
+			null
+		}
+	}
+
+	private fun processRelease(release: GitHubRelease): UpdateResult {
+		val currentVersion = getAppVersionName(context)
+		val latestVersion = release.tagName.removePrefix("v").trim()
+
+		if (isVersionNewer(currentVersion, latestVersion)) {
+			val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
+			return if (apkAsset != null) {
+				UpdateResult.Available(
+					newVersion = latestVersion,
+					downloadUrl = apkAsset.downloadUrl,
+					releaseNotes = release.body ?: ""
+				)
+			} else {
+				UpdateResult.NoApkFound
+			}
+		} else {
+			return UpdateResult.UpToDate
 		}
 	}
 	private fun getAppVersionName(context: Context): String {

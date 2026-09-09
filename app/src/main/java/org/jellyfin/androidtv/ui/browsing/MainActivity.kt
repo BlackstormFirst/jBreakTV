@@ -37,7 +37,7 @@ import org.jellyfin.androidtv.util.applyTheme
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import timber.log.Timber
-import org.jellyfin.androidtv.util.updater.CustomUpdateChecker
+import org.jellyfin.androidtv.util.updater.UpdateCheck
 import org.jellyfin.androidtv.util.updater.UpdateResult
 import org.jellyfin.androidtv.util.updater.ApkInstaller
 import org.jellyfin.androidtv.preference.UserPreferences
@@ -112,8 +112,8 @@ class MainActivity : FragmentActivity() {
 			hasCheckUpdateThisSession = true
 			val isAutoUpdateEnabled = userPreferences[UserPreferences.autoUpdateEnabled]
 			if (isAutoUpdateEnabled) {
-				val checker = CustomUpdateChecker(this@MainActivity)
-				val result = checker.checkForUpdate("https://home2.vlzone.com/jbreaktv/app-update.json")
+				val checker = UpdateCheck(this@MainActivity)
+				val result = checker.checkForUpdate("BlackstormFirst", "jBreakTV")
 
 				if (result is UpdateResult.Available) {
 					// Start download or display warning

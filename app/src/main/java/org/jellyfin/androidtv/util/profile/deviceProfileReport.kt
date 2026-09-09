@@ -67,7 +67,7 @@ fun createDeviceProfileReport(
 	appendLine("---")
 	appendLine("client: jBreakTV for Android TV")
 	appendLine("client_version: ${BuildConfig.VERSION_NAME}")
-	appendLine("client_repository: https://github.com/BlackstormFirst/jbreaktv")
+	appendLine("client_repository: https://github.com/BlackstormFirst/jBreakTV")
 	appendLine("type: media_capabilities_report")
 	appendLine("format: markdown")
 	appendLine("---")
