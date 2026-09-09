@@ -14,8 +14,7 @@ android {
 		targetSdk = libs.versions.android.targetSdk.get().toInt()
 
 		// Release version
-		//applicationId = "com.github.blackstormfirst.jbreaktv"
-		applicationId = "jBreakTV"
+		applicationId = "com.github.blackstormfirst.jbreaktv"
 		versionName = project.getVersionName()
 		versionCode = getVersionCode(versionName!!)
 	}

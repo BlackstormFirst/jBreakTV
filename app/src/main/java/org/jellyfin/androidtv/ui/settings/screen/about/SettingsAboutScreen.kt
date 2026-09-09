@@ -50,8 +50,6 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 	var updateStatusText by remember { mutableStateOf("") }
 	var downloadProgress by remember { mutableStateOf<Int?>(null) }
 
-	// val updateUrl = "https://home2.vlzone.com/jbreaktv/app-update.json"
-
 	SettingsColumn {
 		if (launchedFromLogin) item {
 			ListSection(
