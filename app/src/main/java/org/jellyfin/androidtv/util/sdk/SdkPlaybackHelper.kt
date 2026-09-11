@@ -83,9 +83,9 @@ class SdkPlaybackHelper(
 						fields = ItemRepository.itemFields
 					)
 
-					response.items
+					response.items.filter { it.canPlay() }
 				} else {
-					listOf(mainItem)
+					if (mainItem.canPlay()) listOf(mainItem) else emptyList()
 				}
 			}
 
@@ -97,7 +97,7 @@ class SdkPlaybackHelper(
 					limit = ITEM_QUERY_LIMIT,
 					fields = ItemRepository.itemFields,
 				)
-				response.items
+				response.items.filter { it.canPlay() }
 			}
 
 			BaseItemKind.SEASON -> {
@@ -109,7 +109,7 @@ class SdkPlaybackHelper(
 					limit = ITEM_QUERY_LIMIT,
 					fields = ItemRepository.itemFields,
 				)
-				response.items
+				response.items.filter { it.canPlay() }
 			}
 
 			BaseItemKind.FOLDER -> {
@@ -127,7 +127,7 @@ class SdkPlaybackHelper(
 					fields = ItemRepository.itemFields
 				)
 
-				response.items
+				response.items.filter { it.canPlay() }
 			}
 
 			BaseItemKind.BOX_SET -> {
@@ -145,7 +145,7 @@ class SdkPlaybackHelper(
 					fields = ItemRepository.itemFields
 				)
 
-				response.items
+				response.items.filter { it.canPlay() }
 			}
 
 			BaseItemKind.MUSIC_ALBUM -> {
@@ -198,7 +198,7 @@ class SdkPlaybackHelper(
 					fields = ItemRepository.itemFields
 				)
 
-				response.items
+				response.items.filter { it.canPlay() }
 			}
 
 			BaseItemKind.PROGRAM -> {

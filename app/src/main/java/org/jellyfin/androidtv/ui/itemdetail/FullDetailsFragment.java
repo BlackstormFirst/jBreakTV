@@ -1224,6 +1224,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 if (!isActive()) return;
                 if (response.isEmpty()) {
                     Timber.e("No items to play - ignoring play request.");
+                    Utils.showToast(requireContext(), R.string.msg_no_playable_items);
                     return;
                 }
 

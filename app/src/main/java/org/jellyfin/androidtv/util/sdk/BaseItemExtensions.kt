@@ -51,9 +51,10 @@ fun BaseItemDto.getDisplayName(context: Context): String {
 fun BaseItemDto?.canPlay() = this != null
 	&& playAccess != PlayAccess.NONE
 	&& isPlaceHolder != true
-	&& (type != BaseItemKind.EPISODE || locationType != LocationType.VIRTUAL)
+	&& locationType != LocationType.VIRTUAL
 	&& type != BaseItemKind.PERSON
-	&& (isFolder != true || childCount?.takeIf { it > 0 } != null)
+	&& (mediaSourceCount?.let { it > 0 } ?: true)
+	&& (isFolder != true || childCount?.let { it > 0 } ?: true)
 
 fun BaseItemDto.isLiveTv() = type == BaseItemKind.PROGRAM || type == BaseItemKind.LIVE_TV_CHANNEL
 fun BaseItemDto.isNew() = isSeries == true && isNews != true && isRepeat != true

@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
@@ -18,17 +19,21 @@ import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.apiclient.getSeriesOverview
 import org.jellyfin.androidtv.util.popupMenu
 import org.jellyfin.androidtv.util.sdk.TrailerUtils.getExternalTrailerIntent
+import org.jellyfin.androidtv.util.sdk.canPlay
 import org.jellyfin.androidtv.util.sdk.compat.canResume
 import org.jellyfin.androidtv.util.sdk.compat.copyWithUserData
 import org.jellyfin.androidtv.util.showIfNotEmpty
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
+import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.ItemFilter
+import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
 import org.jellyfin.sdk.model.extensions.ticks
@@ -238,16 +243,37 @@ fun FullDetailsFragment.getNextUpEpisode(callback: (BaseItemDto?) -> Unit) {
 
 suspend fun FullDetailsFragment.getNextUpEpisode(): BaseItemDto? {
 	val api by inject<ApiClient>()
+	val userRepository by inject<UserRepository>()
 
 	try {
+		val seriesId = mBaseItem.seriesId ?: mBaseItem.id
 		val episodes = withContext(Dispatchers.IO) {
 			api.tvShowsApi.getNextUp(
-				seriesId = mBaseItem.seriesId ?: mBaseItem.id,
+				seriesId = seriesId,
 				fields = ItemRepository.itemFields,
-				limit = 1,
+				limit = 24,
 			).content
 		}
-		return episodes.items.firstOrNull()
+		val nextUp = episodes.items.firstOrNull { it.canPlay() }
+		if (nextUp != null) return nextUp
+
+		// Fallback: search for the first unplayed episode that is playable
+		val userId = userRepository.currentUser.value?.id
+		val fallbackResponse = withContext(Dispatchers.IO) {
+			api.itemsApi.getItems(
+				userId = userId,
+				parentId = seriesId,
+				includeItemTypes = listOf(BaseItemKind.EPISODE),
+				isMissing = false,
+				filters = listOf(ItemFilter.IS_UNPLAYED),
+				sortBy = listOf(ItemSortBy.AIRED_EPISODE_ORDER),
+				limit = 20,
+				recursive = true,
+				fields = ItemRepository.itemFields
+			).content
+		}
+
+		return fallbackResponse.items.firstOrNull { it.canPlay() }
 	} catch (err: ApiClientException) {
 		Timber.w(err, "Failed to get next up items")
 		return null
@@ -267,7 +293,7 @@ fun FullDetailsFragment.resumePlayback(v: View) {
 		if (nextUpEpisode == null) {
 			Toast.makeText(
 				requireContext(),
-				getString(R.string.msg_video_playback_error),
+				getString(R.string.msg_no_playable_items),
 				Toast.LENGTH_LONG
 			).show()
 		} else if (nextUpEpisode.userData?.playbackPositionTicks == 0L) {
