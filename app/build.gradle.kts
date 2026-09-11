@@ -90,7 +90,6 @@ android {
 	lint {
 		lintConfig = file("$rootDir/android-lint.xml")
 		abortOnError = false
-		sarifReport = true
 		checkDependencies = true
 	}
 
