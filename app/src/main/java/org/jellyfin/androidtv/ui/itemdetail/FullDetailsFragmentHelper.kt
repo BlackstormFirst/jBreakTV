@@ -267,7 +267,7 @@ suspend fun FullDetailsFragment.getNextUpEpisode(): BaseItemDto? {
 				isMissing = false,
 				filters = listOf(ItemFilter.IS_UNPLAYED),
 				sortBy = listOf(ItemSortBy.AIRED_EPISODE_ORDER),
-				limit = 20,
+				limit = 50,
 				recursive = true,
 				fields = ItemRepository.itemFields
 			).content

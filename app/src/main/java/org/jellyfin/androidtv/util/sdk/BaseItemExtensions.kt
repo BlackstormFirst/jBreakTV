@@ -53,8 +53,7 @@ fun BaseItemDto?.canPlay() = this != null
 	&& isPlaceHolder != true
 	&& locationType != LocationType.VIRTUAL
 	&& type != BaseItemKind.PERSON
-	&& (mediaSourceCount?.let { it > 0 } ?: true)
-	&& (isFolder != true || childCount?.let { it > 0 } ?: true)
+	&& (if (isFolder == true) (childCount ?: 0) > 0 else (mediaSourceCount ?: mediaSources?.size ?: 0) > 0)
 
 fun BaseItemDto.isLiveTv() = type == BaseItemKind.PROGRAM || type == BaseItemKind.LIVE_TV_CHANNEL
 fun BaseItemDto.isNew() = isSeries == true && isNews != true && isRepeat != true
