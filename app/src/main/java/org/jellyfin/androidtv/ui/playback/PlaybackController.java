@@ -361,10 +361,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         return bestMode;
     }
 
-    private void setRefreshRate(MediaStream videoStream) {
+    private boolean setRefreshRate(MediaStream videoStream) {
         if (videoStream == null || mFragment == null) {
             Timber.e("Null video stream attempting to set refresh rate");
-            return;
+            return false;
         }
 
         Display.Mode current = mFragment.requireActivity().getWindowManager().getDefaultDisplay().getMode();
@@ -378,12 +378,14 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 WindowManager.LayoutParams params = mFragment.requireActivity().getWindow().getAttributes();
                 params.preferredDisplayModeId = best.getModeId();
                 mFragment.requireActivity().getWindow().setAttributes(params);
+                return true;
             } else {
                 Timber.i("Display is already in best mode");
             }
         } else {
             Timber.i("*** Unable to find display mode for refresh rate: %f", videoStream.getRealFrameRate());
         }
+        return false;
     }
 
     // central place to update mCurrentPosition
@@ -662,8 +664,9 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         Long mbPos = position * 10000;
 
         // set refresh rate
+        boolean refreshRateChanged = false;
         if (refreshRateSwitchingBehavior != RefreshRateSwitchingBehavior.DISABLED) {
-            setRefreshRate(JavaCompat.getVideoStream(response.getMediaSource()));
+            refreshRateChanged = setRefreshRate(JavaCompat.getVideoStream(response.getMediaSource()));
         }
 
         // set playback speed to user selection, or 1 if we're watching live-tv
@@ -672,32 +675,48 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
         if (mFragment != null) mFragment.updateDisplay();
 
-        if (mVideoManager != null) {
-            mVideoManager.setMediaStreamInfo(api.getValue(), response);
-        }
+        final StreamInfo finalResponse = response;
+        final BaseItemDto finalItem = item;
+        final Long finalMbPos = mbPos;
 
-        PlaybackControllerHelperKt.applyMediaSegments(this, item, () -> {
-            if (mFragment == null) return null;
-            // Set video start delay
-            long videoStartDelay = userPreferences.getValue().get(UserPreferences.Companion.getVideoStartDelay());
-            if (videoStartDelay > 0) {
-                mHandler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (mVideoManager != null) {
-                            mVideoManager.start();
-                        }
+        Runnable prepareAndStartPlayer = new Runnable() {
+            @Override
+            public void run() {
+                if (mVideoManager != null) {
+                    mVideoManager.setMediaStreamInfo(api.getValue(), finalResponse);
+                }
+
+                PlaybackControllerHelperKt.applyMediaSegments(PlaybackController.this, finalItem, () -> {
+                    if (mFragment == null) return null;
+                    // Set video start delay
+                    long videoStartDelay = userPreferences.getValue().get(UserPreferences.Companion.getVideoStartDelay());
+                    if (videoStartDelay > 0) {
+                        mHandler.postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (mVideoManager != null) {
+                                    mVideoManager.start();
+                                }
+                            }
+                        }, videoStartDelay);
+                    } else {
+                        mVideoManager.start();
                     }
-                }, videoStartDelay);
-            } else {
-                mVideoManager.start();
+
+                    dataRefreshService.getValue().setLastPlayedItem(finalItem);
+                    reportingHelper.getValue().reportStart(mFragment, PlaybackController.this, finalItem, finalResponse, finalMbPos, false);
+
+                    return null;
+                });
             }
+        };
 
-            dataRefreshService.getValue().setLastPlayedItem(item);
-            reportingHelper.getValue().reportStart(mFragment, PlaybackController.this, item, response, mbPos, false);
-
-            return null;
-        });
+        if (refreshRateChanged) {
+            // Delay player preparation to allow the display refresh rate switch / HDMI handshake to complete smoothly
+            mHandler.postDelayed(prepareAndStartPlayer, 1500);
+        } else {
+            prepareAndStartPlayer.run();
+        }
     }
 
     public void startSpinner() {

@@ -8,8 +8,11 @@ import android.media.audiofx.DynamicsProcessing;
 import android.media.audiofx.DynamicsProcessing.Limiter;
 import android.media.audiofx.Equalizer;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.util.TypedValue;
+import android.view.Surface;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.FrameLayout;
 
@@ -51,6 +54,7 @@ import org.jellyfin.androidtv.data.compat.StreamInfo;
 import org.jellyfin.androidtv.preference.UserPreferences;
 import org.jellyfin.androidtv.preference.constant.BufferLength;
 import org.jellyfin.androidtv.preference.constant.ZoomMode;
+import org.jellyfin.androidtv.util.sdk.compat.JavaCompat;
 import org.jellyfin.sdk.api.client.ApiClient;
 import org.jellyfin.sdk.model.api.MediaStream;
 import org.jellyfin.sdk.model.api.MediaStreamType;
@@ -218,6 +222,9 @@ public class VideoManager {
      */
     private ExoPlayer.Builder configureExoplayerBuilder(Context context, AssHandler assHandler) {
         ExoPlayer.Builder exoPlayerBuilder = new ExoPlayer.Builder(context);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            exoPlayerBuilder.setVideoChangeFrameRateStrategy(2);
+        }
         DefaultRenderersFactory defaultRendererFactory = new DefaultRenderersFactory(context);
         defaultRendererFactory.setEnableDecoderFallback(true);
         defaultRendererFactory.setExtensionRendererMode(determineExoPlayerExtensionRendererMode());
@@ -418,6 +425,30 @@ public class VideoManager {
                     .setUri(Uri.parse(path))
                     .setSubtitleConfigurations(subtitleConfigurations)
                     .build();
+
+            MediaStream videoStream = JavaCompat.getVideoStream(streamInfo.getMediaSource());
+            if (videoStream != null && videoStream.getRealFrameRate() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                float frameRate = videoStream.getRealFrameRate();
+                if (frameRate > 0) {
+                    try {
+                        View surfaceView = mExoPlayerView.getVideoSurfaceView();
+                        if (surfaceView instanceof SurfaceView) {
+                            Surface surface = ((SurfaceView) surfaceView).getHolder().getSurface();
+                            if (surface != null && surface.isValid()) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    surface.setFrameRate(frameRate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE, Surface.CHANGE_FRAME_RATE_ALWAYS);
+                                    Timber.i("Successfully set surface frame rate to %f (CHANGE_FRAME_RATE_ALWAYS)", frameRate);
+                                } else {
+                                    surface.setFrameRate(frameRate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
+                                    Timber.i("Successfully set surface frame rate to %f (R-compatible)", frameRate);
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        Timber.w(e, "Could not set frame rate on surface view directly");
+                    }
+                }
+            }
 
             mExoPlayer.setMediaItem(mediaItem);
             mExoPlayer.prepare();
