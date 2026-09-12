@@ -47,7 +47,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Behavior of app background while browsing
 		 */
-		var backdropBehavior = enumPreference("backdrop_behavior", BackdropBehavior.BACKDROP_WITH_BLUR)
+		var backdropBehavior = enumPreference("backdrop_behavior", BackdropBehavior.BACKDROP_WITHOUT_BLUR)
 
 		/* Playback - General*/
 		/**
@@ -182,7 +182,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Use direct play
 		 */
-		var liveTvDirectPlayEnabled = booleanPreference("pref_live_direct", true)
+		var liveTvDirectPlayEnabled = booleanPreference("pref_live_direct", false)
 
 		/* Developer options */
 		/**
