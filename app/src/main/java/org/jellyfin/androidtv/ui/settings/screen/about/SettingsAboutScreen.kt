@@ -75,91 +75,93 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 			)
 		}
 
-		item {
-			ListButton(
-				leadingContent = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
-				headingContent = { Text(stringResource(R.string.pref_auto_updates)) },
-				trailingContent = { Checkbox(checked = autoUpdateEnabled) },
-				captionContent = {
-					Text(if (autoUpdateEnabled) stringResource(R.string.pref_auto_updates_enabled) else stringResource(R.string.pref_auto_updates_disabled))
-				},
-				onClick = {
-					scope.launch {
-						autoUpdateEnabled = !autoUpdateEnabled
-					}
-				}
-			)
-		}
-
-		item {
-			ListButton(
-				leadingContent = { Icon(painterResource(R.drawable.ic_update), contentDescription = null) },
-				headingContent = { Text(stringResource(R.string.lbl_check_updates)) },
-				captionContent = {
-					when {
-						downloadProgress != null -> Text(stringResource(R.string.lbl_downloading) + ": $downloadProgress%")
-						isChecking -> Text(stringResource(R.string.lbl_checking))
-						updateStatusText.isNotEmpty() -> Text(updateStatusText)
-						else -> Text(stringResource(R.string.lbl_check_new_release))
-					}
-				},
-				onClick = {
-					if (!isChecking && downloadProgress == null) {
-						isChecking = true
-						updateStatusText = ""
-
+		if (BuildConfig.DEBUG) {
+			item {
+				ListButton(
+					leadingContent = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
+					headingContent = { Text(stringResource(R.string.pref_auto_updates)) },
+					trailingContent = { Checkbox(checked = autoUpdateEnabled) },
+					captionContent = {
+						Text(if (autoUpdateEnabled) stringResource(R.string.pref_auto_updates_enabled) else stringResource(R.string.pref_auto_updates_disabled))
+					},
+					onClick = {
 						scope.launch {
-							val checker = UpdateCheck(context)
-							when (val result = checker.checkForUpdate("BlackstormFirst", "jBreakTV")) {
-								is UpdateResult.Available -> {
-									updateStatusText = context.getString(R.string.lbl_new_release) + " ${result.newVersion} " + context.getString(R.string.lbl_found) + ". " + context.getString(R.string.lbl_downloading) + "..."
-									isChecking = false
+							autoUpdateEnabled = !autoUpdateEnabled
+						}
+					}
+				)
+			}
 
-									val installer = ApkInstaller(context)
-									installer.downloadAndInstall(
-										downloadUrl = result.downloadUrl,
-										onProgress = { progress ->
-											downloadProgress = progress
-										},
-										onComplete = {
-											downloadProgress = null
-											isChecking = false
-											updateStatusText = context.getString(R.string.lbl_install) + " " + context.getString(R.string.lbl_completed) + "."
-										},
-										onError = {
-											downloadProgress = null
-											isChecking = false
-											updateStatusText = context.getString(R.string.lbl_downloading) + " " + context.getString(R.string.lbl_failed) + "."
-										},
-										onCancel = {
-											downloadProgress = null
-											isChecking = false
-											updateStatusText = context.getString(R.string.lbl_downloading) + " " + context.getString(R.string.lbl_canceled) + "."
-										}
-									)
-								}
+			item {
+				ListButton(
+					leadingContent = { Icon(painterResource(R.drawable.ic_update), contentDescription = null) },
+					headingContent = { Text(stringResource(R.string.lbl_check_updates)) },
+					captionContent = {
+						when {
+							downloadProgress != null -> Text(stringResource(R.string.lbl_downloading) + ": $downloadProgress%")
+							isChecking -> Text(stringResource(R.string.lbl_checking))
+							updateStatusText.isNotEmpty() -> Text(updateStatusText)
+							else -> Text(stringResource(R.string.lbl_check_new_release))
+						}
+					},
+					onClick = {
+						if (!isChecking && downloadProgress == null) {
+							isChecking = true
+							updateStatusText = ""
+
+							scope.launch {
+								val checker = UpdateCheck(context)
+								when (val result = checker.checkForUpdate("BlackstormFirst", "jBreakTV")) {
+									is UpdateResult.Available -> {
+										updateStatusText = context.getString(R.string.lbl_new_release) + " ${result.newVersion} " + context.getString(R.string.lbl_found) + ". " + context.getString(R.string.lbl_downloading) + "..."
+										isChecking = false
+
+										val installer = ApkInstaller(context)
+										installer.downloadAndInstall(
+											downloadUrl = result.downloadUrl,
+											onProgress = { progress ->
+												downloadProgress = progress
+											},
+											onComplete = {
+												downloadProgress = null
+												isChecking = false
+												updateStatusText = context.getString(R.string.lbl_install) + " " + context.getString(R.string.lbl_completed) + "."
+											},
+											onError = {
+												downloadProgress = null
+												isChecking = false
+												updateStatusText = context.getString(R.string.lbl_downloading) + " " + context.getString(R.string.lbl_failed) + "."
+											},
+											onCancel = {
+												downloadProgress = null
+												isChecking = false
+												updateStatusText = context.getString(R.string.lbl_downloading) + " " + context.getString(R.string.lbl_canceled) + "."
+											}
+										)
+									}
 
 
-								is UpdateResult.UpToDate -> {
-									isChecking = false
-									updateStatusText = context.getString(R.string.lbl_app_already_uptodate)
-								}
+									is UpdateResult.UpToDate -> {
+										isChecking = false
+										updateStatusText = context.getString(R.string.lbl_app_already_uptodate)
+									}
 
-								is UpdateResult.Error -> {
-									isChecking = false
-									updateStatusText = context.getString(R.string.lbl_error) + " : ${result.message}"
-									//updateStatusText = "Erreur de connexion."
-								}
+									is UpdateResult.Error -> {
+										isChecking = false
+										updateStatusText = context.getString(R.string.lbl_error) + " : ${result.message}"
+										//updateStatusText = "Erreur de connexion."
+									}
 
-								UpdateResult.NoApkFound -> {
-									isChecking = false
-									updateStatusText = context.getString(R.string.lbl_update_file_not_found)
+									UpdateResult.NoApkFound -> {
+										isChecking = false
+										updateStatusText = context.getString(R.string.lbl_update_file_not_found)
+									}
 								}
 							}
 						}
 					}
-				}
-			)
+				)
+			}
 		}
 
 		item {

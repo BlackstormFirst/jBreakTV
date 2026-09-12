@@ -12,23 +12,17 @@ class UpdateCheck(private val context: Context) {
 
 	suspend fun checkForUpdate(repoOwner: String, repoName: String): UpdateResult = withContext(Dispatchers.IO) {
 		try {
-			// On tente d'abord de récupérer la "dernière" release officielle
-			val response = fetchFromApi("https://api.github.com/repos/$repoOwner/$repoName/releases/latest")
+			// Récupération des dernières releases (inclut les pré-releases)
+			val response = fetchFromApi("https://api.github.com/repos/$repoOwner/$repoName/releases?per_page=10")
+				?: return@withContext UpdateResult.NoApkFound
 
-			// Si 404, on tente de récupérer toutes les releases et on prend la première (plus récente)
-			if (response == null) {
-				val allReleasesJson = fetchFromApi("https://api.github.com/repos/$repoOwner/$repoName/releases")
-				if (allReleasesJson != null) {
-					val releases = json.decodeFromString<List<GitHubRelease>>(allReleasesJson)
-					if (releases.isNotEmpty()) {
-						return@withContext processRelease(releases.first())
-					}
-				}
-				return@withContext UpdateResult.NoApkFound
-			}
+			val releases = json.decodeFromString<List<GitHubRelease>>(response)
 
-			val release = json.decodeFromString<GitHubRelease>(response)
-			return@withContext processRelease(release)
+			// Sélection de la version pré-release la plus récente
+			val latestPreRelease = releases.firstOrNull { it.prerelease }
+				?: return@withContext UpdateResult.NoApkFound
+
+			return@withContext processRelease(latestPreRelease)
 
 		} catch (e: Exception) {
 			UpdateResult.Error(e.localizedMessage ?: "Erreur réseau inconnue")
@@ -69,13 +63,18 @@ class UpdateCheck(private val context: Context) {
 			return UpdateResult.UpToDate
 		}
 	}
+
 	private fun getAppVersionName(context: Context): String {
 		return context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
 	}
 
 	private fun isVersionNewer(current: String, latest: String): Boolean {
-		val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
-		val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
+		// Isoler le numéro de version de base avant un éventuel tiret (ex: "1.2.0-debug" -> "1.2.0")
+		val currentClean = current.split("-").first()
+		val latestClean = latest.split("-").first()
+
+		val currentParts = currentClean.split(".").mapNotNull { it.toIntOrNull() }
+		val latestParts = latestClean.split(".").mapNotNull { it.toIntOrNull() }
 
 		val length = maxOf(currentParts.size, latestParts.size)
 		for (i in 0 until length) {

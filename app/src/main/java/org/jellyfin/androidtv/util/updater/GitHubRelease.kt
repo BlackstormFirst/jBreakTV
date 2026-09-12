@@ -1,6 +1,7 @@
 package org.jellyfin.androidtv.util.updater
 
-import kotlinx.serialization.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class GitHubRelease(
@@ -8,8 +9,10 @@ data class GitHubRelease(
 	val tagName: String,
 	@SerialName("html_url")
 	val htmlUrl: String,
-	val body: String?,
-	val assets: List<GitHubAsset>
+	@SerialName("prerelease")
+	val prerelease: Boolean = false,
+	val body: String? = null,
+	val assets: List<GitHubAsset> = emptyList()
 )
 
 @Serializable

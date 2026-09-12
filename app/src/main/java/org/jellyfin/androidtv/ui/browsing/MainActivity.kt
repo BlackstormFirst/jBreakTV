@@ -21,6 +21,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.integration.LeanbackChannelWorker
@@ -108,25 +109,29 @@ class MainActivity : FragmentActivity() {
 
 		if(hasCheckUpdateThisSession) return
 		// AutoUpdater: Check if user enable auto update
-		lifecycleScope.launch {
-			hasCheckUpdateThisSession = true
-			val isAutoUpdateEnabled = userPreferences[UserPreferences.autoUpdateEnabled]
-			if (isAutoUpdateEnabled) {
-				val checker = UpdateCheck(this@MainActivity)
-				val result = checker.checkForUpdate("BlackstormFirst", "jBreakTV")
+		if (BuildConfig.DEBUG) {
+			lifecycleScope.launch {
+				hasCheckUpdateThisSession = true
+				val isAutoUpdateEnabled = userPreferences[UserPreferences.autoUpdateEnabled]
+				if (isAutoUpdateEnabled) {
+					val checker = UpdateCheck(this@MainActivity)
+					val result = checker.checkForUpdate("BlackstormFirst", "jBreakTV")
 
-				if (result is UpdateResult.Available) {
-					// Start download or display warning
-					val installer = ApkInstaller(this@MainActivity)
-					installer.downloadAndInstall(
-						result.downloadUrl,
-						onProgress = { progress ->
-							// Optional progress
-						},
-						onCancel = { hasCheckUpdateThisSession = true }
-					)
+					if (result is UpdateResult.Available) {
+						// Start download or display warning
+						val installer = ApkInstaller(this@MainActivity)
+						installer.downloadAndInstall(
+							result.downloadUrl,
+							onProgress = { progress ->
+								// Optional progress
+							},
+							onCancel = { hasCheckUpdateThisSession = true }
+						)
+					}
 				}
 			}
+		} else {
+			hasCheckUpdateThisSession = true
 		}
 	}
 
