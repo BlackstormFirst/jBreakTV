@@ -42,6 +42,7 @@ import org.jellyfin.androidtv.data.model.ChapterItemInfo;
 import org.jellyfin.androidtv.data.model.DataRefreshService;
 import org.jellyfin.androidtv.data.model.InfoItem;
 import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest;
+import org.jellyfin.androidtv.data.querying.GetNextEpisodesRequest;
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest;
 import org.jellyfin.androidtv.data.querying.GetTrailersRequest;
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository;
@@ -618,9 +619,8 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                     addItemRow(adapter, additionalPartsAdapter, 0, getString(R.string.lbl_additional_parts));
                 }
 
-                if (mBaseItem.getSeasonId() != null && mBaseItem.getIndexNumber() != null) {
-                    // query index is zero-based but episode no is not
-                    ItemRowAdapter nextAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createNextEpisodesRequest(mBaseItem.getSeasonId(), mBaseItem.getIndexNumber()), 0, false, true, new CardPresenter(true, 120), adapter);
+                if (mBaseItem.getSeasonId() != null && mBaseItem.getSeriesId() != null) {
+                    ItemRowAdapter nextAdapter = new ItemRowAdapter(requireContext(), new GetNextEpisodesRequest(mBaseItem.getSeriesId(), mBaseItem.getSeasonId(), mBaseItem.getId()), true, new CardPresenter(true, 120), adapter);
                     addItemRow(adapter, nextAdapter, 5, getString(R.string.lbl_next_episode));
                 }
 

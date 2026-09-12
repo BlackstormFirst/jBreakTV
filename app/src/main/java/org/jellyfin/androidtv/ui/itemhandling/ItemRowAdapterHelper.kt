@@ -10,8 +10,10 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest
+import org.jellyfin.androidtv.data.querying.GetNextEpisodesRequest
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest
 import org.jellyfin.androidtv.data.querying.GetTrailersRequest
+import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.BrowseGridFragment.SortOption
@@ -111,16 +113,18 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 				// we want to query the server for all episodes in the same season starting from
 				// this one to create a list of all unwatched episodes
 				val episodesResponse = withContext(Dispatchers.IO) {
-					api.itemsApi.getItems(
-						parentId = firstNextUp.seasonId,
-						startIndex = firstNextUp.indexNumber,
+					api.tvShowsApi.getEpisodes(
+						seriesId = query.seriesId!!,
+						seasonId = firstNextUp.seasonId,
+						startItemId = firstNextUp.id,
+						fields = ItemRepository.itemFields
 					).content
 				}
 
 				// Combine the next up episode with the additionally retrieved episodes
 				val items = buildList {
 					add(firstNextUp)
-					addAll(episodesResponse.items)
+					addAll(episodesResponse.items.dropWhile { it.id == firstNextUp.id })
 				}
 
 				setItems(
@@ -219,6 +223,37 @@ fun ItemRowAdapter.retrieveAdditionalParts(api: ApiClient, query: GetAdditionalP
 			)
 
 			if (response.items.isEmpty()) removeRow()
+		}.fold(
+			onSuccess = { notifyRetrieveFinished() },
+			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
+		)
+	}
+}
+
+fun ItemRowAdapter.retrieveNextEpisodes(api: ApiClient, query: GetNextEpisodesRequest) {
+	ProcessLifecycleOwner.get().lifecycleScope.launch {
+		runCatching {
+			val response = withContext(Dispatchers.IO) {
+				api.tvShowsApi.getEpisodes(
+					seriesId = query.seriesId,
+					seasonId = query.seasonId,
+					startItemId = query.startItemId,
+					fields = ItemRepository.itemFields
+				).content
+			}
+
+			// getEpisodes includes the startItemId if it exists. We only want the *next* episodes.
+			// However, if the current episode is missing from the list (e.g. filtered),
+			// startItemId might just start returning from the next available.
+			// Let's filter out the startItemId itself just in case.
+			val nextEpisodes = response.items.dropWhile { it.id == query.startItemId }
+
+			setItems(
+				items = nextEpisodes,
+				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
+			)
+
+			if (nextEpisodes.isEmpty()) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }

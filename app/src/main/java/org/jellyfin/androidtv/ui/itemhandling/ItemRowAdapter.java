@@ -20,6 +20,7 @@ import org.jellyfin.androidtv.data.model.ChapterItemInfo;
 import org.jellyfin.androidtv.data.model.DataRefreshService;
 import org.jellyfin.androidtv.data.model.FilterOptions;
 import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest;
+import org.jellyfin.androidtv.data.querying.GetNextEpisodesRequest;
 import org.jellyfin.androidtv.data.querying.GetSeriesTimersRequest;
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest;
 import org.jellyfin.androidtv.data.querying.GetTrailersRequest;
@@ -32,6 +33,7 @@ import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter;
 import org.jellyfin.androidtv.ui.presentation.TextItemPresenter;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.androidtv.util.apiclient.EmptyResponse;
+import org.jellyfin.sdk.api.client.ApiClient;
 import org.jellyfin.sdk.model.api.BaseItemDto;
 import org.jellyfin.sdk.model.api.BaseItemPerson;
 import org.jellyfin.sdk.model.api.ItemSortBy;
@@ -72,6 +74,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     private GetAlbumArtistsRequest mAlbumArtistsQuery;
     private GetLatestMediaRequest mLatestQuery;
     private GetResumeItemsRequest resumeQuery;
+    private GetNextEpisodesRequest mNextEpisodesQuery;
     private QueryType queryType;
 
     private ItemSortBy mSortBy;
@@ -85,7 +88,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     private BaseItemPerson[] mPersons;
     private List<ChapterItemInfo> mChapters;
-    private List<org.jellyfin.sdk.model.api.BaseItemDto> mItems;
+    private List<BaseItemDto> mItems;
     private MutableObjectAdapter<Row> mParent;
     private ListRow mRow;
     private Row siblingRow;
@@ -101,7 +104,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     private boolean preferParentThumb = false;
     private boolean staticHeight = false;
 
-    private final Lazy<org.jellyfin.sdk.api.client.ApiClient> api = inject(org.jellyfin.sdk.api.client.ApiClient.class);
+    private final Lazy<ApiClient> api = inject(ApiClient.class);
     private final Lazy<UserViewsRepository> userViewsRepository = inject(UserViewsRepository.class);
     private Context context;
 
@@ -236,7 +239,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         queryType = QueryType.StaticChapters;
     }
 
-    public ItemRowAdapter(Context context, List<org.jellyfin.sdk.model.api.BaseItemDto> items, Presenter presenter, MutableObjectAdapter<Row> parent, QueryType queryType) {
+    public ItemRowAdapter(Context context, List<BaseItemDto> items, Presenter presenter, MutableObjectAdapter<Row> parent, QueryType queryType) {
         super(presenter);
         this.context = context;
         mParent = parent;
@@ -274,6 +277,15 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         mParent = parent;
         mTrailersQuery = query;
         queryType = QueryType.Trailers;
+    }
+
+    public ItemRowAdapter(Context context, GetNextEpisodesRequest query, boolean staticHeight, Presenter presenter, MutableObjectAdapter<Row> parent) {
+        super(presenter);
+        this.context = context;
+        mParent = parent;
+        mNextEpisodesQuery = query;
+        this.staticHeight = staticHeight;
+        queryType = QueryType.NextEpisodes;
     }
 
     public ItemRowAdapter(Context context, GetLiveTvChannelsRequest query, int chunkSize, Presenter presenter, MutableObjectAdapter<Row> parent) {
@@ -650,6 +662,9 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
             case Resume:
                 ItemRowAdapterHelperKt.retrieveResumeItems(this, api.getValue(), resumeQuery);
                 break;
+            case NextEpisodes:
+                ItemRowAdapterHelperKt.retrieveNextEpisodes(this, api.getValue(), mNextEpisodesQuery);
+                break;
         }
     }
 
@@ -681,7 +696,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     private void loadStaticItems() {
         if (mItems != null) {
-            for (org.jellyfin.sdk.model.api.BaseItemDto item : mItems) {
+            for (BaseItemDto item : mItems) {
                 add(new BaseItemDtoBaseRowItem(item));
             }
             itemsLoaded = mItems.size();

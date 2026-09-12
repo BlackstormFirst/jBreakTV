@@ -237,15 +237,6 @@ object BrowsingUtils {
 	)
 
 	@JvmStatic
-	fun createNextEpisodesRequest(seasonId: UUID, indexNumber: Int) = GetItemsRequest(
-		fields = ItemRepository.itemFields,
-		parentId = seasonId,
-		includeItemTypes = setOf(BaseItemKind.EPISODE),
-		startIndex = indexNumber,
-		limit = 20,
-	)
-
-	@JvmStatic
 	fun createResumeItemsRequest(parentId: UUID, itemType: BaseItemKind) = GetItemsRequest(
 		fields = ItemRepository.itemFields,
 		includeItemTypes = setOf(itemType),
