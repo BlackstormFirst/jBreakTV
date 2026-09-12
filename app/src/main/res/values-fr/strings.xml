@@ -438,7 +438,6 @@
     <string name="image_type_poster">Affiche</string>
     <string name="episode_name_special">special</string>
     <string name="lbl_quality_profile">Profil de qualité</string>
-    <string name="dovi_profile_8_description">Monocouche avec HDR10 en secours</string>
     <string name="desc_audio_night_mode">Nivellement automatique du volume audio</string>
     <string name="pref_audio_night_mode">Mode nuit audio (expérimental)</string>
     <string name="color_white">Blanc</string>
@@ -722,10 +721,7 @@
     <string name="lbl_canceled">annulé</string>
     <string name="lbl_failed">échoué</string>
     <string name="lbl_completed">terminée</string>
-
-
     <string name="preference_hdr_overrides">Formats HDR</string>
-    <string name="preference_hdr_overrides_summary">Remplacer les capacités HDR signalées par l\'appareil</string>
     <string name="hdr_override_auto">Auto (détection de l\'appareil)</string>
     <string name="hdr_override_enable">Activer</string>
     <string name="hdr_override_disable">Désactiver</string>
