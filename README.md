@@ -2,22 +2,30 @@
 <h3 align="center">Based on a fork of <a href="https://github.com/jellyfin/jellyfin-androidtv">Jellyfin Android TV</a></h3>
 
 ---
+
+<h4 align="center">Take a break ! Use jBreakTV !</h4>
 <p>
 jBreakTV is an alternative of the original Jellyfin client for Android TV, Nvidia Shield, and Amazon Fire TV devices.
 
 As a fork, it retains core features and merging capabilities while introducing additional features and fixes.
 
+Works with Jellyfin server versions 10.11.x and 12.x.
+
 Here are some of the improvements:
 - Playback Index Manager (Added support for multiple video tracks in the player and improved fallback handling for audio and subtitles)
 - Server-side audio and subtitle option management (the client now checks the user's audio and subtitles preferences on the server; two modes —DEFAULT and SMART— are currently supported for subtitles, determining behavior when switching between episodes)
 - Images Cache Management (optimizations and new options to manage the image loader's memory and disk cache; changes take effect only after a full restart of the application or the TV)
-- Library Filtering (Added filtering by Genre across libraries and by Type for movie libraries, as well as a workaround for audio filtering using Tags)
+- Library Filtering (Added filtering by Genre across libraries and by Type for movie libraries, as well as a workaround for audio filtering using Tags => The tag must be of the format: #language_French or #language_English ...)
 - Navigation fluidity on the home page has also been improved.
 - Option to change actor thumbnails to a circular shape in the customization menu.
-- Download/Update Manager (For use while the app is not on the Play Store)
+- Download/Update Manager (for Debug builds only)
+- Changes to several default user preferences during installation
+- and lots of other things...
 
 
 The application is currently provided in Debug mode; a properly signed version will soon be available for your devices.
+
+Requests for new features or fixes can still be submitted, though you will likely be redirected to the original source; furthermore, this project focuses specifically on the stability and proper functioning of the video playback component, which is its core feature.
 
 Note that some code modifications were developed with AI assistance to analyze the relevance and impact of the changes, though the final modifications remain the choice and decision of the developers.
 
