@@ -2,4 +2,6 @@
 <paths>
     <external-cache-path name="jBreakTV_cache" path="." />
     <cache-path name="jBreakTV_cache_internal" path="." />
+    <files-path name="files" path="." />
+    <external-path name="external" path="." />
 </paths>

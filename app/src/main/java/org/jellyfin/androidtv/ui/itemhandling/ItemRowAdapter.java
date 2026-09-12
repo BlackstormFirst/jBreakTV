@@ -128,6 +128,10 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         return staticHeight;
     }
 
+    public Context getContext() {
+        return context;
+    }
+
     public QueryType getQueryType() {
         return queryType;
     }

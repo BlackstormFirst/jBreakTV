@@ -15,8 +15,14 @@ import org.jellyfin.androidtv.data.querying.GetSpecialsRequest
 import org.jellyfin.androidtv.data.querying.GetTrailersRequest
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
+import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.BrowseGridFragment.SortOption
+import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
+import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
+import org.jellyfin.androidtv.util.usbdevices.UsbGridButton
+import org.jellyfin.androidtv.util.usbdevices.UsbStorageManager
+import org.koin.java.KoinJavaComponent.get
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.InvalidStatusException
 import org.jellyfin.sdk.api.client.extensions.artistsApi
@@ -27,6 +33,7 @@ import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
 import org.jellyfin.sdk.api.client.extensions.videosApi
+import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemFilter
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
@@ -261,9 +268,49 @@ fun ItemRowAdapter.retrieveNextEpisodes(api: ApiClient, query: GetNextEpisodesRe
 	}
 }
 
+fun ItemRowAdapter.ensureUsbTilePresent() {
+	val userPreferences = get<UserPreferences>(UserPreferences::class.java)
+	val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
+
+	if (!isLocalPlayerUsbEnabled) {
+		var i = 0
+		while (i < size()) {
+			val item = get(i)
+			if (item is UsbBaseRowItem || (item is BaseRowItem && item.baseItem?.id == USB_TILE_UUID)) {
+				remove(item)
+			} else {
+				i++
+			}
+		}
+		return
+	}
+
+	val alreadyHasUsb = (0 until size()).any { i ->
+		val item = get(i)
+		item is UsbBaseRowItem || (item is BaseRowItem && item.baseItem?.id == USB_TILE_UUID)
+	}
+	val usbVolumes = UsbStorageManager.getMountedVolumes(context)
+	val hasUsb = usbVolumes.isNotEmpty() || alreadyHasUsb || UsbStorageManager.hasMountedUsbVolumes(context)
+
+	if (hasUsb) {
+		var presentAtIndex0 = false
+		if (size() > 0) {
+			val firstItem = get(0)
+			if (firstItem is UsbBaseRowItem || (firstItem is BaseRowItem && firstItem.baseItem?.id == USB_TILE_UUID)) {
+				presentAtIndex0 = true
+			}
+		}
+		if (!presentAtIndex0) {
+			add(0, UsbBaseRowItem())
+			Timber.d("USB_DEBUG: ensureUsbTilePresent force-added UsbBaseRowItem at index 0")
+		}
+	}
+}
+
 fun ItemRowAdapter.retrieveUserViews(api: ApiClient, userViewsRepository: UserViewsRepository) {
 	ProcessLifecycleOwner.get().lifecycleScope.launch {
 		runCatching {
+			Timber.d("USB_DEBUG: 1. retrieveUserViews started")
 			val response = withContext(Dispatchers.IO) {
 				api.userViewsApi.getUserViews().content
 			}
@@ -271,15 +318,54 @@ fun ItemRowAdapter.retrieveUserViews(api: ApiClient, userViewsRepository: UserVi
 			val filteredItems = response.items
 				.filter { userViewsRepository.isSupported(it.collectionType) }
 
+			val userPreferences = get<UserPreferences>(UserPreferences::class.java)
+			val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
+
+			val isUsbCurrentlyDisplayed = (0 until size()).any { i ->
+				val itm = get(i)
+				itm is UsbBaseRowItem || (itm is BaseRowItem && itm.baseItem?.id == USB_TILE_UUID)
+			}
+			val usbVolumes = UsbStorageManager.getMountedVolumes(context)
+			val hasUsb = isLocalPlayerUsbEnabled && (usbVolumes.isNotEmpty() || isUsbCurrentlyDisplayed)
+
+			Timber.d("USB_DEBUG: 2. retrieveUserViews hasUsb=$hasUsb (volumesCount=${usbVolumes.size}, isUsbCurrentlyDisplayed=$isUsbCurrentlyDisplayed)")
+
+			itemsLoaded = 0
+
+			val finalServerAndUsbItems = buildList {
+				if (hasUsb) {
+					add(UsbBaseRowItem())
+					Timber.d("USB_DEBUG: 3. UsbBaseRowItem injected at index 0 in finalServerAndUsbItems")
+				}
+				addAll(filteredItems)
+			}
+
+			Timber.d("USB_DEBUG: 4. Submitting ${finalServerAndUsbItems.size} items to setItems()")
 			setItems(
-				items = filteredItems,
-				transform = { item, _ -> BaseItemDtoBaseRowItem(item, staticHeight = true) }
+				items = finalServerAndUsbItems,
+				transform = { item, _ ->
+					when (item) {
+						is UsbBaseRowItem -> item
+						is BaseItemDto -> BaseItemDtoBaseRowItem(item, staticHeight = true)
+						else -> null
+					}
+				}
 			)
 
-			if (filteredItems.isEmpty()) removeRow()
+			ensureUsbTilePresent()
+
+			if (filteredItems.isEmpty() && !hasUsb) removeRow()
 		}.fold(
-			onSuccess = { notifyRetrieveFinished() },
-			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
+			onSuccess = {
+				ensureUsbTilePresent()
+				Timber.d("USB_DEBUG: 5. retrieveUserViews completed successfully, adapter size=${size()}")
+				notifyRetrieveFinished()
+			},
+			onFailure = { error ->
+				ensureUsbTilePresent()
+				Timber.e(error, "USB_DEBUG: 6. retrieveUserViews failed")
+				notifyRetrieveFinished(error as? Exception)
+			}
 		)
 	}
 }
@@ -734,7 +820,8 @@ fun ItemRowAdapter.refreshItem(
 	currentBaseRowItem: BaseRowItem,
 	callback: () -> Unit = {}
 ) {
-	if (currentBaseRowItem !is BaseItemDtoBaseRowItem || currentBaseRowItem is AudioQueueBaseRowItem) return
+	if (currentBaseRowItem !is BaseItemDtoBaseRowItem || currentBaseRowItem is AudioQueueBaseRowItem || currentBaseRowItem is UsbBaseRowItem) return
+	if (currentBaseRowItem.baseItem?.id == USB_TILE_UUID) return
 	val currentBaseItem = currentBaseRowItem.baseItem ?: return
 
 	lifecycleOwner.lifecycleScope.launch {

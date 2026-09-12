@@ -21,6 +21,10 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
+    <!-- Storage permissions for USB drives -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+
     <!-- Device feature requirements -->
     <uses-feature
         android:name="android.software.leanback"
@@ -149,5 +153,20 @@
             android:windowSoftInputMode="adjustNothing" />
 
         <activity android:name=".ui.playback.ExternalPlayerActivity" />
+
+        <!-- USB Storage receiver -->
+
+        <receiver
+            android:name=".util.usbdevices.UsbStorageReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_MOUNTED" />
+                <action android:name="android.intent.action.MEDIA_UNMOUNTED" />
+                <action android:name="android.intent.action.MEDIA_REMOVED" />
+                <action android:name="android.intent.action.MEDIA_EJECT" />
+                <action android:name="android.intent.action.MEDIA_BAD_REMOVAL" />
+                <data android:scheme="file" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

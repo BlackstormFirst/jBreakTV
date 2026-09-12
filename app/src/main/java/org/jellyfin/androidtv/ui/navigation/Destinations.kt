@@ -23,6 +23,9 @@ import org.jellyfin.androidtv.ui.playback.stillwatching.StillWatchingFragment
 import org.jellyfin.androidtv.ui.player.photo.PhotoPlayerFragment
 import org.jellyfin.androidtv.ui.player.video.VideoPlayerFragment
 import org.jellyfin.androidtv.ui.search.SearchFragment
+import org.jellyfin.androidtv.util.usbdevices.ARG_CURRENT_DIR
+import org.jellyfin.androidtv.util.usbdevices.ARG_VOLUME_NAME
+import org.jellyfin.androidtv.util.usbdevices.UsbFileExplorerFragment
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
@@ -35,6 +38,12 @@ object Destinations {
 	val home = fragmentDestination<HomeFragment>()
 	fun search(query: String? = null) = fragmentDestination<SearchFragment> {
 		putString(SearchFragment.EXTRA_QUERY, query)
+	}
+	val usbVolumeSelector = fragmentDestination<org.jellyfin.androidtv.util.usbdevices.UsbVolumeSelectorFragment>()
+	fun usbExplorer(currentDir: String, rootPath: String, volumeName: String) = fragmentDestination<UsbFileExplorerFragment> {
+		putString(ARG_CURRENT_DIR, currentDir)
+		putString(org.jellyfin.androidtv.util.usbdevices.ARG_ROOT_PATH, rootPath)
+		putString(ARG_VOLUME_NAME, volumeName)
 	}
 
 	// Browsing

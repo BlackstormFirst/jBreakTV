@@ -3,8 +3,10 @@ package org.jellyfin.androidtv.ui.home
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.widget.Toast
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ListRow
+import androidx.leanback.widget.ListRowPresenter
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
 import androidx.leanback.widget.Presenter
@@ -35,13 +37,16 @@ import org.jellyfin.androidtv.data.repository.CustomMessageRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.data.service.BackgroundService
+import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.CompositeClickedListener
 import org.jellyfin.androidtv.ui.browsing.CompositeSelectedListener
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
+import org.jellyfin.androidtv.ui.itemhandling.GridButtonBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
+import org.jellyfin.androidtv.ui.itemhandling.ensureUsbTilePresent
 import org.jellyfin.androidtv.ui.itemhandling.refreshItem
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
@@ -51,6 +56,12 @@ import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter
 import org.jellyfin.androidtv.util.KeyProcessor
+import org.jellyfin.androidtv.util.usbdevices.USB_GRID_BUTTON_ID
+import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
+import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
+import org.jellyfin.androidtv.util.usbdevices.UsbGridButton
+import org.jellyfin.androidtv.util.usbdevices.UsbHomeDecorator
+import org.jellyfin.androidtv.util.usbdevices.UsbStorageManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.sockets.subscribe
@@ -67,6 +78,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val mediaManager by inject<MediaManager>()
 	private val notificationsRepository by inject<NotificationsRepository>()
 	private val userRepository by inject<UserRepository>()
+	private val userPreferences by inject<UserPreferences>()
 	private val userSettingPreferences by inject<UserSettingPreferences>()
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val dataRefreshService by inject<DataRefreshService>()
@@ -199,15 +211,72 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	override fun onResume() {
 		super.onResume()
 
-		//React to deletion
+		// React to deletion
 		if (currentRow != null && currentItem != null && currentItem?.baseItem != null && currentItem!!.baseItem!!.id == dataRefreshService.lastDeletedItemId) {
 			(currentRow!!.adapter as ItemRowAdapter).remove(currentItem)
 			currentItem = null
 			dataRefreshService.lastDeletedItemId = null
 		}
 
+		// Re-evaluate USB storage state & force reinjection on return to home
+		val isLocalPlayerUsbEnabled = userPreferences.get(UserPreferences.localPlayerUsbEnabled)
+		if (isLocalPlayerUsbEnabled) {
+			val rowsAdapter = adapter as? MutableObjectAdapter<Row>
+			if (rowsAdapter != null) {
+				for (i in 0 until rowsAdapter.size()) {
+					val listRow = rowsAdapter.get(i) as? ListRow ?: continue
+					val itemAdapter = listRow.adapter as? ItemRowAdapter ?: continue
+					if (itemAdapter.queryType == QueryType.Views) {
+						itemAdapter.ensureUsbTilePresent()
+					}
+				}
+			}
+		} else {
+			// Remove USB tile if disabled
+			val rowsAdapter = adapter as? MutableObjectAdapter<Row>
+			if (rowsAdapter != null) {
+				for (i in 0 until rowsAdapter.size()) {
+					val listRow = rowsAdapter.get(i) as? ListRow ?: continue
+					val itemAdapter = listRow.adapter as? ItemRowAdapter ?: continue
+					if (itemAdapter.queryType == QueryType.Views) {
+						var j = 0
+						while (j < itemAdapter.size()) {
+							val item = itemAdapter.get(j)
+							if (item is UsbBaseRowItem || (item is BaseRowItem && item.baseItem?.id == USB_TILE_UUID)) {
+								itemAdapter.remove(item)
+							} else {
+								j++
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Restore focus to current row / item if returning to home
+		val rowsAdapter = adapter as? MutableObjectAdapter<Row>
+		if (rowsAdapter != null && currentRow != null) {
+			val rowIndex = rowsAdapter.indexOf(currentRow as Row)
+			if (rowIndex >= 0) {
+				setSelectedPosition(rowIndex)
+				verticalGridView?.post {
+					val rowVh = findRowViewHolderByPosition(rowIndex) as? ListRowPresenter.ViewHolder
+					if (rowVh != null) {
+						val itemAdapter = currentRow?.adapter as? ItemRowAdapter
+						if (itemAdapter != null && currentItem != null) {
+							val itemIndex = itemAdapter.indexOf(currentItem)
+							if (itemIndex >= 0) {
+								rowVh.gridView.selectedPosition = itemIndex
+							}
+						}
+						rowVh.gridView.requestFocus()
+					}
+				}
+			}
+		}
+
 		if (!justLoaded) {
-			//Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
+			// Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
 			refreshCurrentItem()
 			refreshRows()
 		} else {
@@ -231,9 +300,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			if (delayed) delay(1.5.seconds)
 
 			repeat(adapter.size()) { i ->
-				val rowAdapter = (adapter[i] as? ListRow)?.adapter as? ItemRowAdapter
-				if (force) rowAdapter?.Retrieve()
-				else rowAdapter?.ReRetrieveIfNeeded()
+				val rowAdapter = (adapter[i] as? ListRow)?.adapter as? ItemRowAdapter ?: return@repeat
+				if (rowAdapter.queryType == QueryType.Views) return@repeat
+
+				if (force) rowAdapter.Retrieve()
+				else rowAdapter.ReRetrieveIfNeeded()
 			}
 		}
 	}
@@ -259,13 +330,51 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			rowViewHolder: RowPresenter.ViewHolder?,
 			row: Row?,
 		) {
-			if (item is GridButton) {
-				when (item.id) {
+			try {
+				val isUsbTile = when (item) {
+					is UsbBaseRowItem -> true
+					is UsbGridButton -> true
+					is GridButtonBaseRowItem -> item.gridButton.id == USB_GRID_BUTTON_ID
+					is BaseRowItem -> item.baseItem?.id == USB_TILE_UUID
+					else -> false
+				}
+
+				if (isUsbTile) {
+					try {
+						val activityContext = activity ?: requireContext()
+						UsbHomeDecorator.handleUsbTileClick(activityContext, navigationRepository)
+					} catch (t: Throwable) {
+						Toast.makeText(
+							context,
+							"Erreur ouverture USB: ${t.javaClass.simpleName} - ${t.message}",
+							Toast.LENGTH_LONG
+						).show()
+					}
+					return
+				}
+			} catch (t: Throwable) {
+				Toast.makeText(
+					context,
+					"Erreur détection USB: ${t.javaClass.simpleName} - ${t.message}",
+					Toast.LENGTH_LONG
+				).show()
+				return
+			}
+
+			val gridButton = when (item) {
+				is GridButton -> item
+				is GridButtonBaseRowItem -> item.gridButton
+				else -> null
+			}
+
+			if (gridButton != null) {
+				when (gridButton.id) {
 					LiveTvOption.LIVE_TV_GUIDE_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvGuide)
 					LiveTvOption.LIVE_TV_SCHEDULE_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvSchedule)
 					LiveTvOption.LIVE_TV_RECORDINGS_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvRecordings)
 					LiveTvOption.LIVE_TV_SERIES_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvSeriesRecordings)
 				}
+				return
 			}
 
 			if (item !is BaseRowItem) return

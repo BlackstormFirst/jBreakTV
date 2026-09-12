@@ -12,6 +12,8 @@
     <string name="pref_authentication_cat">Authentication</string>
     <string name="chapters">Chapters</string>
     <string name="state_disabled">Disabled</string>
+    <string name="state_enabled">Enabled</string>
+    <string name="pref_local_player_usb">Local or USB player</string>
     <string name="lbl_settings">Preferences</string>
     <string name="lbl_home">Home</string>
     <string name="lbl_continue_watching">Continue watching</string>

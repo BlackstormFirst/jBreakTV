@@ -19,6 +19,9 @@ import org.jellyfin.androidtv.util.PlaybackHelper;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.androidtv.util.apiclient.Response;
 import org.jellyfin.androidtv.util.sdk.compat.JavaCompat;
+import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem;
+import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItemKt;
+import org.jellyfin.androidtv.util.usbdevices.UsbHomeDecorator;
 import org.jellyfin.sdk.model.api.BaseItemDto;
 import org.jellyfin.sdk.model.api.BaseItemKind;
 import org.jellyfin.sdk.model.api.CollectionType;
@@ -67,6 +70,12 @@ public class ItemLauncher {
     }
 
     public void launch(final BaseRowItem rowItem, MutableObjectAdapter<Object> adapter, final Context context) {
+        if (rowItem instanceof UsbBaseRowItem
+                || (rowItem.getBaseItem() != null && UsbBaseRowItemKt.getUSB_TILE_UUID().equals(rowItem.getBaseItem().getId()))) {
+            UsbHomeDecorator.INSTANCE.handleUsbTileClick(context, navigationRepository.getValue());
+            return;
+        }
+
         switch (rowItem.getBaseRowType()) {
             case BaseItem:
                 BaseItemDto baseItem = rowItem.getBaseItem();

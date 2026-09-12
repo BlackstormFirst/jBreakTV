@@ -86,6 +86,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 */
 		var stillWatchingBehavior = enumPreference("enable_still_watching", StillWatchingBehavior.DISABLED)
 
+		/**
+		 * Enable local or USB player tile
+		 */
+		var localPlayerUsbEnabled = booleanPreference("localPlayerUsbEnabled", true)
+
 		/* Playback - Video */
 		/**
 		 * Whether to use an external playback application or not.

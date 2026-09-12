@@ -57,6 +57,10 @@ import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
+import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
 
 class CardPresenter(
 	val showInfo: Boolean,
@@ -316,7 +320,7 @@ private fun CardViewHolderContent(
 
 	val usePreview = displayConfig.overrideShowInfo ?: showInfo
 
-	// Détermination si l'élément courant est une personne
+	// Determine if the current item is a person
 	val isPersonItem = item.baseRowType == BaseRowType.Person ||
 		item.baseItem?.type == BaseItemKind.PERSON
 
@@ -338,6 +342,15 @@ private fun CardViewHolderContent(
 						scaleType = displayConfig.scaleType ?: ImageView.ScaleType.CENTER_CROP,
 						modifier = Modifier
 							.fillMaxSize()
+					)
+				} else if (item is UsbBaseRowItem || item.baseItem?.id == USB_TILE_UUID) {
+					Image(
+						painter = painterResource(R.drawable.ic_folder),
+						contentDescription = null,
+						colorFilter = ColorFilter.tint(Color(0xFFFFC107)),
+						modifier = Modifier
+							.fillMaxSize(0.4f)
+							.align(Alignment.Center)
 					)
 				} else if (item is GridButtonBaseRowItem && item.gridButton.imageRes != null) {
 					Image(

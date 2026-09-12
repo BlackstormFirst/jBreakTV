@@ -20,7 +20,7 @@ class TitleView @JvmOverloads constructor(
 
 	private val titleViewAdapter: TitleViewAdapter = object : TitleViewAdapter() {
 		override fun setTitle(titleText: CharSequence) {
-			binding.titleText.text = title
+			binding.titleText.text = titleText
 			binding.titleText.isVisible = true
 		}
 

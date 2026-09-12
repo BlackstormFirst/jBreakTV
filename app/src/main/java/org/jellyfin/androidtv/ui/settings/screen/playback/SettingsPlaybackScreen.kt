@@ -19,6 +19,7 @@ import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.LocalShapes
 import org.jellyfin.androidtv.ui.base.Text
+import org.jellyfin.androidtv.ui.base.form.Checkbox
 import org.jellyfin.androidtv.ui.base.list.ListButton
 import org.jellyfin.androidtv.ui.base.list.ListSection
 import org.jellyfin.androidtv.ui.navigation.LocalRouter
@@ -91,6 +92,21 @@ fun SettingsPlaybackScreen() {
 				captionContent = { Text(stringResource(stillWatchingBehavior.nameRes)) },
 				onClick = { router.push(Routes.PLAYBACK_INACTIVITY_PROMPT) },
 				modifier = Modifier.focusKey(Routes.PLAYBACK_INACTIVITY_PROMPT)
+			)
+		}
+
+		item {
+			var localPlayerUsbEnabled by rememberPreference(userPreferences, UserPreferences.localPlayerUsbEnabled)
+
+			ListButton(
+				leadingContent = { Icon(painterResource(R.drawable.ic_next), contentDescription = null) },
+				headingContent = { Text(stringResource(R.string.pref_local_player_usb)) },
+				trailingContent = { Checkbox(checked = localPlayerUsbEnabled) },
+				captionContent = {
+					Text(if (localPlayerUsbEnabled) stringResource(R.string.state_enabled) else stringResource(R.string.state_disabled))
+				},
+				onClick = { localPlayerUsbEnabled = !localPlayerUsbEnabled },
+				modifier = Modifier.focusKey("local_player_usb_enabled")
 			)
 		}
 
