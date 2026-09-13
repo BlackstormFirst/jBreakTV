@@ -10,6 +10,8 @@ import android.view.Display;
 import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
+import androidx.media3.common.util.UnstableApi;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.data.compat.PlaybackException;
 import org.jellyfin.androidtv.data.compat.StreamInfo;
@@ -29,6 +31,7 @@ import org.jellyfin.androidtv.util.apiclient.ReportingHelper;
 import org.jellyfin.androidtv.util.apiclient.Response;
 import org.jellyfin.androidtv.util.profile.DeviceProfileKt;
 import org.jellyfin.androidtv.util.sdk.compat.JavaCompat;
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager;
 import org.jellyfin.sdk.api.client.ApiClient;
 import org.jellyfin.sdk.model.ServerVersion;
 import org.jellyfin.sdk.model.api.BaseItemDto;
@@ -48,6 +51,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 import kotlin.Lazy;
@@ -550,16 +554,33 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (!isLiveTv) {
             internalOptions.setMediaSourceId(currentMediaSource.getId());
         }
-        DeviceProfile internalProfile = DeviceProfileKt.createDeviceProfile(
-                mFragment.getContext(),
-                userPreferences.getValue(),
-                get(ServerVersion.class)
-        );
-        internalOptions.setProfile(internalProfile);
+        if (!isCurrentItemLocal(item)) {
+            try {
+                DeviceProfile internalProfile = DeviceProfileKt.createDeviceProfile(
+                        mFragment.getContext(),
+                        userPreferences.getValue(),
+                        get(ServerVersion.class)
+                );
+                internalOptions.setProfile(internalProfile);
+            } catch (Exception ignored) {}
+        }
         return internalOptions;
     }
 
     private void playInternal(final BaseItemDto item, final Long position, final VideoOptions internalOptions) {
+        if (isCurrentItemLocal(item)) {
+            Timber.i("UsbDebug: Direct Local USB playback for %s", item.getPath());
+            try {
+                StreamInfo localStreamInfo = LocalVideoManager.INSTANCE.buildLocalStreamInfo(item);
+                mCurrentStreamInfo = localStreamInfo;
+                mCurrentOptions = internalOptions;
+                startItem(item, position, localStreamInfo);
+                return;
+            } catch (Exception e) {
+                Timber.e(e, "UsbDebug: Error building local USB StreamInfo in PlaybackController");
+            }
+        }
+
         if (isLiveTv) {
             updateTvProgramInfo();
             TvManager.setLastLiveTvChannel(item.getId());
@@ -680,34 +701,50 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         final Long finalMbPos = mbPos;
 
         Runnable prepareAndStartPlayer = new Runnable() {
+            @OptIn(markerClass = UnstableApi.class)
             @Override
             public void run() {
+                boolean isLocal = isCurrentItemLocal(finalItem);
+
                 if (mVideoManager != null) {
-                    mVideoManager.setMediaStreamInfo(api.getValue(), finalResponse);
+                    if (isLocal) {
+                        LocalVideoManager.INSTANCE.configureAndPlayLocal(mVideoManager, finalResponse);
+                        onPrepared();
+                    } else {
+                        mVideoManager.setMediaStreamInfo(api.getValue(), finalResponse);
+                    }
                 }
 
-                PlaybackControllerHelperKt.applyMediaSegments(PlaybackController.this, finalItem, () -> {
-                    if (mFragment == null) return null;
-                    // Set video start delay
+                Runnable startAction = () -> {
+                    if (mFragment == null) return;
+
                     long videoStartDelay = userPreferences.getValue().get(UserPreferences.Companion.getVideoStartDelay());
                     if (videoStartDelay > 0) {
-                        mHandler.postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (mVideoManager != null) {
-                                    mVideoManager.start();
-                                }
+                        mHandler.postDelayed(() -> {
+                            if (mVideoManager != null) {
+                                mVideoManager.start();
                             }
                         }, videoStartDelay);
                     } else {
-                        mVideoManager.start();
+                        if (mVideoManager != null) {
+                            mVideoManager.start();
+                        }
                     }
 
                     dataRefreshService.getValue().setLastPlayedItem(finalItem);
-                    reportingHelper.getValue().reportStart(mFragment, PlaybackController.this, finalItem, finalResponse, finalMbPos, false);
+                    if (!isLocal) {
+                        reportingHelper.getValue().reportStart(mFragment, PlaybackController.this, finalItem, finalResponse, finalMbPos, false);
+                    }
+                };
 
-                    return null;
-                });
+                if (isLocal) {
+                    startAction.run();
+                } else {
+                    PlaybackControllerHelperKt.applyMediaSegments(PlaybackController.this, finalItem, () -> {
+                        startAction.run();
+                        return null;
+                    });
+                }
             }
         };
 
@@ -717,6 +754,25 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         } else {
             prepareAndStartPlayer.run();
         }
+    }
+
+    public static boolean isCurrentItemLocal(@Nullable BaseItemDto item) {
+        if (item == null) return false;
+
+        String path = item.getPath();
+        if (path == null || path.trim().isEmpty()) return false;
+
+        // Si c'est une URL réseau, c'est obligatoirement du streaming distant
+        String lower = path.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("http://") || lower.startsWith("https://")) {
+            return false;
+        }
+
+        // Fichier strictement présent sur le stockage physique Android local (USB, interne, SD)
+        return path.startsWith("/storage/")
+                || path.startsWith("/mnt/")
+                || path.startsWith("file:")
+                || path.startsWith("content:");
     }
 
     public void startSpinner() {
@@ -920,7 +976,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             mPlaybackState = PlaybackState.IDLE;
 
             if (mVideoManager != null && mVideoManager.isPlaying()) mVideoManager.stopPlayback();
-            if (getCurrentlyPlayingItem() != null && mCurrentStreamInfo != null && mFragment != null) {
+            if (getCurrentlyPlayingItem() != null && mCurrentStreamInfo != null) {
                 Long mbPos = mCurrentPosition * 10000;
                 reportingHelper.getValue().reportStopped(mFragment, getCurrentlyPlayingItem(), mCurrentStreamInfo, mbPos);
             }
@@ -1156,17 +1212,13 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     private void startReportLoop() {
-        if (mCurrentStreamInfo == null || mFragment == null) return;
+        if (mCurrentStreamInfo == null) return;
 
         stopReportLoop();
         reportingHelper.getValue().reportProgress(mFragment, this, getCurrentlyPlayingItem(), getCurrentStreamInfo(), mCurrentPosition * 10000, false);
         mReportLoop = new Runnable() {
             @Override
             public void run() {
-                if (mFragment == null) {
-                    stopReportLoop();
-                    return;
-                }
                 if (isPlaying()) {
                     refreshCurrentPosition();
                     long currentTime = isLiveTv ? getTimeShiftedProgress() : mCurrentPosition;
@@ -1183,15 +1235,11 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     private void startPauseReportLoop() {
         stopReportLoop();
-        if (mCurrentStreamInfo == null || mFragment == null) return;
+        if (mCurrentStreamInfo == null) return;
         reportingHelper.getValue().reportProgress(mFragment, this, getCurrentlyPlayingItem(), mCurrentStreamInfo, mCurrentPosition * 10000, true);
         mReportLoop = new Runnable() {
             @Override
             public void run() {
-                if (mFragment == null) {
-                    stopReportLoop();
-                    return;
-                }
                 BaseItemDto currentItem = getCurrentlyPlayingItem();
                 if (currentItem == null) {
                     // Loop was called while nothing was playing!
@@ -1286,13 +1334,17 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (mPlaybackState == PlaybackState.BUFFERING) {
             if (mFragment != null) {
                 mFragment.setFadingEnabled(true);
-                mFragment.leanbackOverlayFragment.setShouldShowOverlay(true);
+                mFragment.leanbackOverlayFragment.setShouldShowOverlay(false);
             }
 
             mPlaybackState = PlaybackState.PLAYING;
-            interactionTracker.notifyStart(getCurrentlyPlayingItem());
+            if (!isCurrentItemLocal(getCurrentlyPlayingItem())) {
+                interactionTracker.notifyStart(getCurrentlyPlayingItem());
+            }
             mCurrentTranscodeStartTime = mCurrentStreamInfo.getPlayMethod() == PlayMethod.TRANSCODE ? Instant.now().toEpochMilli() : 0;
-            startReportLoop();
+            if (!isCurrentItemLocal(getCurrentlyPlayingItem())) {
+                startReportLoop();
+            }
         }
 
         Timber.i("Play method: %s", mCurrentStreamInfo.getPlayMethod() == PlayMethod.TRANSCODE ? "Trans" : "Direct");
@@ -1302,9 +1354,14 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         } else {
             if (!burningSubs) {
                 // Make sure the requested subtitles are enabled when external/embedded
-                var currentSubtitleIndex = mCurrentOptions.getSubtitleStreamIndex();
+                Integer currentSubtitleIndex = mCurrentOptions.getSubtitleStreamIndex();
                 if (currentSubtitleIndex == null) currentSubtitleIndex = -1;
-                PlaybackControllerHelperKt.setSubtitleIndex(this, currentSubtitleIndex, true);
+
+                if (Objects.equals(mCurrentOptions.getSubtitleStreamIndex(), currentSubtitleIndex) && currentSubtitleIndex != -1) {
+                    Timber.d("PlaybackController: onPrepared - subtitle index %s already applied, skipping", currentSubtitleIndex);
+                } else {
+                    PlaybackControllerHelperKt.setSubtitleIndex(this, currentSubtitleIndex, false);
+                }
             } else {
                 PlaybackControllerHelperKt.disableDefaultSubtitles(this);
             }
@@ -1328,8 +1385,14 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 if (mCurrentOptions != null && mCurrentOptions.getVideoStreamIndex() != null) {
                     eligibleVideoTrack = mCurrentOptions.getVideoStreamIndex();
                 }
-                if (eligibleVideoTrack != -1) {
+
+                // Protection : on ne force la piste QUE si elle n'est pas déjà sélectionnée
+                int currentVideoTrack = getVideoStreamIndex();
+                if (eligibleVideoTrack != -1 && eligibleVideoTrack != currentVideoTrack) {
+                    Timber.i("onPrepared: Applying video track %d (current was %d)", eligibleVideoTrack, currentVideoTrack);
                     mVideoManager.setExoPlayerTrack(eligibleVideoTrack, MediaStreamType.VIDEO, getCurrentMediaSource().getMediaStreams());
+                } else {
+                    Timber.d("onPrepared: Video track %d already applied, skipping override", eligibleVideoTrack);
                 }
             }
         }

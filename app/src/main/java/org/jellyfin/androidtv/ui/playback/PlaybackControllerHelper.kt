@@ -1,5 +1,7 @@
 package org.jellyfin.androidtv.ui.playback
 
+import android.net.Uri
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
@@ -8,6 +10,7 @@ import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.data.compat.StreamInfo
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentAction
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentRepository
 import org.jellyfin.androidtv.util.sdk.end
@@ -15,12 +18,98 @@ import org.jellyfin.androidtv.util.sdk.start
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.LocationType
+import org.jellyfin.sdk.model.api.MediaProtocol
 import org.jellyfin.sdk.model.api.MediaSegmentDto
+import org.jellyfin.sdk.model.api.MediaSourceInfo
+import org.jellyfin.sdk.model.api.MediaSourceType
+import org.jellyfin.sdk.model.api.MediaStream
+import org.jellyfin.sdk.model.api.MediaStreamProtocol
 import org.jellyfin.sdk.model.api.MediaStreamType
+import org.jellyfin.sdk.model.api.PlayMethod
 import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
 import org.koin.android.ext.android.inject
 import timber.log.Timber
+import java.io.File
 import java.util.UUID
+
+fun buildLocalStreamInfo(item: BaseItemDto): StreamInfo {
+	val file = File(item.path ?: "")
+	val fileUriStr = Uri.fromFile(file).toString()
+	val containerExt = file.extension.ifBlank { "mkv" }
+
+	val videoStream = MediaStream(
+		type = MediaStreamType.VIDEO,
+		index = 0,
+		codec = containerExt,
+		isDefault = true,
+		isForced = false,
+		isExternal = false,
+		isHearingImpaired = false,
+		isInterlaced = false,
+		isTextSubtitleStream = false,
+		supportsExternalStream = false
+	)
+	val audioStream = MediaStream(
+		type = MediaStreamType.AUDIO,
+		index = 1,
+		codec = "aac",
+		isDefault = true,
+		isForced = false,
+		isExternal = false,
+		isHearingImpaired = false,
+		isInterlaced = false,
+		isTextSubtitleStream = false,
+		supportsExternalStream = false
+	)
+
+	val mediaSource = item.mediaSources?.firstOrNull() ?: MediaSourceInfo(
+		protocol = MediaProtocol.FILE,
+		id = "local_src_" + file.name.hashCode(),
+		path = fileUriStr,
+		type = MediaSourceType.DEFAULT,
+		container = containerExt,
+		name = file.name,
+		isRemote = false,
+		supportsDirectPlay = true,
+		supportsDirectStream = true,
+		supportsTranscoding = false,
+		hasSegments = false,
+		requiresOpening = false,
+		requiresClosing = false,
+		requiresLooping = false,
+		supportsProbing = false,
+		readAtNativeFramerate = false,
+		ignoreDts = false,
+		ignoreIndex = false,
+		genPtsInput = false,
+		transcodingSubProtocol = MediaStreamProtocol.HTTP,
+		isInfiniteStream = false,
+		mediaStreams = listOf(videoStream, audioStream)
+	)
+
+	val safeMediaSource = mediaSource.copy(
+		id = mediaSource.id ?: ("local_src_" + file.name.hashCode()),
+		path = fileUriStr,
+		protocol = MediaProtocol.FILE,
+		container = mediaSource.container ?: containerExt,
+		supportsDirectPlay = true,
+		supportsDirectStream = true,
+		supportsTranscoding = false,
+		isRemote = false,
+		isInfiniteStream = false,
+		mediaStreams = mediaSource.mediaStreams ?: listOf(videoStream, audioStream)
+	)
+
+	return StreamInfo().apply {
+		itemId = item.id
+		this.mediaSource = safeMediaSource
+		mediaUrl = fileUriStr
+		playMethod = PlayMethod.DIRECT_PLAY
+		container = containerExt
+		playSessionId = "local_session_" + file.name.hashCode()
+	}
+}
 
 fun PlaybackController.getLiveTvChannel(
 	id: UUID,
@@ -54,7 +143,13 @@ fun PlaybackController.disableDefaultSubtitles() {
 @OptIn(UnstableApi::class)
 @JvmOverloads
 fun PlaybackController.setSubtitleIndex(index: Int, force: Boolean = false) {
-	Timber.i("Switching subtitles from index ${mCurrentOptions.subtitleStreamIndex} to $index")
+	val activeSubtitleIndex = mCurrentOptions.subtitleStreamIndex
+	if (activeSubtitleIndex != null && activeSubtitleIndex == index && !force) {
+		Timber.d("PlaybackControllerHelper: skipping subtitle switch, already set to $index")
+		return
+	}
+
+	Timber.i("Switching subtitles from index $activeSubtitleIndex to $index.)}")
 
 	// Save subtitle language preference for restoration after NextUp screen
 	val videoQueueManager by fragment.inject<VideoQueueManager>()
@@ -75,9 +170,6 @@ fun PlaybackController.setSubtitleIndex(index: Int, force: Boolean = false) {
 		videoQueueManager.setLastPlayedSubtitleLanguageIsoCode(stream?.language)
 		videoQueueManager.setLastPlayedSubtitleTitle(stream?.title)
 	}
-
-	// Already using this subtitle index
-	if (mCurrentOptions.subtitleStreamIndex == index && !force) return
 
 	// Disable subtitles
 	if (index == -1) {

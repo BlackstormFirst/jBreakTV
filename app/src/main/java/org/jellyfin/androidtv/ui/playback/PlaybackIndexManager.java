@@ -7,6 +7,7 @@ import android.content.Context;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.preference.UserPreferences;
 import org.jellyfin.androidtv.preference.UserSettingPreferences;
+import org.jellyfin.sdk.model.api.MediaProtocol;
 import org.jellyfin.sdk.model.api.MediaSourceInfo;
 import org.jellyfin.sdk.model.api.MediaStream;
 import org.jellyfin.sdk.model.api.MediaStreamType;
@@ -21,7 +22,29 @@ public class PlaybackIndexManager {
     private Lazy<UserPreferences> userPreferences = inject(UserPreferences.class);
     private Lazy<VideoQueueManager> videoQueueManager = inject(VideoQueueManager.class);
 
+    private boolean isLocalSource(MediaSourceInfo info) {
+        if (info == null) return false;
+        if (info.getProtocol() == MediaProtocol.FILE) return true;
+        String path = info.getPath();
+        return path != null && (path.startsWith("/storage/") || path.startsWith("file:") || path.startsWith("content:"));
+    }
+
     public Integer getBestAudioIndex(MediaSourceInfo info) {
+        boolean isLocal = isLocalSource(info);
+        if (isLocal && info != null && info.getMediaStreams() != null) {
+            List<MediaStream> allAudioStreams = info.getMediaStreams().stream().filter(stream -> stream.getType() == MediaStreamType.AUDIO).toList();
+            if (allAudioStreams != null && !allAudioStreams.isEmpty()) {
+                Integer defaultIndex = allAudioStreams.get(0).getIndex();
+                for (MediaStream stream : allAudioStreams) {
+                    if (stream.isDefault()) {
+                        defaultIndex = stream.getIndex();
+                        break;
+                    }
+                }
+                Timber.i("Best local audio found on index: %d", defaultIndex);
+                return defaultIndex;
+            }
+        }
         var userAudioLangRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getAudioLangRemoteSetting());
         var userAudioAlwaysDefaultRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getUserAlwaysUseAudioDefault());
         var userSubMode = userPreferences.getValue().get(UserSettingPreferences.Companion.getSubMode());
@@ -254,6 +277,21 @@ public class PlaybackIndexManager {
     }
 
     public Integer getBestSubtitleIndex(MediaSourceInfo info, Context context) {
+        boolean isLocal = isLocalSource(info);
+        if (isLocal) {
+            List<MediaStream> allSubStreams = info.getMediaStreams() != null ? info.getMediaStreams().stream().filter(s -> s.getType() == MediaStreamType.SUBTITLE).toList() : null;
+            Integer subIndex = -1;
+            if (allSubStreams != null) {
+                for (MediaStream stream : allSubStreams) {
+                    if (stream.isDefault() || stream.isForced()) {
+                        subIndex = stream.getIndex();
+                        break;
+                    }
+                }
+            }
+            Timber.i("Best local subtitle found on index: %d", subIndex);
+            return subIndex;
+        }
         Integer matchingIndex = null;
         var userAudioLangRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getAudioLangRemoteSetting());
         var userAudioAlwaysDefaultRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getUserAlwaysUseAudioDefault());
@@ -425,6 +463,22 @@ public class PlaybackIndexManager {
     }
 
     public Integer getBestVideoIndex(MediaSourceInfo info) {
+        boolean isLocal = isLocalSource(info);
+        if (isLocal && info != null && info.getMediaStreams() != null) {
+            List<MediaStream> allVideoStreams = info.getMediaStreams().stream().filter(stream -> stream.getType() == MediaStreamType.VIDEO).toList();
+            if (allVideoStreams != null && !allVideoStreams.isEmpty()) {
+                Integer videoIndex = allVideoStreams.get(0).getIndex();
+                for (MediaStream stream : allVideoStreams) {
+                    if (stream.isDefault()) {
+                        videoIndex = stream.getIndex();
+                        break;
+                    }
+                }
+                Timber.i("Best local video found on index: %d", videoIndex);
+                return videoIndex;
+            }
+        }
+
         if (info != null && info.getMediaStreams() != null) {
             Boolean lastVideoDefaultState = videoQueueManager.getValue().getLastPlayedVideoDefaultState();
             List<MediaStream> allVideoStreams = info.getMediaStreams().stream().filter(stream -> stream.getType() == MediaStreamType.VIDEO).toList();

@@ -15,7 +15,6 @@ import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.FrameLayout;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
@@ -78,7 +77,7 @@ import timber.log.Timber;
 @OptIn(markerClass = UnstableApi.class)
 public class VideoManager {
     private ZoomMode mZoomMode;
-    private Activity mActivity;
+    public Activity mActivity;
     private Equalizer mEqualizer;
     private DynamicsProcessing mDynamicsProcessing;
     private Limiter mLimiter;
@@ -91,8 +90,12 @@ public class VideoManager {
     private long mMetaDuration = -1;
     private long lastExoPlayerPosition = -1;
     private boolean nightModeEnabled;
+    private boolean hasNotifiedPrepared = false;
+    private boolean isLocalConfigured = false;
+    private Player.Listener mPlayerListener;
 
     public boolean isContracted = false;
+    public AssHandler mAssHandler;
 
     private final UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
     private final HttpDataSource.Factory exoPlayerHttpDataSourceFactory = KoinJavaComponent.get(HttpDataSource.Factory.class);
@@ -104,6 +107,7 @@ public class VideoManager {
 
         boolean assDirectPlay = userPreferences.get(UserPreferences.Companion.getAssDirectPlay());
         AssHandler assHandler = assDirectPlay ? new AssHandler(AssRenderType.OVERLAY_OPEN_GL, new AssHandlerConfig()) : null;
+        mAssHandler = assHandler;
 
         mExoPlayer = configureExoplayerBuilder(activity, assHandler).build();
 
@@ -145,7 +149,7 @@ public class VideoManager {
         mExoPlayer.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(@NonNull PlaybackException error) {
-                Timber.e("***** Got error from player");
+                Timber.e(error, "***** Got error from player");
                 if (mPlaybackControllerNotifiable != null) mPlaybackControllerNotifiable.onError();
                 stopProgressLoop();
             }
@@ -195,8 +199,13 @@ public class VideoManager {
             }
 
             @Override
-            public void onTracksChanged(Tracks tracks) {
-                Timber.d("Tracks changed");
+            public void onTracksChanged(@NonNull Tracks tracks) {
+                Timber.i("Tracks changed in ExoPlayer: refreshing OSD displays");
+                // When ExoPlayer discovers the actual MKV audio/subtitle streams,
+                // force OSD refresh to display buttons and languages!
+                if (_helper != null && _helper.getFragment() != null) {
+                    mActivity.runOnUiThread(() -> _helper.getFragment().updateDisplay());
+                }
             }
         });
     }
@@ -221,6 +230,10 @@ public class VideoManager {
      * @return A configured builder for Exoplayer
      */
     private ExoPlayer.Builder configureExoplayerBuilder(Context context, AssHandler assHandler) {
+        return configureExoplayerBuilder(context, assHandler, false);
+    }
+
+    private ExoPlayer.Builder configureExoplayerBuilder(Context context, AssHandler assHandler, boolean isLocal) {
         ExoPlayer.Builder exoPlayerBuilder = new ExoPlayer.Builder(context);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             exoPlayerBuilder.setVideoChangeFrameRateStrategy(2);
@@ -256,18 +269,35 @@ public class VideoManager {
             exoPlayerBuilder.setMediaSourceFactory(new DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory));
         }
 
-        BufferLength bufferLength = userPreferences.get(UserPreferences.Companion.getBufferLength());
         DefaultLoadControl loadControl;
-        if (bufferLength == BufferLength.LARGE) {
+        if (isLocal) {
+            // Not yet used.
             loadControl = new DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(50_000, 120_000, 2_500, 5_000)
-                    .build();
-        } else if (bufferLength == BufferLength.EXTRA_LARGE) {
-            loadControl = new DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(80_000, 240_000, 5_000, 10_000)
+                    .setBufferDurationsMs(
+                            80_000,   // minBufferMs (50s)
+                            180_000,  // maxBufferMs (120s forward)
+                            4_500,    // bufferForPlaybackMs
+                            8_000     // bufferForPlaybackAfterRebufferMs
+                    )
+                    .setBackBuffer(
+                            90_000,   // backBufferDurationMs (90s backward)
+                            true      // retainBackBufferFromKeyframe
+                    )
                     .build();
         } else {
-            loadControl = new DefaultLoadControl();
+            BufferLength bufferLength = userPreferences.get(UserPreferences.Companion.getBufferLength());
+            if (bufferLength == BufferLength.LARGE) {
+                loadControl = new DefaultLoadControl.Builder()
+                        .setBufferDurationsMs(50_000, 120_000, 2_500, 5_000)
+                        .build();
+            } else if (bufferLength == BufferLength.EXTRA_LARGE) {
+                loadControl = new DefaultLoadControl.Builder()
+                        .setBufferDurationsMs(80_000, 240_000, 2_500, 10_000)
+                        .setBackBuffer(120_000, true)
+                        .build();
+            } else {
+                loadControl = new DefaultLoadControl();
+            }
         }
         exoPlayerBuilder.setLoadControl(loadControl);
 
@@ -323,13 +353,15 @@ public class VideoManager {
     }
 
     public long getCurrentPosition() {
-        if (mExoPlayer == null || !isPlaying()) {
+        if (!isInitialized()) {
             return lastExoPlayerPosition == -1 ? 0 : lastExoPlayerPosition;
-        } else {
-            long mExoPlayerCurrentPosition = mExoPlayer.getCurrentPosition();
-            lastExoPlayerPosition = mExoPlayerCurrentPosition;
-            return mExoPlayerCurrentPosition;
         }
+        long pos = mExoPlayer.getCurrentPosition();
+        if (pos >= 0) {
+            lastExoPlayerPosition = pos;
+            return pos;
+        }
+        return lastExoPlayerPosition == -1 ? 0 : lastExoPlayerPosition;
     }
 
     public boolean isPlaying() {
@@ -355,7 +387,12 @@ public class VideoManager {
         mExoPlayer.setPlayWhenReady(false);
     }
 
+    public void resetPreparedState() {
+        hasNotifiedPrepared = false;
+    }
+
     public void stopPlayback() {
+        hasNotifiedPrepared = false;
         if (mExoPlayer != null) {
             mExoPlayer.stop();
 
@@ -526,16 +563,16 @@ public class VideoManager {
         return exoTrackID;
     }
 
-    public boolean setExoPlayerTrack(int index, @Nullable org.jellyfin.sdk.model.api.MediaStreamType streamType, @Nullable List<org.jellyfin.sdk.model.api.MediaStream> allStreams) {
-        if (!isInitialized() || allStreams == null || allStreams.isEmpty() || (streamType != org.jellyfin.sdk.model.api.MediaStreamType.SUBTITLE && streamType != org.jellyfin.sdk.model.api.MediaStreamType.AUDIO && streamType != org.jellyfin.sdk.model.api.MediaStreamType.VIDEO))
+    public boolean setExoPlayerTrack(int index, @Nullable MediaStreamType streamType, @Nullable List<MediaStream> allStreams) {
+        if (!isInitialized() || allStreams == null || allStreams.isEmpty() || (streamType != MediaStreamType.SUBTITLE && streamType != MediaStreamType.AUDIO && streamType != MediaStreamType.VIDEO))
             return false;
 
         int chosenTrackType;
-        if (streamType == org.jellyfin.sdk.model.api.MediaStreamType.SUBTITLE) {
+        if (streamType == MediaStreamType.SUBTITLE) {
             chosenTrackType = C.TRACK_TYPE_TEXT;
-        } else if (streamType == org.jellyfin.sdk.model.api.MediaStreamType.AUDIO) {
+        } else if (streamType == MediaStreamType.AUDIO) {
             chosenTrackType = C.TRACK_TYPE_AUDIO;
-        } else if (streamType == org.jellyfin.sdk.model.api.MediaStreamType.VIDEO) {
+        } else if (streamType == MediaStreamType.VIDEO) {
             chosenTrackType = C.TRACK_TYPE_VIDEO;
         } else {
             return false;

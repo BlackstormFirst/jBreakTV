@@ -32,6 +32,11 @@ class ReportingHelper(
 		position: Long,
 		paused: Boolean
 	) {
+		if (PlaybackController.isCurrentItemLocal(item)) {
+			Timber.d("UsbDebug: Skipping reportStart for local file ${item.name}")
+			return
+		}
+
 		val info = PlaybackStartInfo(
 			itemId = item.id,
 			positionTicks = position,
@@ -64,6 +69,10 @@ class ReportingHelper(
 		position: Long,
 		paused: Boolean
 	) {
+		if (PlaybackController.isCurrentItemLocal(item)) {
+			return
+		}
+
 		val info = PlaybackProgressInfo(
 			itemId = item.id,
 			positionTicks = position,
@@ -89,6 +98,11 @@ class ReportingHelper(
 	}
 
 	fun reportStopped(lifecycleOwner: LifecycleOwner, item: BaseItemDto, streamInfo: StreamInfo, position: Long?) {
+		if (PlaybackController.isCurrentItemLocal(item)) {
+			Timber.d("UsbDebug: Skipping reportStopped for local file ${item.name}")
+			return
+		}
+
 		val info = PlaybackStopInfo(
 			itemId = item.id,
 			positionTicks = position,
