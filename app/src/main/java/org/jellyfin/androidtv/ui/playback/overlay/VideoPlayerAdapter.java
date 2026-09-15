@@ -8,6 +8,7 @@ import org.jellyfin.androidtv.ui.playback.CustomPlaybackOverlayFragment;
 import org.jellyfin.androidtv.ui.playback.PlaybackController;
 import org.jellyfin.androidtv.util.Utils;
 import org.jellyfin.androidtv.util.apiclient.StreamHelper;
+import org.jellyfin.sdk.model.api.BaseItemDto;
 import org.jellyfin.sdk.model.api.ChapterInfo;
 import org.jellyfin.sdk.model.api.MediaSourceInfo;
 import org.jellyfin.sdk.model.api.MediaStream;
@@ -103,13 +104,13 @@ public class VideoPlayerAdapter extends PlayerAdapter {
         getCallback().onDurationChanged(this);
     }
 
-    // Helper interne pour récupérer les flux du média (soit via MediaSource, soit via BaseItemDto)
+    // Internal helper to retrieve media streams (either via MediaSource or via BaseItemDto)
     private List<MediaStream> getMediaStreamsSafe() {
         MediaSourceInfo mediaSource = playbackController.getCurrentMediaSource();
         if (mediaSource != null && mediaSource.getMediaStreams() != null && !mediaSource.getMediaStreams().isEmpty()) {
             return mediaSource.getMediaStreams();
         }
-        org.jellyfin.sdk.model.api.BaseItemDto item = getCurrentlyPlayingItem();
+        BaseItemDto item = getCurrentlyPlayingItem();
         if (item != null && item.getMediaStreams() != null && !item.getMediaStreams().isEmpty()) {
             return item.getMediaStreams();
         }
@@ -124,10 +125,10 @@ public class VideoPlayerAdapter extends PlayerAdapter {
                     return true;
                 }
             }
-            return false; // Flux locaux inspectés : aucun sous-titre trouvé
+            return false; // Local streams inspected: no subtitles found
         }
 
-        // Mode serveur : repli sur StreamHelper d'origine
+        // Server mode: fallback to original StreamHelper
         MediaSourceInfo mediaSource = playbackController.getCurrentMediaSource();
         if (mediaSource != null) {
             return StreamHelper.getSubtitleStreams(mediaSource).size() > 0;
@@ -144,14 +145,13 @@ public class VideoPlayerAdapter extends PlayerAdapter {
                     audioCount++;
                 }
             }
-            // Au moins 1 piste pour voir le tag / ouvrir le dialogue de sélection
-            return audioCount > 0;
+            return audioCount > 1;
         }
 
-        // Mode serveur : repli sur StreamHelper d'origine
+        // Server mode: fallback to original StreamHelper
         MediaSourceInfo mediaSource = playbackController.getCurrentMediaSource();
         if (mediaSource != null) {
-            return StreamHelper.getAudioStreams(mediaSource).size() > 0;
+            return StreamHelper.getAudioStreams(mediaSource).size() > 1;
         }
         return false;
     }
@@ -165,11 +165,11 @@ public class VideoPlayerAdapter extends PlayerAdapter {
                     videoCount++;
                 }
             }
-            // Strictement plus d'une piste : si 1 seule piste, retourne FALSE immédiatement
+            // Strictly more than 1 track: if only 1 track, return FALSE immediately
             return videoCount > 1;
         }
 
-        // Mode serveur : repli sur StreamInfo si disponible
+        // Server mode: fallback to StreamInfo if available
         if (playbackController.getCurrentStreamInfo() != null) {
             return playbackController.getCurrentStreamInfo().getSelectableStreams(MediaStreamType.VIDEO).size() > 1;
         }
@@ -213,23 +213,23 @@ public class VideoPlayerAdapter extends PlayerAdapter {
     }
 
     boolean canRecordLiveTv() {
-        org.jellyfin.sdk.model.api.BaseItemDto currentlyPlayingItem = getCurrentlyPlayingItem();
+        BaseItemDto currentlyPlayingItem = getCurrentlyPlayingItem();
         return currentlyPlayingItem != null
                 && currentlyPlayingItem.getCurrentProgram() != null
                 && Utils.canManageRecordings(KoinJavaComponent.<UserRepository>get(UserRepository.class).getCurrentUser().getValue());
     }
 
     public void toggleRecording() {
-        org.jellyfin.sdk.model.api.BaseItemDto currentlyPlayingItem = getCurrentlyPlayingItem();
+        BaseItemDto currentlyPlayingItem = getCurrentlyPlayingItem();
         if (currentlyPlayingItem != null) {
             getMasterOverlayFragment().toggleRecording(currentlyPlayingItem);
         }
     }
 
     boolean isRecording() {
-        org.jellyfin.sdk.model.api.BaseItemDto currentlyPlayingItem = getCurrentlyPlayingItem();
+        BaseItemDto currentlyPlayingItem = getCurrentlyPlayingItem();
         if (currentlyPlayingItem == null) return false;
-        org.jellyfin.sdk.model.api.BaseItemDto currentProgram = currentlyPlayingItem.getCurrentProgram();
+        BaseItemDto currentProgram = currentlyPlayingItem.getCurrentProgram();
         if (currentProgram == null) {
             return false;
         } else {
@@ -237,7 +237,7 @@ public class VideoPlayerAdapter extends PlayerAdapter {
         }
     }
 
-    org.jellyfin.sdk.model.api.BaseItemDto getCurrentlyPlayingItem() {
+    BaseItemDto getCurrentlyPlayingItem() {
         return playbackController.getCurrentlyPlayingItem();
     }
 
@@ -246,7 +246,7 @@ public class VideoPlayerAdapter extends PlayerAdapter {
     }
 
     boolean hasChapters() {
-        org.jellyfin.sdk.model.api.BaseItemDto item = getCurrentlyPlayingItem();
+        BaseItemDto item = getCurrentlyPlayingItem();
         if (item == null) return false;
         List<ChapterInfo> chapters = item.getChapters();
         return chapters != null && chapters.size() > 0;

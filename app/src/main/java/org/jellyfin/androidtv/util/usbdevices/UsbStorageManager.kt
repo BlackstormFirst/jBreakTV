@@ -41,7 +41,12 @@ object UsbStorageManager {
                     appContext.mainExecutor,
                     object : StorageManager.StorageVolumeCallback() {
                         override fun onStateChanged(volume: StorageVolume) {
-                            Timber.d("UsbDebug: StorageVolumeCallback state changed for ${volume.getDescription(appContext)}")
+                            runCatching {
+                                val label = volume.getDescription(appContext)
+                                Timber.d("UsbDebug: StorageVolumeCallback state changed for $label")
+                            }.onFailure { e ->
+                                Timber.w(e, "UsbDebug: StorageVolumeCallback state changed for volume")
+                            }
                             updateVolumes(appContext)
                         }
                     }
@@ -90,10 +95,8 @@ object UsbStorageManager {
 
         if (context != null) {
             val syncList = scanVolumesSync(context)
-            if (syncList.isNotEmpty()) {
-                _mountedVolumes.value = syncList
-                return syncList
-            }
+            _mountedVolumes.value = syncList
+            return syncList
         }
         return emptyList()
     }

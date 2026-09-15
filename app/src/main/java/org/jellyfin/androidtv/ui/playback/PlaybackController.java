@@ -46,6 +46,7 @@ import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod;
 import org.jellyfin.sdk.model.serializer.UUIDSerializerKt;
 import org.koin.java.KoinJavaComponent;
 
+import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -274,6 +275,25 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     public void playerErrorEncountered() {
+        // USB Protection: If the current item is a disconnected local file, close the player cleanly without retrying
+        BaseItemDto currentItem = getCurrentlyPlayingItem();
+        if (isCurrentItemLocal(currentItem)) {
+            String path = currentItem.getPath();
+            if (path != null) {
+                File file = new File(path);
+                if (!file.exists() || !file.canRead()) {
+                    Timber.w("UsbDebug: Local file inaccessible on error (%s). Closing player.", path);
+                    if (mFragment != null) {
+                        Utils.showToast(mFragment.getContext(), "Périphérique USB déconnecté");
+                        mFragment.closePlayer();
+                    } else {
+                        endPlayback();
+                    }
+                    return;
+                }
+            }
+        }
+
         // reset the retry count if it's been more than 30s since previous error
         if (playbackRetries > 0 && Instant.now().toEpochMilli() - lastPlaybackError > 30000) {
             Timber.i("playback stabilized - retry count reset to 0 from %s", playbackRetries);
@@ -545,12 +565,25 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (playbackRetries > 1) internalOptions.setEnableDirectStream(false);
         MediaSourceInfo currentMediaSource = getCurrentMediaSource();
         internalOptions.setVideoStreamIndex(playbackIndexManager.getValue().getBestVideoIndex(currentMediaSource));
+        Integer selectedAudioIndex = playbackIndexManager.getValue().getBestAudioIndex(currentMediaSource);
+        internalOptions.setAudioStreamIndex(selectedAudioIndex);
+
+        String currentAudioLang = null;
+        if (selectedAudioIndex != null && currentMediaSource != null && currentMediaSource.getMediaStreams() != null) {
+            for (MediaStream s : currentMediaSource.getMediaStreams()) {
+                if (s.getType() == MediaStreamType.AUDIO && s.getIndex() == selectedAudioIndex) {
+                    currentAudioLang = s.getLanguage();
+                    break;
+                }
+            }
+        }
+
         if (forcedSubtitleIndex != null) {
             internalOptions.setSubtitleStreamIndex(forcedSubtitleIndex);
-        }else{
-            internalOptions.setSubtitleStreamIndex(playbackIndexManager.getValue().getBestSubtitleIndex(currentMediaSource, mFragment.getContext()));
+        } else {
+            internalOptions.setSubtitleStreamIndex(playbackIndexManager.getValue().getBestSubtitleIndex(currentMediaSource, mFragment.getContext(), currentAudioLang));
         }
-        internalOptions.setAudioStreamIndex(playbackIndexManager.getValue().getBestAudioIndex(currentMediaSource));
+
         if (!isLiveTv) {
             internalOptions.setMediaSourceId(currentMediaSource.getId());
         }
@@ -571,10 +604,26 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (isCurrentItemLocal(item)) {
             Timber.i("UsbDebug: Direct Local USB playback for %s", item.getPath());
             try {
-                StreamInfo localStreamInfo = LocalVideoManager.INSTANCE.buildLocalStreamInfo(item);
+                // On-demand inspection for USB queue items if they haven't been inspected yet
+                BaseItemDto activeItem = item;
+                if (item != null && item.getPath() != null && item.getRunTimeTicks() == null) {
+                    File file = new File(item.getPath());
+                    if (file.exists() && file.canRead() && mFragment != null) {
+                        try {
+                            activeItem = LocalVideoManager.INSTANCE.inspectAndBuildBaseItemDtoSync(mFragment.getContext(), file);
+                            if (mItems != null && mCurrentIndex >= 0 && mCurrentIndex < mItems.size()) {
+                                mItems.set(mCurrentIndex, activeItem);
+                            }
+                        } catch (Exception e) {
+                            Timber.e(e, "UsbDebug: Error enriching minimal USB item %s", item.getPath());
+                        }
+                    }
+                }
+
+                StreamInfo localStreamInfo = LocalVideoManager.INSTANCE.buildLocalStreamInfo(activeItem);
                 mCurrentStreamInfo = localStreamInfo;
                 mCurrentOptions = internalOptions;
-                startItem(item, position, localStreamInfo);
+                startItem(activeItem, position, localStreamInfo);
                 return;
             } catch (Exception e) {
                 Timber.e(e, "UsbDebug: Error building local USB StreamInfo in PlaybackController");
@@ -675,10 +724,22 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         setDefaultVideoIndex(response);
-        var bSubIndex = playbackIndexManager.getValue().getBestSubtitleIndex(response.getMediaSource(), mFragment.getContext());
+        setDefaultAudioIndex(response);
+
+        String currentAudioLang = null;
+        Integer selectedAudioIndex = mCurrentOptions != null ? mCurrentOptions.getAudioStreamIndex() : null;
+        if (selectedAudioIndex != null && response.getMediaSource() != null && response.getMediaSource().getMediaStreams() != null) {
+            for (MediaStream s : response.getMediaSource().getMediaStreams()) {
+                if (s.getType() == MediaStreamType.AUDIO && s.getIndex() == selectedAudioIndex) {
+                    currentAudioLang = s.getLanguage();
+                    break;
+                }
+            }
+        }
+
+        var bSubIndex = playbackIndexManager.getValue().getBestSubtitleIndex(response.getMediaSource(), mFragment.getContext(), currentAudioLang);
         var mSubIndex = mCurrentOptions.getSubtitleStreamIndex();
         PlaybackControllerHelperKt.setSubtitleIndex(this, bSubIndex, (mSubIndex == null || !Objects.equals(mSubIndex, bSubIndex)));
-        setDefaultAudioIndex(response);
         Timber.i("default audio index set to %s remote default %s", mDefaultAudioIndex, response.getMediaSource().getDefaultAudioStreamIndex());
         Timber.i("default sub index set to %s remote default %s", mSubIndex, response.getMediaSource().getDefaultSubtitleStreamIndex());
 
@@ -709,7 +770,6 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 if (mVideoManager != null) {
                     if (isLocal) {
                         LocalVideoManager.INSTANCE.configureAndPlayLocal(mVideoManager, finalResponse);
-                        onPrepared();
                     } else {
                         mVideoManager.setMediaStreamInfo(api.getValue(), finalResponse);
                     }
@@ -756,23 +816,33 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
     }
 
-    public static boolean isCurrentItemLocal(@Nullable BaseItemDto item) {
-        if (item == null) return false;
-
-        String path = item.getPath();
+    public static boolean isLocalPath(@Nullable String path) {
         if (path == null || path.trim().isEmpty()) return false;
 
-        // Si c'est une URL réseau, c'est obligatoirement du streaming distant
+        // If it is a network URL, it is strictly remote streaming
         String lower = path.toLowerCase(Locale.ROOT);
         if (lower.startsWith("http://") || lower.startsWith("https://")) {
             return false;
         }
 
-        // Fichier strictement présent sur le stockage physique Android local (USB, interne, SD)
+        // File strictly present on local Android physical storage (USB, internal, SD)
         return path.startsWith("/storage/")
                 || path.startsWith("/mnt/")
-                || path.startsWith("file:")
-                || path.startsWith("content:");
+                || lower.startsWith("file:/storage/")
+                || lower.startsWith("file:/mnt/")
+                || lower.startsWith("file:///storage/")
+                || lower.startsWith("file:///mnt/")
+                || lower.startsWith("content:");
+    }
+
+    public static boolean isLocalSource(@Nullable MediaSourceInfo info) {
+        if (info == null) return false;
+        return isLocalPath(info.getPath());
+    }
+
+    public static boolean isCurrentItemLocal(@Nullable BaseItemDto item) {
+        if (item == null) return false;
+        return isLocalPath(item.getPath());
     }
 
     public void startSpinner() {
@@ -906,10 +976,15 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             videoQueueManager.getValue().setLastPlayedAudioHearingImpairedState(currentMediaStream.isHearingImpaired());
         }
 
+        int activeExoAudioTrack = -1;
+        if (hasInitializedVideoManager() && currentMediaSource != null && currentMediaSource.getMediaStreams() != null) {
+            activeExoAudioTrack = mVideoManager.getExoPlayerTrack(MediaStreamType.AUDIO, currentMediaSource.getMediaStreams());
+        }
+
         int currAudioIndex = getAudioStreamIndex();
-        Timber.i("trying to switch audio stream from %s to %s", currAudioIndex, index);
-        if (currAudioIndex == index) {
-            Timber.d("skipping setting audio stream, already set to requested index %s", index);
+        Timber.i("trying to switch audio stream from %s (ExoPlayer active: %s) to %s", currAudioIndex, activeExoAudioTrack, index);
+        if (currAudioIndex == index && activeExoAudioTrack == index) {
+            Timber.d("skipping setting audio stream, already set and active at requested index %s", index);
             if (mCurrentOptions.getAudioStreamIndex() == null || mCurrentOptions.getAudioStreamIndex() != index) {
                 Timber.i("setting mCurrentOptions audio stream index from %s to %s", mCurrentOptions.getAudioStreamIndex(), index);
                 mCurrentOptions.setAudioStreamIndex(index);
@@ -1331,6 +1406,11 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     @Override
     public void onPrepared() {
+        if (mCurrentStreamInfo == null) {
+            Timber.w("onPrepared called but mCurrentStreamInfo is null, ignoring.");
+            return;
+        }
+
         if (mPlaybackState == PlaybackState.BUFFERING) {
             if (mFragment != null) {
                 mFragment.setFadingEnabled(true);
@@ -1353,14 +1433,20 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             mPlaybackState = PlaybackState.PLAYING;
         } else {
             if (!burningSubs) {
-                // Make sure the requested subtitles are enabled when external/embedded
-                Integer currentSubtitleIndex = mCurrentOptions.getSubtitleStreamIndex();
+                // Verify if ExoPlayer is ACTUALLY rendering the desired subtitle index
+                Integer currentSubtitleIndex = (mCurrentOptions != null) ? mCurrentOptions.getSubtitleStreamIndex() : null;
                 if (currentSubtitleIndex == null) currentSubtitleIndex = -1;
 
-                if (Objects.equals(mCurrentOptions.getSubtitleStreamIndex(), currentSubtitleIndex) && currentSubtitleIndex != -1) {
-                    Timber.d("PlaybackController: onPrepared - subtitle index %s already applied, skipping", currentSubtitleIndex);
+                int activeExoSubtitleTrack = -1;
+                if (hasInitializedVideoManager() && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
+                    activeExoSubtitleTrack = mVideoManager.getExoPlayerTrack(MediaStreamType.SUBTITLE, getCurrentMediaSource().getMediaStreams());
+                }
+
+                if (activeExoSubtitleTrack != currentSubtitleIndex) {
+                    Timber.i("onPrepared: Subtitle mismatch (ExoPlayer active: %d, Desired: %d) -> applying subtitle index", activeExoSubtitleTrack, currentSubtitleIndex);
+                    PlaybackControllerHelperKt.setSubtitleIndex(this, currentSubtitleIndex, true);
                 } else {
-                    PlaybackControllerHelperKt.setSubtitleIndex(this, currentSubtitleIndex, false);
+                    Timber.d("onPrepared: Subtitle index %d already correctly active in ExoPlayer, skipping", currentSubtitleIndex);
                 }
             } else {
                 PlaybackControllerHelperKt.disableDefaultSubtitles(this);
@@ -1371,24 +1457,40 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
             // if track switching is done without rebuilding the stream, mCurrentOptions is updated
             // otherwise, use the server default
-            if (mCurrentOptions.getAudioStreamIndex() != null) {
+            if (mCurrentOptions != null && mCurrentOptions.getAudioStreamIndex() != null) {
                 eligibleAudioTrack = mCurrentOptions.getAudioStreamIndex();
-            } else if (getCurrentMediaSource().getDefaultAudioStreamIndex() != null) {
+            } else if (getCurrentMediaSource() != null && getCurrentMediaSource().getDefaultAudioStreamIndex() != null) {
                 eligibleAudioTrack = getCurrentMediaSource().getDefaultAudioStreamIndex();
             }
-            switchAudioStream(eligibleAudioTrack);
 
-            // Correctif Direct Play : On force la piste vidéo au démarrage car ExoPlayer ignore
-            // souvent la sélection initiale lors de l'ouverture d'un fichier brut.
+            int activeExoAudioTrack = -1;
+            if (hasInitializedVideoManager() && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
+                activeExoAudioTrack = mVideoManager.getExoPlayerTrack(MediaStreamType.AUDIO, getCurrentMediaSource().getMediaStreams());
+            }
+
+            if (eligibleAudioTrack != -1 && activeExoAudioTrack != eligibleAudioTrack && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
+                Timber.i("onPrepared: Audio track mismatch (ExoPlayer active: %d, Desired: %d) -> applying audio track", activeExoAudioTrack, eligibleAudioTrack);
+                if (mVideoManager.setExoPlayerTrack(eligibleAudioTrack, MediaStreamType.AUDIO, getCurrentMediaSource().getMediaStreams())) {
+                    mCurrentOptions.setAudioStreamIndex(eligibleAudioTrack);
+                    mDefaultAudioIndex = eligibleAudioTrack;
+                } else {
+                    switchAudioStream(eligibleAudioTrack);
+                }
+            } else {
+                switchAudioStream(eligibleAudioTrack);
+            }
+
+            // Direct Play fix: Force video track at startup because ExoPlayer often
+            // ignores the initial selection when opening a raw file.
             if (mCurrentStreamInfo.getPlayMethod() == PlayMethod.DIRECT_PLAY) {
                 int eligibleVideoTrack = mDefaultVideoIndex;
                 if (mCurrentOptions != null && mCurrentOptions.getVideoStreamIndex() != null) {
                     eligibleVideoTrack = mCurrentOptions.getVideoStreamIndex();
                 }
 
-                // Protection : on ne force la piste QUE si elle n'est pas déjà sélectionnée
+                // Protection: force track ONLY if it is not already selected
                 int currentVideoTrack = getVideoStreamIndex();
-                if (eligibleVideoTrack != -1 && eligibleVideoTrack != currentVideoTrack) {
+                if (eligibleVideoTrack != -1 && eligibleVideoTrack != currentVideoTrack && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
                     Timber.i("onPrepared: Applying video track %d (current was %d)", eligibleVideoTrack, currentVideoTrack);
                     mVideoManager.setExoPlayerTrack(eligibleVideoTrack, MediaStreamType.VIDEO, getCurrentMediaSource().getMediaStreams());
                 } else {

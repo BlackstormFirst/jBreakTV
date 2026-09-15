@@ -17,6 +17,10 @@ import androidx.leanback.widget.FocusHighlight
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.VerticalGridPresenter
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
@@ -123,6 +127,23 @@ class UsbFileExplorerFragment : VerticalGridSupportFragment() {
         setSelectedPosition(0)
         view.post {
             setSelectedPosition(0)
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                UsbStorageManager.mountedVolumes.collect { volumes ->
+                    val isStillMounted = volumes.any { vol ->
+                        rootDirPath.startsWith(vol.path.absolutePath) || vol.path.absolutePath == rootDirPath
+                    }
+                    if (!isStillMounted) {
+                        if (navigationRepository.canGoBack) {
+                            navigationRepository.goBack()
+                        } else {
+                            navigationRepository.reset(Destinations.home, clearHistory = true)
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -3,9 +3,6 @@ package org.jellyfin.androidtv.util.usbdevices
 
 import android.content.Context
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
-import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -48,6 +45,7 @@ import java.io.File
 import java.util.Locale
 import java.util.UUID
 import androidx.core.net.toUri
+import kotlinx.coroutines.runBlocking
 
 object LocalVideoManager {
 
@@ -103,6 +101,12 @@ object LocalVideoManager {
 			Timber.d("AmorceBenchmark: player.setMediaItem et prepare() déclenchés en ${System.currentTimeMillis() - tStart}ms")
 		} catch (t: Throwable) {
 			Timber.e(t, "LocalVideoManager: Error in configureAndPlayLocal")
+		}
+	}
+
+	fun inspectAndBuildBaseItemDtoSync(context: Context, file: File): BaseItemDto {
+		return runBlocking(Dispatchers.IO) {
+			inspectAndBuildBaseItemDto(context, file)
 		}
 	}
 
@@ -319,18 +323,19 @@ object LocalVideoManager {
         val runTimeTicks = if (durationMs > 0) durationMs * 10000L else null
 
         // Fallbacks
-        if (streams.none { it.type == MediaStreamType.VIDEO }) {
+        if (isVideo && streams.none { it.type == MediaStreamType.VIDEO }) {
             streams.add(0, MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
         if (streams.none { it.type == MediaStreamType.AUDIO }) {
-            streams.add(MediaStream(type = MediaStreamType.AUDIO, index = 1, codec = "aac", channels = 2, sampleRate = 48000, language = "fre", title = "Français - AAC Stéréo", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
+            streams.add(MediaStream(type = MediaStreamType.AUDIO, index = streams.size, codec = "aac", channels = 2, sampleRate = 48000, language = "fre", title = "Français - AAC Stéréo", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
 
         // Sidecars
+        val baseIndex = streams.size
         val sidecars = UsbMediaHelper.findSidecarSubtitles(file)
         sidecars.forEachIndexed { subIndex, subFile ->
             val subUriStr = try { FileProvider.getUriForFile(context, "${context.packageName}.provider", subFile).toString() } catch (e: Exception) { Uri.fromFile(subFile).toString() }
-            streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = streams.size + subIndex, codec = subFile.extension, language = "fre", title = "${subFile.nameWithoutExtension} (${subFile.extension.uppercase(Locale.ROOT)})", isDefault = false, isForced = false, isExternal = true, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
+            streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = baseIndex + subIndex, codec = subFile.extension, language = "fre", title = "${subFile.nameWithoutExtension} (${subFile.extension.uppercase(Locale.ROOT)})", isDefault = false, isForced = false, isExternal = true, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
         }
 
         val openTime = t1 - t0
@@ -342,14 +347,6 @@ object LocalVideoManager {
 
         val totalTracks = streams.size
         val minutes = (runTimeTicks ?: 0L) / 10000 / 1000 / 60
-
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(
-                context,
-                "Extraction Media3: $totalTracks pistes (V:$nbV A:$nbA S:$nbS) - $minutes min en ${totalTime}ms",
-                Toast.LENGTH_LONG
-            ).show()
-        }
 
         val mediaSource = MediaSourceInfo(
             protocol = MediaProtocol.FILE,
@@ -418,10 +415,11 @@ object LocalVideoManager {
             MediaStream(type = MediaStreamType.AUDIO, index = 1, codec = "aac", language = "fre", title = "Français - AAC Stéréo", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false)
         )
 
+        val baseIndex = streams.size
         val sidecars = UsbMediaHelper.findSidecarSubtitles(file)
         sidecars.forEachIndexed { subIndex, subFile ->
             val subUriStr = try { FileProvider.getUriForFile(context, "${context.packageName}.provider", subFile).toString() } catch (e: Exception) { Uri.fromFile(subFile).toString() }
-            streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = 2 + subIndex, codec = subFile.extension, language = "fre", title = subFile.name, isDefault = false, isForced = false, isExternal = true, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
+            streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = baseIndex + subIndex, codec = subFile.extension, language = "fre", title = subFile.name, isDefault = false, isForced = false, isExternal = true, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
         }
 
         val mediaSource = MediaSourceInfo(
@@ -487,7 +485,7 @@ object LocalVideoManager {
                     "$languageDisplayName - $codecUpper $channelLayout"
                 }
                 MediaStreamType.SUBTITLE -> {
-                    val forcedStr = if (isForced) " forcé" else ""
+                    val forcedStr = if (isForced) " forced" else ""
                     "$languageDisplayName$forcedStr ($codecUpper)"
                 }
                 else -> languageDisplayName
@@ -498,7 +496,7 @@ object LocalVideoManager {
     }
 
     private fun getDisplayNameForLanguage(langCode: String?): String {
-        if (langCode.isNullOrBlank()) return "Indéterminé"
+        if (langCode.isNullOrBlank()) return "Unknown"
         val locale = Locale.forLanguageTag(langCode)
         val display = locale.getDisplayLanguage(Locale.getDefault())
         return if (display.isNotBlank() && display != langCode) {
