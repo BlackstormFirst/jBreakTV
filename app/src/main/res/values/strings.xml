@@ -557,7 +557,7 @@
     <string name="playback_buffer_length">Playback buffer size</string>
     <string name="playback_buffer_auto">Auto</string>
     <string name="playback_buffer_large">Large</string>
-    <string name="playback_buffer_extra_large">Extra large</string>
+    <string name="playback_buffer_extra_large">Extra large (Optimized for Shield TV)</string>
     <string name="pref_mediasegment_actions">Media segment actions</string>
     <string name="segment_action_ask_to_skip">Ask to skip</string>
     <string name="segment_action_nothing">Do nothing</string>

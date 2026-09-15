@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -149,7 +148,6 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 									is UpdateResult.Error -> {
 										isChecking = false
 										updateStatusText = context.getString(R.string.lbl_error) + " : ${result.message}"
-										//updateStatusText = "Erreur de connexion."
 									}
 
 									UpdateResult.NoApkFound -> {

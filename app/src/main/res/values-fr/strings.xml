@@ -181,7 +181,7 @@
     <string name="lbl_new">Nouveau</string>
     <string name="lbl_recent_recordings">Enregistrements récents</string>
     <string name="lbl_repeat">Répéter</string>
-    <string name="lbl_resume_from">Reprendre à partir de %1$s</string>
+    <string name="lbl_resume_from">Reprendre à %1$s</string>
     <string name="lbl_save">Sauvegarder</string>
     <string name="lbl_select_date">Choisir la date</string>
     <string name="lbl_series_settings">Préférences des séries</string>
@@ -669,7 +669,7 @@
     <string name="playback_buffer_length">Taille de la mémoire tampon</string>
     <string name="playback_buffer_auto">Auto</string>
     <string name="playback_buffer_large">Grand</string>
-    <string name="playback_buffer_extra_large">Très grand</string>
+    <string name="playback_buffer_extra_large">Très grand (Optimisé pour la Shield TV)</string>
     <string name="pref_software_codecs_enabled">Utiliser des codecs logiciels</string>
     <string name="pref_software_codecs_enabled_description">Certaines mises en œuvre basées sur un logiciel peuvent entraîner une dégradation des performances. La désactivation de cette option augmente les chances de transcodage.</string>
     <string name="preference_enable_ass">Sous-titres ASS en direct</string>

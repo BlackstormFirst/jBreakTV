@@ -12,13 +12,13 @@ class UpdateCheck(private val context: Context) {
 
 	suspend fun checkForUpdate(repoOwner: String, repoName: String): UpdateResult = withContext(Dispatchers.IO) {
 		try {
-			// Récupération des dernières releases (inclut les pré-releases)
+			// Fetch latest releases (includes pre-releases)
 			val response = fetchFromApi("https://api.github.com/repos/$repoOwner/$repoName/releases?per_page=10")
 				?: return@withContext UpdateResult.NoApkFound
 
 			val releases = json.decodeFromString<List<GitHubRelease>>(response)
 
-			// Sélection de la version pré-release la plus récente
+			// Select the most recent pre-release version
 			val latestPreRelease = releases.firstOrNull { it.prerelease }
 				?: return@withContext UpdateResult.NoApkFound
 
@@ -69,7 +69,7 @@ class UpdateCheck(private val context: Context) {
 	}
 
 	private fun isVersionNewer(current: String, latest: String): Boolean {
-		// Isoler le numéro de version de base avant un éventuel tiret (ex: "1.2.0-debug" -> "1.2.0")
+		// Isolate the base version number before any dash (e.g., "1.2.0-debug" -> "1.2.0")
 		val currentClean = current.split("-").first()
 		val latestClean = latest.split("-").first()
 
