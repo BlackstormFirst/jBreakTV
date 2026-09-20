@@ -25,7 +25,6 @@ import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.extensions.sessionApi
-import org.jellyfin.sdk.api.client.extensions.userApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.sockets.subscribe
 import org.jellyfin.sdk.api.sockets.subscribeGeneralCommand
@@ -38,13 +37,12 @@ import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.PlayMessage
 import org.jellyfin.sdk.model.api.PlaystateCommand
 import org.jellyfin.sdk.model.api.PlaystateMessage
-import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.jellyfin.sdk.model.extensions.get
 import org.jellyfin.sdk.model.extensions.getValue
+import org.jellyfin.sdk.model.extensions.ticks
 import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import timber.log.Timber
 import java.time.Instant
-import java.time.Duration
 import java.util.UUID
 
 class SocketHandler(
@@ -100,9 +98,6 @@ class SocketHandler(
 		}
 	}
 
-	var lastRefresh: Instant? = null
-	val minRefreshInterval: Duration = Duration.ofSeconds(15)
-
 	private fun subscribe(coroutineScope: CoroutineScope) = api.webSocket.apply {
 		// Library
 		subscribe<LibraryChangedMessage>()
@@ -120,38 +115,6 @@ class SocketHandler(
 		subscribe<PlaystateMessage>()
 			.onEach { message -> onPlayStateMessage(message) }
 			.launchIn(coroutineScope)
-
-		subscribe<UserDataChangedMessage>()
-			/*
-			.onEach { message ->
-				Timber.d("Received UserDataChangedMessage")
-				if (message.data?.userId == api.userApi.getCurrentUser().content.id){
-					preferencesRepository.refreshServerUserSettings()
-				}
-			}
-			 */
-			.launchIn(coroutineScope)
-/*
-		subscribe<SessionsMessage>()
-			.onEach { message ->
-				Timber.d("Received SessionsMessage")
-				//val now = Instant.now()
-				//val elapsed = lastRefresh?.let { Duration.between(it, now) }
-				//if (elapsed == null || elapsed > minRefreshInterval){
-				//	lastRefresh = now
-					preferencesRepository.refreshServerUserSettings()
-				//}
-			}
-			.launchIn(coroutineScope)
- */
-
-/*
-		subscribeAll()
-			.onEach { message ->
-				Timber.i("Received type: %s", message.messageType)
-			}
-			.launchIn(coroutineScope)
- */
 
 		subscribeGeneralCommand(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)
 			.onEach { message ->
@@ -247,7 +210,7 @@ class SocketHandler(
 					PlaystateCommand.NEXT_TRACK -> playbackController?.next()
 					PlaystateCommand.PREVIOUS_TRACK -> playbackController?.prev()
 					PlaystateCommand.SEEK -> playbackController?.seek(
-						(message.data?.seekPositionTicks ?: 0) / TICKS_TO_MS
+						message.data?.seekPositionTicks?.ticks?.inWholeMilliseconds ?: 0
 					)
 
 					PlaystateCommand.REWIND -> playbackController?.rewind()
@@ -272,7 +235,7 @@ class SocketHandler(
 		when (itemKind) {
 			BaseItemKind.USER_VIEW,
 			BaseItemKind.COLLECTION_FOLDER -> {
-				val item by api.userLibraryApi.getItem(itemId = itemId)
+				val item = withContext(Dispatchers.IO) { api.userLibraryApi.getItem(itemId = itemId).content }
 				itemLauncher.launchUserView(item)
 			}
 
@@ -289,9 +252,5 @@ class SocketHandler(
 		runBlocking(Dispatchers.Main) {
 			Toast.makeText(context, toastMessage, Toast.LENGTH_LONG).show()
 		}
-	}
-
-	companion object {
-		const val TICKS_TO_MS = 10000L
 	}
 }
