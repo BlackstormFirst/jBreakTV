@@ -87,7 +87,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
 
-	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository) }
+	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, userPreferences) }
 
 	// Data
 	private var currentItem: BaseRowItem? = null

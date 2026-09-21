@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.settings
 
+import org.jellyfin.androidtv.preference.constant.BitstreamAudioFormat
 import org.jellyfin.androidtv.preference.constant.HdrFormat
 import org.jellyfin.androidtv.ui.navigation.RouteComposable
 import org.jellyfin.androidtv.ui.settings.screen.SettingsDeveloperScreen
@@ -21,6 +22,7 @@ import org.jellyfin.androidtv.ui.settings.screen.customization.subtitle.Settings
 import org.jellyfin.androidtv.ui.settings.screen.customization.subtitle.SettingsSubtitlesBackgroundColorScreen
 import org.jellyfin.androidtv.ui.settings.screen.customization.subtitle.SettingsSubtitlesScreen
 import org.jellyfin.androidtv.ui.settings.screen.customization.subtitle.SettingsSubtitlesTextColorScreen
+import org.jellyfin.androidtv.ui.settings.screen.home.SettingsHomeNextUpCutoffScreen
 import org.jellyfin.androidtv.ui.settings.screen.home.SettingsHomeScreen
 import org.jellyfin.androidtv.ui.settings.screen.home.SettingsHomeSectionScreen
 import org.jellyfin.androidtv.ui.settings.screen.library.SettingsLibrariesDisplayGridScreen
@@ -36,15 +38,16 @@ import org.jellyfin.androidtv.ui.settings.screen.livetv.SettingsLiveTvGuideOptio
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackAVCLevelScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackAdvancedScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackAudioBehaviorScreen
-import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackHdrOverrideScreen
-import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackHdrOverridesScreen
+import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackBitstreamAudioScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackBufferLengthScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackCodecScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackHEVCLevelScreen
+import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackHdrOverrideScreen
+import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackHdrOverridesScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackInactivityPromptScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackMaxBitrateScreen
-import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackPlayerScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackPhotoPlayerScreen
+import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackPlayerScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackPrerollsScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackRefreshRateSwitchingBehaviorScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackResumeSubtractDurationScreen
@@ -87,6 +90,7 @@ object Routes {
 	const val LIBRARIES_DISPLAY_GRID = "/libraries/display/{itemId}/{displayPreferencesId}/grid"
 	const val HOME = "/home"
 	const val HOME_SECTION = "/home/section/{index}"
+	const val HOME_NEXT_UP_CUTOFF = "/home/next-up-cutoff"
 	const val LIVETV_GUIDE_FILTERS = "/livetv/guide/filters"
 	const val LIVETV_GUIDE_OPTIONS = "/livetv/guide/options"
 	const val LIVETV_GUIDE_CHANNEL_ORDER = "/livetv/guide/channel-order"
@@ -109,6 +113,7 @@ object Routes {
 	const val PLAYBACK_HDR_OVERRIDE = "/playback/hdr-overrides/{format}"
 	const val PLAYBACK_AUDIO_BEHAVIOR = "/playback/audio-behavior"
 	const val PLAYBACK_CODEC = "/playback/codec"
+	const val PLAYBACK_BITSTREAM_AUDIO = "/playback/codec/bitstream-audio/{format}"
 	const val PLAYBACK_AVC_LEVEL = "/playback/codec/avc-level"
 	const val PLAYBACK_HEVC_LEVEL = "/playback/codec/hevc-level"
 	const val TELEMETRY = "/telemetry"
@@ -210,6 +215,9 @@ val routes = mapOf<String, RouteComposable>(
 	Routes.HOME_SECTION to { context ->
 		SettingsHomeSectionScreen(context.parameters["index"]?.toInt()!!)
 	},
+	Routes.HOME_NEXT_UP_CUTOFF to {
+		SettingsHomeNextUpCutoffScreen()
+	},
 	Routes.LIVETV_GUIDE_FILTERS to {
 		SettingsLiveTvGuideFiltersScreen()
 	},
@@ -279,6 +287,11 @@ val routes = mapOf<String, RouteComposable>(
 	},
 	Routes.PLAYBACK_CODEC to {
 		SettingsPlaybackCodecScreen()
+	},
+	Routes.PLAYBACK_BITSTREAM_AUDIO to { context ->
+		SettingsPlaybackBitstreamAudioScreen(
+			format = context.parameters["format"]?.let(BitstreamAudioFormat::valueOf)!!,
+		)
 	},
 	Routes.PLAYBACK_AVC_LEVEL to {
 		SettingsPlaybackAVCLevelScreen()

@@ -8,10 +8,11 @@ import org.jellyfin.androidtv.preference.constant.AVCLevel
 import org.jellyfin.androidtv.preference.constant.AppTheme
 import org.jellyfin.androidtv.preference.constant.AudioBehavior
 import org.jellyfin.androidtv.preference.constant.BackdropBehavior
+import org.jellyfin.androidtv.preference.constant.BitstreamAudioMode
 import org.jellyfin.androidtv.preference.constant.BufferLength
 import org.jellyfin.androidtv.preference.constant.ClockBehavior
-import org.jellyfin.androidtv.preference.constant.HdrOverrideMode
 import org.jellyfin.androidtv.preference.constant.HEVCLevel
+import org.jellyfin.androidtv.preference.constant.HdrOverrideMode
 import org.jellyfin.androidtv.preference.constant.NextUpBehavior
 import org.jellyfin.androidtv.preference.constant.RefreshRateSwitchingBehavior
 import org.jellyfin.androidtv.preference.constant.StillWatchingBehavior
@@ -140,9 +141,24 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		var audioNightMode = enumPreference("audio_night_mode", false)
 
 		/**
-		 * Enable AC3
+		 * AC3 bitstream device profile override.
 		 */
-		var ac3Enabled = booleanPreference("pref_bitstream_ac3", true)
+		var bitstreamAc3 = enumPreference("bitstream_ac3_mode", BitstreamAudioMode.AUTO)
+
+		/**
+		 * EAC3 bitstream device profile override.
+		 */
+		var bitstreamEac3 = enumPreference("bitstream_eac3_mode", BitstreamAudioMode.AUTO)
+
+		/**
+		 * DTS bitstream device profile override.
+		 */
+		var bitstreamDts = enumPreference("bitstream_dts_mode", BitstreamAudioMode.AUTO)
+
+		/**
+		 * TrueHD bitstream device profile override.
+		 */
+		var bitstreamTrueHd = enumPreference("bitstream_truehd_mode", BitstreamAudioMode.AUTO)
 
 		/**
 		 * Enable EAC3
@@ -215,6 +231,12 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 * Enable series thumbnails in home screen rows
 		 */
 		var seriesThumbnailsEnabled = booleanPreference("pref_enable_series_thumbnails", true)
+
+		/**
+		 * Maximum days since last watch to show an item in next up.
+		 * Set to 0 to disable (no cutoff).
+		 */
+		var homeNextUpMaxDays = intPreference("home_next_up_max_days", 0)
 
 		/**
 		 * Subtitles foreground color
