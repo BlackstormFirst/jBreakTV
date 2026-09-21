@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.preference
 
 import android.content.Context
 import androidx.preference.PreferenceManager
+import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.preference.UserPreferences.Companion.screensaverInAppEnabled
 import org.jellyfin.androidtv.preference.constant.AVCLevel
 import org.jellyfin.androidtv.preference.constant.AppTheme
@@ -313,7 +314,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 
 		var memoryMaxCachePercent = intPreference("memoryMaxCachePercent", 25)
 
-		var autoUpdateEnabled = booleanPreference("autoUpdateEnabled", false)
+		var autoUpdateEnabled = booleanPreference("autoUpdateEnabled", BuildConfig.DEBUG)
 
 		var displayCirclePersonCards = booleanPreference("displayCirclePersonCards", true)
 

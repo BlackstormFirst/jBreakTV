@@ -6,6 +6,7 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import org.jellyfin.androidtv.BuildConfig
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -24,6 +25,10 @@ class CustomUpdateChecker(private val context: Context) {
 	private val json = Json { ignoreUnknownKeys = true }
 
 	suspend fun checkForUpdate(serverJsonUrl: String): UpdateResult = withContext(Dispatchers.IO) {
+		if (!BuildConfig.DEBUG) {
+			return@withContext UpdateResult.UpToDate
+		}
+
 		try {
 			val url = URL(serverJsonUrl)
 			val connection = url.openConnection() as HttpURLConnection
