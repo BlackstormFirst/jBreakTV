@@ -130,8 +130,8 @@ fun SettingsDeveloperScreen() {
 							.weight(1f),
 						interactionSource = interactionSource,
 						min = 20f,
-						max = 70f,
-						stepForward = 5f,
+						max = 40f,
+						stepForward = 1f,
 						value = memoryMaxCachePercent.toFloat(),
 						onValueChange = { memoryMaxCachePercent = it.toInt() }
 					)
