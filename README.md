@@ -12,9 +12,10 @@ As a fork, it retains core features and merging capabilities while introducing a
 Works with Jellyfin server versions 10.11.x and 12.x.
 
 Here are some of the improvements:
+- Added a feature that allows media playback from local or USB devices (can be disabled in the playback menu).
 - Playback Index Manager (Added support for multiple video tracks in the player and improved fallback handling for audio and subtitles)
-- Server-side audio and subtitle option management (the client now checks the user's audio and subtitles preferences on the server; two modes —DEFAULT and SMART— are currently supported for subtitles, determining behavior when switching between episodes)
-- Images Cache Management (optimizations and new options to manage the image loader's memory and disk cache; changes take effect only after a full restart of the application or the TV)
+- Server-side audio and subtitle option management (the client now checks the user's audio and subtitles preferences on the server; all modes and options should now be supported for audio and subtitles, determining behavior when switching between episodes)
+- Images Cache Management (optimizations and new options to manage the image loader's memory and disk cache; changes take effect only after a full restart of the application or the TV, try not to exceed 35% for the cache memory ^^)
 - Library Filtering (Added filtering by Genre across libraries and by Type for movie libraries, as well as a workaround for audio filtering using Tags => The tag must be of the format: #language_French or #language_English ...)
 - Navigation fluidity on the home page has also been improved.
 - Option to change actor thumbnails to a circular shape in the customization menu.

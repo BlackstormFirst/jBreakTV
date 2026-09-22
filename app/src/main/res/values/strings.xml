@@ -437,7 +437,6 @@
     <string name="searchable_hint">Search jBreakTV</string>
     <string name="home_next_up_max_days">Next up date cutoff</string>
     <string name="home_next_up_max_days_disabled">Disabled</string>
-    <string name="searchable_hint">Search Jellyfin</string>
     <string name="searchable_settings_description">Media</string>
     <string name="pref_subtitles_background_title">Enable background</string>
     <string name="pref_subtitles_background_summary">Show a black background behind the subtitles</string>

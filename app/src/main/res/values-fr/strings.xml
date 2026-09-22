@@ -677,12 +677,9 @@
     <string name="preference_enable_ass_description">Fonctionnalité expérimentale, peut ne pas fonctionner de manière fiable</string>
     <string name="lbl_date_show_added">Date d\'ajout de la série</string>
     <string name="lbl_date_episode_added">Date d\'ajout de l\'épisode</string>
-    <string name="bitstream_truehd">Flux audio Dolby TrueHD</string>
     <string name="truehd">TrueHD</string>
     <string name="eac3_atmos">DD+ Atmos</string>
     <string name="truehd_atmos">TrueHD Atmos</string>
-    <string name="bitstream_eac3">Flux audio Dolby Digital Plus</string>
-    <string name="bitstream_dts">Flux audio Dolby Theater System</string>
     <string name="subtitle_mode">Mode des sous-titres</string>
     <string name="use_user_profile">Utilise les préférences de votre profil</string>
     <string name="subtitle_mode_default">Défaut</string>
