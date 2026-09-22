@@ -124,7 +124,7 @@ fun PlaybackController.setSubtitleIndex(index: Int, force: Boolean = false) {
 		}
 
 		when {
-			stream.deliveryMethod == SubtitleDeliveryMethod.ENCODE || shouldBurnInSubtitles(currentStreamInfo.playMethod) -> {
+			stream.deliveryMethod == SubtitleDeliveryMethod.ENCODE || (currentStreamInfo != null && shouldBurnInSubtitles(currentStreamInfo.playMethod)) -> {
 				Timber.i("Restarting playback for subtitle baking")
 
 				stop()

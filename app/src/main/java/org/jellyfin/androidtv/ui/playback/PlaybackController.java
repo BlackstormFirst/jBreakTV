@@ -1421,12 +1421,13 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             if (!isCurrentItemLocal(getCurrentlyPlayingItem())) {
                 interactionTracker.notifyStart(getCurrentlyPlayingItem());
             }
-            mCurrentTranscodeStartTime = mCurrentStreamInfo.getPlayMethod() == PlayMethod.TRANSCODE ? Instant.now().toEpochMilli() : 0;
+            mCurrentTranscodeStartTime = (mCurrentStreamInfo != null && mCurrentStreamInfo.getPlayMethod() == PlayMethod.TRANSCODE) ? Instant.now().toEpochMilli() : 0;
             if (!isCurrentItemLocal(getCurrentlyPlayingItem())) {
                 startReportLoop();
             }
         }
 
+        if (mCurrentStreamInfo == null) return;
         Timber.i("Play method: %s", mCurrentStreamInfo.getPlayMethod() == PlayMethod.TRANSCODE ? "Trans" : "Direct");
 
         if (mPlaybackState == PlaybackState.PAUSED) {
@@ -1452,33 +1453,39 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 PlaybackControllerHelperKt.disableDefaultSubtitles(this);
             }
 
-            // select an audio track
-            int eligibleAudioTrack = mDefaultAudioIndex;
+            if (mCurrentStreamInfo == null) return;
 
-            // if track switching is done without rebuilding the stream, mCurrentOptions is updated
-            // otherwise, use the server default
-            if (mCurrentOptions != null && mCurrentOptions.getAudioStreamIndex() != null) {
-                eligibleAudioTrack = mCurrentOptions.getAudioStreamIndex();
-            } else if (getCurrentMediaSource() != null && getCurrentMediaSource().getDefaultAudioStreamIndex() != null) {
-                eligibleAudioTrack = getCurrentMediaSource().getDefaultAudioStreamIndex();
-            }
+            // Audio track selection is only for non-transcoded streams in ExoPlayer.
+            // When transcoding, the server transcodes the requested audio track directly into the stream.
+            if (!isTranscoding()) {
+                // select an audio track
+                int eligibleAudioTrack = mDefaultAudioIndex;
 
-            int activeExoAudioTrack = -1;
-            if (hasInitializedVideoManager() && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
-                activeExoAudioTrack = mVideoManager.getExoPlayerTrack(MediaStreamType.AUDIO, getCurrentMediaSource().getMediaStreams());
-            }
-
-            if (eligibleAudioTrack != -1 && activeExoAudioTrack != eligibleAudioTrack && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
-                Timber.i("onPrepared: Audio track mismatch (ExoPlayer active: %d, Desired: %d) -> applying audio track", activeExoAudioTrack, eligibleAudioTrack);
-                if (mVideoManager.setExoPlayerTrack(eligibleAudioTrack, MediaStreamType.AUDIO, getCurrentMediaSource().getMediaStreams())) {
-                    mCurrentOptions.setAudioStreamIndex(eligibleAudioTrack);
-                    mDefaultAudioIndex = eligibleAudioTrack;
-                } else {
-                    switchAudioStream(eligibleAudioTrack);
+                // if track switching is done without rebuilding the stream, mCurrentOptions is updated
+                // otherwise, use the server default
+                if (mCurrentOptions != null && mCurrentOptions.getAudioStreamIndex() != null) {
+                    eligibleAudioTrack = mCurrentOptions.getAudioStreamIndex();
+                } else if (getCurrentMediaSource() != null && getCurrentMediaSource().getDefaultAudioStreamIndex() != null) {
+                    eligibleAudioTrack = getCurrentMediaSource().getDefaultAudioStreamIndex();
                 }
-            } else {
-                switchAudioStream(eligibleAudioTrack);
+
+                int activeExoAudioTrack = -1;
+                if (hasInitializedVideoManager() && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
+                    activeExoAudioTrack = mVideoManager.getExoPlayerTrack(MediaStreamType.AUDIO, getCurrentMediaSource().getMediaStreams());
+                }
+
+                if (eligibleAudioTrack != -1 && activeExoAudioTrack != eligibleAudioTrack && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
+                    Timber.i("onPrepared: Audio track mismatch (ExoPlayer active: %d, Desired: %d) -> applying audio track", activeExoAudioTrack, eligibleAudioTrack);
+                    if (mVideoManager.setExoPlayerTrack(eligibleAudioTrack, MediaStreamType.AUDIO, getCurrentMediaSource().getMediaStreams())) {
+                        mCurrentOptions.setAudioStreamIndex(eligibleAudioTrack);
+                        mDefaultAudioIndex = eligibleAudioTrack;
+                    } else {
+                        switchAudioStream(eligibleAudioTrack);
+                    }
+                }
             }
+
+            if (mCurrentStreamInfo == null) return;
 
             // Direct Play fix: Force video track at startup because ExoPlayer often
             // ignores the initial selection when opening a raw file.
