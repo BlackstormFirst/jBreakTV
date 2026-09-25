@@ -37,95 +37,63 @@ public class PlaybackIndexManager {
     }
 
     private Integer matchAudioStream(List<MediaStream> streams, String targetLang, String targetCodec, Boolean targetDefault, Boolean targetHI) {
-        if (streams == null || streams.isEmpty()) return null;
+        if (streams == null || streams.isEmpty() || targetLang == null || targetLang.isEmpty()) return null;
 
-        // 1. targetLang + codec + default + HI
-        if (targetLang != null && targetCodec != null && targetDefault != null && targetHI != null) {
+        boolean preferHI = Boolean.TRUE.equals(targetHI) || Boolean.FALSE.equals(targetDefault);
+
+        if (preferHI) {
+            if (targetCodec != null) {
+                for (MediaStream s : streams) {
+                    if (areLanguagesEqual(targetLang, s.getLanguage())
+                            && targetCodec.equalsIgnoreCase(s.getCodec())
+                            && (s.isHearingImpaired() || !s.isDefault())) {
+                        return s.getIndex();
+                    }
+                }
+            }
+
             for (MediaStream s : streams) {
                 if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetCodec.equalsIgnoreCase(s.getCodec())
-                        && targetDefault.equals(s.isDefault())
-                        && targetHI.equals(s.isHearingImpaired())) {
-                    Timber.d("Best audio found ! (lang+codec+default+HI)");
+                        && (s.isHearingImpaired() || !s.isDefault())) {
                     return s.getIndex();
                 }
             }
-        }
 
-        // 2. targetLang + codec + HI
-        if (targetLang != null && targetCodec != null && targetHI != null) {
-            for (MediaStream s : streams) {
-                if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetCodec.equalsIgnoreCase(s.getCodec())
-                        && targetHI.equals(s.isHearingImpaired())) {
-                    Timber.d("Best audio found ! (lang+codec+HI)");
-                    return s.getIndex();
-                }
-            }
-        }
-
-        // 3. targetLang + codec + default
-        if (targetLang != null && targetCodec != null && targetDefault != null) {
-            for (MediaStream s : streams) {
-                if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetCodec.equalsIgnoreCase(s.getCodec())
-                        && targetDefault.equals(s.isDefault())) {
-                    Timber.d("Best audio found ! (lang+codec+default)");
-                    return s.getIndex();
-                }
-            }
-        }
-
-        // 4. targetLang + codec
-        if (targetLang != null && targetCodec != null) {
-            for (MediaStream s : streams) {
-                if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetCodec.equalsIgnoreCase(s.getCodec())) {
-                    Timber.d("Best audio found ! (lang+codec)");
-                    return s.getIndex();
-                }
-            }
-        }
-
-        // 5. targetLang + default + HI
-        if (targetLang != null && targetDefault != null && targetHI != null) {
-            for (MediaStream s : streams) {
-                if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetDefault.equals(s.isDefault())
-                        && targetHI.equals(s.isHearingImpaired())) {
-                    Timber.d("Best audio found ! (lang+default+HI)");
-                    return s.getIndex();
-                }
-            }
-        }
-
-        // 6. targetLang + default
-        if (targetLang != null && targetDefault != null) {
-            for (MediaStream s : streams) {
-                if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetDefault.equals(s.isDefault())) {
-                    Timber.d("Best audio found ! (lang+default)");
-                    return s.getIndex();
-                }
-            }
-        }
-
-        // 7. targetLang + HI
-        if (targetLang != null && targetHI != null) {
-            for (MediaStream s : streams) {
-                if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetHI.equals(s.isHearingImpaired())) {
-                    Timber.d("Best audio found ! (lang+HI)");
-                    return s.getIndex();
-                }
-            }
-        }
-
-        // 8. targetLang only
-        if (targetLang != null && !targetLang.isEmpty()) {
             for (MediaStream s : streams) {
                 if (areLanguagesEqual(targetLang, s.getLanguage())) {
-                    Timber.d("Best audio found ! (lang only)");
+                    return s.getIndex();
+                }
+            }
+        } else {
+            if (targetCodec != null) {
+                for (MediaStream s : streams) {
+                    if (areLanguagesEqual(targetLang, s.getLanguage())
+                            && targetCodec.equalsIgnoreCase(s.getCodec())
+                            && s.isDefault()
+                            && !s.isHearingImpaired()) {
+                        return s.getIndex();
+                    }
+                }
+            }
+
+            if (targetCodec != null) {
+                for (MediaStream s : streams) {
+                    if (areLanguagesEqual(targetLang, s.getLanguage())
+                            && targetCodec.equalsIgnoreCase(s.getCodec())
+                            && !s.isHearingImpaired()) {
+                        return s.getIndex();
+                    }
+                }
+            }
+
+            for (MediaStream s : streams) {
+                if (areLanguagesEqual(targetLang, s.getLanguage()) && !s.isHearingImpaired()) {
+                    return s.getIndex();
+                }
+            }
+
+            for (MediaStream s : streams) {
+                if (areLanguagesEqual(targetLang, s.getLanguage())) {
                     return s.getIndex();
                 }
             }
@@ -133,45 +101,8 @@ public class PlaybackIndexManager {
 
         // --- PHASE 2 : Codec priority over another language (if target language was not found) ---
         if (targetCodec != null && !targetCodec.isEmpty()) {
-
-            // 9. !targetLang + codec + default + HI
-            if (targetDefault != null && targetHI != null) {
-                for (MediaStream s : streams) {
-                    if (targetCodec.equalsIgnoreCase(s.getCodec())
-                            && targetDefault.equals(s.isDefault())
-                            && targetHI.equals(s.isHearingImpaired())) {
-                        Timber.d("Best audio found on codec fallback (!lang+codec+default+HI)");
-                        return s.getIndex();
-                    }
-                }
-            }
-
-            // 10. !targetLang + codec + HI
-            if (targetHI != null) {
-                for (MediaStream s : streams) {
-                    if (targetCodec.equalsIgnoreCase(s.getCodec())
-                            && targetHI.equals(s.isHearingImpaired())) {
-                        Timber.d("Best audio found on codec fallback (!lang+codec+HI)");
-                        return s.getIndex();
-                    }
-                }
-            }
-
-            // 11. !targetLang + codec + default
-            if (targetDefault != null) {
-                for (MediaStream s : streams) {
-                    if (targetCodec.equalsIgnoreCase(s.getCodec())
-                            && targetDefault.equals(s.isDefault())) {
-                        Timber.d("Best audio found on codec fallback (!lang+codec+default)");
-                        return s.getIndex();
-                    }
-                }
-            }
-
-            // 12. !targetLang + codec seul
             for (MediaStream s : streams) {
                 if (targetCodec.equalsIgnoreCase(s.getCodec())) {
-                    Timber.d("Best audio found on codec fallback (!lang+codec)");
                     return s.getIndex();
                 }
             }
@@ -186,6 +117,16 @@ public class PlaybackIndexManager {
         List<MediaStream> allAudioStreams = info.getMediaStreams().stream().filter(stream -> stream.getType() == MediaStreamType.AUDIO).toList();
         if (allAudioStreams == null || allAudioStreams.isEmpty()) return null;
 
+        boolean isLocal = PlaybackController.isLocalSource(info);
+        String lastAudioLanguage = videoQueueManager.getValue().getLastPlayedAudioLanguageIsoCode();
+
+        if (!isLocal && (lastAudioLanguage == null || lastAudioLanguage.isEmpty())) {
+            Integer serverDefault = info.getDefaultAudioStreamIndex();
+            if (serverDefault != null) {
+                return serverDefault;
+            }
+        }
+
         var userAudioLangRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getAudioLangRemoteSetting());
         boolean userAudioAlwaysDefaultRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getUserAlwaysUseAudioDefault());
         var userSubMode = userPreferences.getValue().get(UserSettingPreferences.Companion.getSubMode());
@@ -193,7 +134,6 @@ public class PlaybackIndexManager {
         Timber.i("Remote user audio lang settings: %s", userAudioLangRemoteSetting);
         Timber.i("Remote user audio always default settings: %b", userAudioAlwaysDefaultRemoteSetting);
 
-        String lastAudioLanguage = videoQueueManager.getValue().getLastPlayedAudioLanguageIsoCode();
         String lastAudioCodec = videoQueueManager.getValue().getLastPlayedAudioCodec();
         Boolean lastAudioDefaultState = videoQueueManager.getValue().getLastPlayedAudioDefaultState();
         Boolean lastAudioHearingImpairedState = videoQueueManager.getValue().getLastPlayedAudioHearingImpairedState();
@@ -213,7 +153,7 @@ public class PlaybackIndexManager {
             }
 
             if (matchingIndex == null && !userAudioLangRemoteSetting.isEmpty()) {
-                matchingIndex = matchAudioStream(allAudioStreams, userAudioLangRemoteSetting, lastAudioCodec, lastAudioDefaultState, lastAudioHearingImpairedState);
+                matchingIndex = matchAudioStream(allAudioStreams, userAudioLangRemoteSetting, null, true, false);
             }
         }
 
@@ -223,6 +163,15 @@ public class PlaybackIndexManager {
         }
 
         // General Fallbacks
+        if (matchingIndex == null) {
+            for (MediaStream stream : allAudioStreams) {
+                if (stream.isDefault() && !stream.isHearingImpaired()) {
+                    matchingIndex = stream.getIndex();
+                    break;
+                }
+            }
+        }
+
         if (matchingIndex == null) {
             // Fallback 1: Stream marked default
             for (MediaStream stream : allAudioStreams) {
@@ -397,6 +346,16 @@ public class PlaybackIndexManager {
             return -1;
         }
 
+        boolean isLocal = PlaybackController.isLocalSource(info);
+        String lastSubtitleLanguage = videoQueueManager.getValue().getLastPlayedSubtitleLanguageIsoCode();
+
+        if (!isLocal && lastSubtitleLanguage == null) {
+            Integer serverDefaultSub = info.getDefaultSubtitleStreamIndex();
+            if (serverDefaultSub != null) {
+                return serverDefaultSub;
+            }
+        }
+
         List<MediaStream> allSubtitleStreams = info.getMediaStreams().stream().filter(s -> s.getType() == MediaStreamType.SUBTITLE).toList();
         if (allSubtitleStreams == null || allSubtitleStreams.isEmpty()) {
             return -1;
@@ -429,7 +388,6 @@ public class PlaybackIndexManager {
         Timber.i("Remote user sub mode settings: %s", userSubModeTitle);
         Timber.i("Current audio language: %s", audioLang);
 
-        String lastSubtitleLanguage = videoQueueManager.getValue().getLastPlayedSubtitleLanguageIsoCode();
         String lastSubtitleCodec = videoQueueManager.getValue().getLastPlayedSubtitleCodec();
         Boolean lastSubtitleDefaultState = videoQueueManager.getValue().getLastPlayedSubtitleDefaultState();
         Boolean lastSubtitleForcedState = videoQueueManager.getValue().getLastPlayedSubtitleForcedState();
@@ -446,6 +404,16 @@ public class PlaybackIndexManager {
 
         // MODE ONLY_FORCED
         if (userSubMode.equals(R.string.subtitle_mode_only_forced)) {
+            if (lastSubtitleCodec != null && !lastSubtitleCodec.isEmpty()) {
+                for (MediaStream stream : allSubtitleStreams) {
+                    if (stream.isForced()
+                            && lastSubtitleCodec.equalsIgnoreCase(stream.getCodec())
+                            && (areLanguagesEqual(userSubLangRemoteSetting, stream.getLanguage()) || areLanguagesEqual(audioLang, stream.getLanguage()))) {
+                        Timber.d("Best sub found (ONLY_FORCED in preferred language with codec match)");
+                        return stream.getIndex();
+                    }
+                }
+            }
             for (MediaStream stream : allSubtitleStreams) {
                 if (stream.isForced() && (areLanguagesEqual(userSubLangRemoteSetting, stream.getLanguage()) || areLanguagesEqual(audioLang, stream.getLanguage()))) {
                     Timber.d("Best sub found (ONLY_FORCED in preferred language)");
@@ -479,11 +447,44 @@ public class PlaybackIndexManager {
             if (audioMatchesUserPreference) {
                 // Audio is in user's native/preferred language -> Subtitles NOT needed unless FORCED
                 Timber.d("SMART mode: Audio matches user preference (%s) -> Checking for forced subtitles only", audioLang);
-                for (MediaStream s : allSubtitleStreams) {
-                    if (s.isForced() && areLanguagesEqual(userSubLangRemoteSetting, s.getLanguage())) {
-                        matchingIndex = s.getIndex();
-                        Timber.d("SMART mode: Found forced subtitle in user sub lang (%d)", matchingIndex);
-                        break;
+
+                // Priority 1: Check with lastSubtitleCodec match
+                if (lastSubtitleCodec != null && !lastSubtitleCodec.isEmpty()) {
+                    for (MediaStream s : allSubtitleStreams) {
+                        if (s.isForced() && lastSubtitleCodec.equalsIgnoreCase(s.getCodec()) && areLanguagesEqual(userSubLangRemoteSetting, s.getLanguage())) {
+                            matchingIndex = s.getIndex();
+                            Timber.d("SMART mode: Found forced subtitle matching user sub lang AND codec %s (%d)", lastSubtitleCodec, matchingIndex);
+                            break;
+                        }
+                    }
+                    if (matchingIndex == null) {
+                        for (MediaStream s : allSubtitleStreams) {
+                            if (s.isForced() && lastSubtitleCodec.equalsIgnoreCase(s.getCodec()) && areLanguagesEqual(audioLang, s.getLanguage())) {
+                                matchingIndex = s.getIndex();
+                                Timber.d("SMART mode: Found forced subtitle matching audio lang AND codec %s (%d)", lastSubtitleCodec, matchingIndex);
+                                break;
+                            }
+                        }
+                    }
+                    if (matchingIndex == null) {
+                        for (MediaStream s : allSubtitleStreams) {
+                            if (s.isForced() && lastSubtitleCodec.equalsIgnoreCase(s.getCodec())) {
+                                matchingIndex = s.getIndex();
+                                Timber.d("SMART mode: Found generic forced subtitle matching codec %s (%d)", lastSubtitleCodec, matchingIndex);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Priority 2: Fallback to any forced subtitle if no codec match
+                if (matchingIndex == null) {
+                    for (MediaStream s : allSubtitleStreams) {
+                        if (s.isForced() && areLanguagesEqual(userSubLangRemoteSetting, s.getLanguage())) {
+                            matchingIndex = s.getIndex();
+                            Timber.d("SMART mode: Found forced subtitle in user sub lang (%d)", matchingIndex);
+                            break;
+                        }
                     }
                 }
                 if (matchingIndex == null) {

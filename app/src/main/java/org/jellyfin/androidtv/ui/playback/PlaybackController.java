@@ -573,6 +573,12 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             for (MediaStream s : currentMediaSource.getMediaStreams()) {
                 if (s.getType() == MediaStreamType.AUDIO && s.getIndex() == selectedAudioIndex) {
                     currentAudioLang = s.getLanguage();
+                    if (currentAudioLang != null) {
+                        videoQueueManager.getValue().setLastPlayedAudioLanguageIsoCode(currentAudioLang);
+                        if (s.getCodec() != null) videoQueueManager.getValue().setLastPlayedAudioCodec(s.getCodec());
+                        videoQueueManager.getValue().setLastPlayedAudioDefaultState(s.isDefault());
+                        videoQueueManager.getValue().setLastPlayedAudioHearingImpairedState(s.isHearingImpaired());
+                    }
                     break;
                 }
             }
@@ -910,6 +916,20 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
         if (mCurrentOptions != null && mDefaultAudioIndex != -1) {
             mCurrentOptions.setAudioStreamIndex(mDefaultAudioIndex);
+
+            if (info != null && info.getMediaSource() != null && info.getMediaSource().getMediaStreams() != null) {
+                for (MediaStream s : info.getMediaSource().getMediaStreams()) {
+                    if (s.getType() == MediaStreamType.AUDIO && s.getIndex() == mDefaultAudioIndex) {
+                        if (s.getLanguage() != null) {
+                            videoQueueManager.getValue().setLastPlayedAudioLanguageIsoCode(s.getLanguage());
+                            if (s.getCodec() != null) videoQueueManager.getValue().setLastPlayedAudioCodec(s.getCodec());
+                            videoQueueManager.getValue().setLastPlayedAudioDefaultState(s.isDefault());
+                            videoQueueManager.getValue().setLastPlayedAudioHearingImpairedState(s.isHearingImpaired());
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 
