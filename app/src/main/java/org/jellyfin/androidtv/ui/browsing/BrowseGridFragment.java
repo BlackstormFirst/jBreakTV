@@ -777,6 +777,15 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
 
         binding.toolBar.addView(mSortButton);
 
+        mFilterButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
+        mFilterButton.setImageResource(R.drawable.ic_filter);
+        mFilterButton.setFocusable(true);
+        mFilterButton.setMaxHeight(size);
+        mFilterButton.setAdjustViewBounds(true);
+        mFilterButton.setOnClickListener(v -> showFilterPopupWindow(v));
+        mFilterButton.setContentDescription(getString(R.string.filters));
+        binding.toolBar.addView(mFilterButton);
+
         if (mRowDef.getQueryType() == QueryType.Items) {
             mUnwatchedButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
             mUnwatchedButton.setImageResource(R.drawable.ic_unwatch);
@@ -800,15 +809,6 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
             mUnwatchedButton.setContentDescription(getString(R.string.lbl_unwatched));
             binding.toolBar.addView(mUnwatchedButton);
         }
-
-        mFilterButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
-        mFilterButton.setImageResource(R.drawable.ic_filter); // Remplacer par la ressource d'icône souhaitée
-        mFilterButton.setFocusable(true);
-        mFilterButton.setMaxHeight(size);
-        mFilterButton.setAdjustViewBounds(true);
-        mFilterButton.setOnClickListener(v -> showFilterPopupWindow(v));
-        mFilterButton.setContentDescription(getString(R.string.filters));
-        binding.toolBar.addView(mFilterButton);
 
         mFavoriteButton = new ImageButton(requireContext(), null, 0, R.style.Button_Icon);
         mFavoriteButton.setImageResource(R.drawable.ic_heart);
