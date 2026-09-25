@@ -14,6 +14,7 @@ import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ItemFilter
 import org.jellyfin.sdk.model.api.ItemSortBy
+import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetAlbumArtistsRequest
 import org.jellyfin.sdk.model.api.request.GetArtistsRequest
@@ -314,6 +315,9 @@ object BrowsingUtils {
 				CollectionType.TVSHOWS -> baseRequest.copy(
 					includeItemTypes = setOf(BaseItemKind.SERIES),
 					recursive = true,
+					isMissing = false,
+					isUnaired = false,
+					excludeLocationTypes = setOf(LocationType.VIRTUAL),
 				)
 
 				CollectionType.MUSIC -> baseRequest.copy(
