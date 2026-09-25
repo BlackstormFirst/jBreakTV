@@ -37,6 +37,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemFilter
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
+import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetAlbumArtistsRequest
 import org.jellyfin.sdk.model.api.request.GetArtistsRequest
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
@@ -766,10 +767,20 @@ fun setArtistsSorting(
 fun setItemsSorting(
 	request: GetItemsRequest,
 	sortOption: SortOption,
-) = request.copy(
-	sortBy = setOf(sortOption.value, ItemSortBy.SORT_NAME),
-	sortOrder = setOf(sortOption.order)
-)
+): GetItemsRequest {
+	val (sortByList, sortOrderList) = if (sortOption.value == ItemSortBy.PREMIERE_DATE) {
+		listOf(ItemSortBy.PRODUCTION_YEAR, ItemSortBy.PREMIERE_DATE, ItemSortBy.SORT_NAME) to
+			listOf(sortOption.order, sortOption.order, SortOrder.ASCENDING)
+	} else {
+		listOf(sortOption.value, ItemSortBy.SORT_NAME) to
+			listOf(sortOption.order, SortOrder.ASCENDING)
+	}
+
+	return request.copy(
+		sortBy = sortByList,
+		sortOrder = sortOrderList
+	)
+}
 
 fun setAlbumArtistsFilter(
 	request: GetAlbumArtistsRequest,
