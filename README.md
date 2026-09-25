@@ -2,7 +2,7 @@
 <h3 align="center">Based on a fork of <a href="https://github.com/jellyfin/jellyfin-androidtv">Jellyfin Android TV</a></h3>
 
 ---
-
+<p style="text-align:center"><img width="300" src="https://github.com/BlackstormFirst/jBreakTV/blob/master/app/src/main/res/mipmap-hdpi/app_banner.png?raw=true" alt="jBreakTV" /></p>
 <h4 align="center">Take a break ! Use jBreakTV !</h4>
 <p>
 jBreakTV is an alternative of the original Jellyfin client for Android TV, Nvidia Shield, and Amazon Fire TV devices.
@@ -10,6 +10,11 @@ jBreakTV is an alternative of the original Jellyfin client for Android TV, Nvidi
 As a fork, it retains core features and merging capabilities while introducing additional features and fixes.
 
 Works with Jellyfin server versions 10.11.x and 12.x.
+
+Recommendations (2026/09/25):
+- Jellyfin Server 10.11.11
+- Server Plugin: <a href="https://github.com/danieladov/jellyfin-plugin-mergeversions">Merge</a> (10.11.0.1)
+- Server Plugin: <a href="https://github.com/Atilil/jellyfin-plugins">JellyTag</a> (the latest version or a fork that fixes the badge caching issues)
 
 Here are some of the improvements:
 - Added a feature that allows media playback from local or USB devices (can be disabled in the playback menu).
@@ -21,7 +26,7 @@ Here are some of the improvements:
 - Option to change actor thumbnails to a circular shape in the customization menu.
 - Download/Update Manager (for Debug builds only)
 - Changes to several default user preferences during installation
-- and lots of other things...
+- and lots of other fixes...
 
 
 The application is currently provided in Debug mode; a properly signed version will soon be available for your devices.
