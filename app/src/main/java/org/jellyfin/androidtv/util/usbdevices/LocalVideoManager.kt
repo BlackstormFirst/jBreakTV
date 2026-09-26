@@ -7,6 +7,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import androidx.annotation.OptIn
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
@@ -62,9 +63,11 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import java.lang.Double
 import java.time.LocalDateTime
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.abs
 
 object LocalVideoManager {
 
@@ -204,16 +207,34 @@ object LocalVideoManager {
             val frameRate: Float? = null,
         )
 
+        fun snapToStandardFrameRate(fps: Float): Float {
+            val standardRates = floatArrayOf(23.976f, 24.0f, 25.0f, 29.97f, 30.0f, 48.0f, 50.0f, 59.94f, 60.0f, 120.0f)
+            for (stdRate in standardRates) {
+                if (abs(fps - stdRate) / stdRate < 0.03f) {
+                    return stdRate
+                }
+            }
+            return fps
+        }
+
         fun probeVideoMetadata(file: File): ProbedVideoMetadata {
             var isInterlaced = false
-            var frameRate: Float? = null
+            val ext = file.extension.lowercase(Locale.ROOT)
+            var frameRate: Float? = when (ext) {
+                "mkv", "webm", "mka" -> LocalChapterExtractor.extractMatroskaFrameRate(file)
+                "mp4", "m4v", "mov" -> LocalChapterExtractor.extractMp4FrameRate(file)
+                else -> null
+            }
+
             val extractor = MediaExtractor()
-            return try {
+            try {
                 extractor.setDataSource(file.absolutePath)
+                var videoTrackIndex = -1
                 for (i in 0 until extractor.trackCount) {
                     val format = extractor.getTrackFormat(i)
                     val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
                     if (mime.startsWith("video/")) {
+                        videoTrackIndex = i
                         if (format.containsKey("scan-type")) {
                             val scanType = format.getString("scan-type")
                             if (scanType?.lowercase(Locale.ROOT) == "interlaced") isInterlaced = true
@@ -221,22 +242,71 @@ object LocalVideoManager {
                         if (format.containsKey("interlaced")) {
                             if (format.getInteger("interlaced") == 1) isInterlaced = true
                         }
-                        if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+                        if (frameRate == null && format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
                             val rate = try {
                                 format.getFloat(MediaFormat.KEY_FRAME_RATE)
                             } catch (_: Exception) {
-                                format.getInteger(MediaFormat.KEY_FRAME_RATE).toFloat()
+                                try {
+                                    format.getInteger(MediaFormat.KEY_FRAME_RATE).toFloat()
+                                } catch (_: Exception) {
+                                    format.getString(MediaFormat.KEY_FRAME_RATE)?.toFloatOrNull()
+                                }
                             }
-                            if (rate > 0f) frameRate = rate
+                            if (rate != null && rate > 0f) frameRate = snapToStandardFrameRate(rate)
+                        }
+                        break
+                    }
+                }
+
+                // Fallback: If KEY_FRAME_RATE was missing in format, advance sampleTime in video track to calculate exact fps
+                if (frameRate == null && videoTrackIndex >= 0) {
+                    extractor.selectTrack(videoTrackIndex)
+                    val timestamps = mutableListOf<Long>()
+                    var sampleCount = 0
+                    while (sampleCount < 15 && extractor.sampleTime >= 0L) {
+                        timestamps.add(extractor.sampleTime)
+                        sampleCount++
+                        if (!extractor.advance()) break
+                    }
+                    if (timestamps.size >= 3) {
+                        val sorted = timestamps.sorted()
+                        val spanUs = sorted.last() - sorted.first()
+                        if (spanUs > 0) {
+                            val rawFps = ((timestamps.size - 1) * 1_000_000.0 / spanUs).toFloat()
+                            val snappedFps = snapToStandardFrameRate(rawFps)
+                            if (snappedFps in 10.0f..120.0f) {
+                                frameRate = snappedFps
+                            }
                         }
                     }
                 }
-                ProbedVideoMetadata(isInterlaced, frameRate)
             } catch (_: Exception) {
-                ProbedVideoMetadata()
             } finally {
                 runCatching { extractor.release() }
             }
+
+            if (frameRate == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                runCatching {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(file.absolutePath)
+                        val countStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_FRAME_COUNT)
+                        val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        val count = countStr?.toFloatOrNull()
+                        val durationMs = durationStr?.toFloatOrNull()
+                        if (count != null && durationMs != null && count > 0f && durationMs > 0f) {
+                            val fps = (count * 1000f) / durationMs
+                            if (fps in 10.0f..120.0f) {
+                                frameRate = snapToStandardFrameRate(fps)
+                            }
+                        }
+                    } finally {
+                        runCatching { retriever.release() }
+                    }
+                }
+            }
+
+            return ProbedVideoMetadata(isInterlaced, frameRate)
         }
 
         fun extractFallbackDimensions(file: File): Pair<Int, Int>? {
@@ -504,6 +574,7 @@ object LocalVideoManager {
                         val isInterlacedVal = probedMeta.isInterlaced
                         val title = resolveTrackTitle(format, MediaStreamType.VIDEO, displayName, codec.uppercase(Locale.ROOT), 0, isForced)
 
+                        Timber.i("UsbDebug: Video Inspection complete for %s -> realFrameRate=%s, resolution=%dx%d", file.name, rawFrameRate, width, height)
                         streams.add(MediaStream(type = MediaStreamType.VIDEO, index = globalIndex++, codec = codec, width = width, height = height, bitRate = bitrate, realFrameRate = rawFrameRate, averageFrameRate = rawFrameRate, videoRange = videoRangeVal, videoRangeType = videoRangeTypeVal, aspectRatio = aspectRatioVal, profile = format.codecs, isInterlaced = isInterlacedVal, isDefault = isFormatDefault || nbV == 1, isForced = isForced, isExternal = false, isHearingImpaired = false, isTextSubtitleStream = false, supportsExternalStream = false, title = title, language = lang))
                     }
                     isAudioTrack -> {
@@ -920,6 +991,9 @@ object LocalVideoManager {
             isInfiniteStream = false
         )
 
+        val enrichedItemStreams = item.mediaSources?.firstOrNull()?.mediaStreams ?: item.mediaStreams
+        val streamsToUse = enrichedItemStreams ?: mediaSource.mediaStreams
+
         val safeMediaSource = mediaSource.copy(
             id = mediaSource.id ?: ("local_src_" + file.name.hashCode()),
             path = fileUriStr,
@@ -930,7 +1004,7 @@ object LocalVideoManager {
             supportsTranscoding = false,
             isRemote = false,
             isInfiniteStream = false,
-            mediaStreams = mediaSource.mediaStreams ?: item.mediaStreams
+            mediaStreams = streamsToUse
         )
 
         return StreamInfo().apply {
@@ -1037,6 +1111,206 @@ object LocalVideoManager {
                     }
                 }
             }
+        }
+
+        fun extractMatroskaFrameRate(file: File): Float? {
+            try {
+                RandomAccessFile(file, "r").use { raf ->
+                    val fileLength = raf.length()
+                    var pos = 0L
+                    val maxScan = minOf(fileLength, 8 * 1024 * 1024L)
+
+                    while (pos < maxScan) {
+                        raf.seek(pos)
+                        val id = readEbmlId(raf) ?: break
+                        val size = readEbmlVint(raf) ?: break
+                        val dataPos = raf.filePointer
+
+                        if (id == 0x18538067L) { // Segment
+                            pos = dataPos
+                            continue
+                        }
+
+                        if (id == 0x1654AE6BL) { // Tracks
+                            return parseMatroskaTracksForFrameRate(raf, dataPos, size)
+                        } else if (id == 0x1F43B675L) { // Cluster
+                            break
+                        }
+
+                        pos = dataPos + size
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "LocalVideoManager: Error extracting Matroska FrameRate")
+            }
+            return null
+        }
+
+        private fun parseMatroskaTracksForFrameRate(
+            raf: RandomAccessFile,
+            dataPos: Long,
+            size: Long
+        ): Float? {
+            val end = minOf(dataPos + size, raf.length())
+            var pos = dataPos
+
+            while (pos < end) {
+                raf.seek(pos)
+                val id = readEbmlId(raf) ?: break
+                val elemSize = readEbmlVint(raf) ?: break
+                val elemData = raf.filePointer
+
+                if (id == 0xAEL) { // TrackEntry
+                    var isVideoTrack = false
+                    var defaultDurationNs = 0L
+                    var headerFrameRate = 0f
+
+                    var childPos = elemData
+                    val childEnd = elemData + elemSize
+
+                    while (childPos < childEnd) {
+                        raf.seek(childPos)
+                        val childId = readEbmlId(raf) ?: break
+                        val childSize = readEbmlVint(raf) ?: break
+                        val childData = raf.filePointer
+
+                        when (childId) {
+                            0x83L -> { // TrackType
+                                val trackType = readEbmlUint(raf, childSize)
+                                if (trackType == 1L) isVideoTrack = true
+                            }
+                            0x23E383L -> { // DefaultDuration (nanoseconds per frame)
+                                defaultDurationNs = readEbmlUint(raf, childSize)
+                            }
+                            0x2383E3L -> { // FrameRate (Float)
+                                if (childSize == 4L) {
+                                    headerFrameRate = java.lang.Float.intBitsToFloat(readUint32(raf).toInt())
+                                } else if (childSize == 8L) {
+                                    headerFrameRate = Double.longBitsToDouble(readUint64(raf)).toFloat()
+                                }
+                            }
+                        }
+                        childPos = childData + childSize
+                    }
+
+                    if (isVideoTrack) {
+                        if (headerFrameRate > 0f) {
+                            return VideoHelper.snapToStandardFrameRate(headerFrameRate)
+                        }
+                        if (defaultDurationNs > 0L) {
+                            val fps = (1_000_000_000.0 / defaultDurationNs).toFloat()
+                            return VideoHelper.snapToStandardFrameRate(fps)
+                        }
+                    }
+                }
+                pos = elemData + elemSize
+            }
+            return null
+        }
+
+        fun extractMp4FrameRate(file: File): Float? {
+            try {
+                RandomAccessFile(file, "r").use { raf ->
+                    val fileLen = raf.length()
+                    var pos = 0L
+
+                    while (pos + 8 <= fileLen) {
+                        raf.seek(pos)
+                        val size = readUint32(raf)
+                        val type = readFourCC(raf)
+                        val boxSize = if (size == 1L) readUint64(raf) else if (size == 0L) fileLen - pos else size
+
+                        if (type == "moov") {
+                            return parseMp4MoovForFrameRate(raf, pos + 8, boxSize - 8)
+                        }
+                        if (boxSize < 8) break
+                        pos += boxSize
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "LocalVideoManager: Error extracting MP4 FrameRate")
+            }
+            return null
+        }
+
+        private fun parseMp4MoovForFrameRate(
+            raf: RandomAccessFile,
+            dataPos: Long,
+            dataSize: Long
+        ): Float? {
+            val end = minOf(dataPos + dataSize, raf.length())
+            var pos = dataPos
+
+            while (pos + 8 <= end) {
+                raf.seek(pos)
+                val size = readUint32(raf)
+                val type = readFourCC(raf)
+                val boxSize = if (size == 1L) readUint64(raf) else if (size == 0L) end - pos else size
+
+                if (type == "trak") {
+                    val fps = parseMp4TrakForFrameRate(raf, pos + 8, boxSize - 8)
+                    if (fps != null && fps > 0f) return fps
+                }
+                if (boxSize < 8) break
+                pos += boxSize
+            }
+            return null
+        }
+
+        private fun parseMp4TrakForFrameRate(
+            raf: RandomAccessFile,
+            dataPos: Long,
+            dataSize: Long
+        ): Float? {
+            var isVideoTrak = false
+            var timescale = 0L
+            var sampleDelta = 0L
+
+            fun scanBoxes(boxPos: Long, boxEnd: Long) {
+                var pos = boxPos
+                while (pos + 8 <= boxEnd) {
+                    raf.seek(pos)
+                    val size = readUint32(raf)
+                    val type = readFourCC(raf)
+                    val boxSize = if (size == 1L) readUint64(raf) else if (size == 0L) boxEnd - pos else size
+                    val payload = pos + 8
+                    val payloadSize = boxSize - 8
+
+                    when (type) {
+                        "mdia", "minf", "stbl" -> scanBoxes(payload, payload + payloadSize)
+                        "hdlr" -> {
+                            raf.seek(payload + 8)
+                            val handlerType = readFourCC(raf)
+                            if (handlerType == "vide") isVideoTrak = true
+                        }
+                        "mdhd" -> {
+                            raf.seek(payload)
+                            val version = raf.read()
+                            raf.skipBytes(3)
+                            if (version == 1) raf.skipBytes(16) else raf.skipBytes(8)
+                            timescale = readUint32(raf)
+                        }
+                        "stts" -> {
+                            raf.seek(payload + 4)
+                            val entryCount = readUint32(raf)
+                            if (entryCount > 0) {
+                                raf.skipBytes(4)
+                                sampleDelta = readUint32(raf)
+                            }
+                        }
+                    }
+                    if (boxSize < 8) break
+                    pos += boxSize
+                }
+            }
+
+            scanBoxes(dataPos, minOf(dataPos + dataSize, raf.length()))
+
+            if (isVideoTrak && timescale > 0L && sampleDelta > 0L) {
+                val fps = timescale.toFloat() / sampleDelta.toFloat()
+                return VideoHelper.snapToStandardFrameRate(fps)
+            }
+            return null
         }
 
         private fun extractMatroskaChapters(file: File): List<RawChapter> {

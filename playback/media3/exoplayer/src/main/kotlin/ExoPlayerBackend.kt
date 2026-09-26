@@ -2,6 +2,7 @@ package org.jellyfin.playback.media3.exoplayer
 
 import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
 import android.view.ViewGroup
 import androidx.annotation.OptIn
 import androidx.core.content.getSystemService
@@ -120,10 +121,16 @@ class ExoPlayerBackend(
 			.build()
 
 		ExoPlayer.Builder(context)
+			.apply {
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+					setVideoChangeFrameRateStrategy(2)
+				}
+			}
 			.setLoadControl(loadControl)
 			.setRenderersFactory(renderersFactory)
 			.setTrackSelector(DefaultTrackSelector(context).apply {
 				setParameters(buildUponParameters().apply {
+					setTunnelingEnabled(true)
 					setAudioOffloadPreferences(
 						TrackSelectionParameters.AudioOffloadPreferences.DEFAULT.buildUpon().apply {
 							setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)

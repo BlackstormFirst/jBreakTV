@@ -236,6 +236,7 @@ public class VideoManager {
     private ExoPlayer.Builder configureExoplayerBuilder(Context context, AssHandler assHandler, boolean isLocal) {
         ExoPlayer.Builder exoPlayerBuilder = new ExoPlayer.Builder(context);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // 2 = Surface.CHANGE_FRAME_RATE_ALWAYS on Android 11+ (API 30+)
             exoPlayerBuilder.setVideoChangeFrameRateStrategy(2);
         }
         DefaultRenderersFactory defaultRendererFactory = new DefaultRenderersFactory(context);
@@ -244,6 +245,7 @@ public class VideoManager {
 
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(context);
         trackSelector.setParameters(trackSelector.buildUponParameters()
+                .setTunnelingEnabled(true)
                 .setAudioOffloadPreferences(new TrackSelectionParameters.AudioOffloadPreferences.Builder()
                         .setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
                         .build()
