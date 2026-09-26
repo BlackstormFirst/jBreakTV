@@ -18,6 +18,7 @@ import org.jellyfin.androidtv.ui.base.form.Checkbox
 import org.jellyfin.androidtv.ui.navigation.LocalRouter
 import org.koin.compose.koinInject
 import androidx.compose.runtime.mutableIntStateOf
+import java.util.Locale
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
@@ -36,8 +37,8 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 	//var userAlwaysUseAudioDefault by rememberPreference(userSettingPreferences, UserSettingPreferences.userAlwaysUseAudioDefault)
 
 	var subtitleModeTitle by remember { mutableIntStateOf(userSettingPreferences[UserSettingPreferences.subMode]) }
-	var userLangPrefs by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.audioLangRemoteSetting])}
-	var userSubPrefs by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.subLangRemoteSetting])}
+	var userLangPrefsRaw by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.audioLangRemoteSetting])}
+	var userSubPrefsRaw by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.subLangRemoteSetting])}
 	var userAlwaysUseAudioDefault by remember { mutableStateOf(userSettingPreferences[UserSettingPreferences.userAlwaysUseAudioDefault])}
 
 	/*
@@ -61,8 +62,37 @@ fun SettingsUserServerPrefsScreen(modifier: Modifier = Modifier) {
 	//Timber.i("Val lang: '%s'", userLangPrefs)
 	//Timber.i("Val subs: '%s'", userSubPrefs)
 
-	if (userLangPrefs == "") userLangPrefs = stringResource(R.string.any_language)
-	if (userSubPrefs == "") userSubPrefs = stringResource(R.string.any_language)
+	val anyLanguageText = stringResource(R.string.any_language)
+
+	val userLangPrefs = remember(userLangPrefsRaw, anyLanguageText) {
+		if (userLangPrefsRaw.isBlank()) {
+			anyLanguageText
+		} else {
+			val displayLanguage = Locale.forLanguageTag(userLangPrefsRaw).getDisplayLanguage(Locale.getDefault())
+			val finalDisplay = if (displayLanguage.isNotBlank() && displayLanguage != userLangPrefsRaw) {
+				displayLanguage
+			} else {
+				runCatching { Locale.Builder().setLanguage(userLangPrefsRaw).build().getDisplayLanguage(Locale.getDefault()) }
+					.getOrNull() ?: userLangPrefsRaw
+			}
+			finalDisplay.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+		}
+	}
+
+	val userSubPrefs = remember(userSubPrefsRaw, anyLanguageText) {
+		if (userSubPrefsRaw.isBlank()) {
+			anyLanguageText
+		} else {
+			val displayLanguage = Locale.forLanguageTag(userSubPrefsRaw).getDisplayLanguage(Locale.getDefault())
+			val finalDisplay = if (displayLanguage.isNotBlank() && displayLanguage != userSubPrefsRaw) {
+				displayLanguage
+			} else {
+				runCatching { Locale.Builder().setLanguage(userSubPrefsRaw).build().getDisplayLanguage(Locale.getDefault()) }
+					.getOrNull() ?: userSubPrefsRaw
+			}
+			finalDisplay.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+		}
+	}
 
 	SettingsColumn {
 		item {
