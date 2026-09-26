@@ -44,10 +44,17 @@ class ClosedCaptionsAction(
 					isChecked = playbackController.subtitleStreamIndex == -1
 				}
 
-				for (sub in playbackController.currentMediaSource.mediaStreams.orEmpty()) {
+				val currentMediaSource = playbackController.currentMediaSource
+
+				for (sub in currentMediaSource?.mediaStreams.orEmpty()) {
 					if (sub.type != MediaStreamType.SUBTITLE) continue
 
-					add(0, sub.index, order++, sub.displayTitle).apply {
+					val displayLabel = sub.displayTitle?.ifBlank { null }
+						?: sub.title?.ifBlank { null }
+						?: sub.language
+						?: "Track ${sub.index}"
+
+					add(0, sub.index, order++, displayLabel).apply {
 						isChecked = sub.index == playbackController.subtitleStreamIndex
 					}
 				}

@@ -52,7 +52,7 @@ object LocalVideoManager {
 	@UnstableApi
 	fun configureAndPlayLocal(videoManager: VideoManager, streamInfo: StreamInfo) {
 		val tStart = System.currentTimeMillis()
-		Timber.d("AmorceBenchmark: configureAndPlayLocal démarré (0ms)")
+		Timber.d("Benchmark: configureAndPlayLocal started (0ms)")
 		val path = streamInfo.mediaUrl ?: return
 
 		//videoManager.resetPreparedState()
@@ -98,7 +98,7 @@ object LocalVideoManager {
 			player.setMediaItem(mediaItem)
 			player.prepare()
 			player.setPlayWhenReady(true)
-			Timber.d("AmorceBenchmark: player.setMediaItem et prepare() déclenchés en ${System.currentTimeMillis() - tStart}ms")
+			Timber.d("Benchmark: player.setMediaItem and prepare() triggered in ${System.currentTimeMillis() - tStart}ms")
 		} catch (t: Throwable) {
 			Timber.e(t, "LocalVideoManager: Error in configureAndPlayLocal")
 		}
@@ -327,7 +327,7 @@ object LocalVideoManager {
             streams.add(0, MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
         if (streams.none { it.type == MediaStreamType.AUDIO }) {
-            streams.add(MediaStream(type = MediaStreamType.AUDIO, index = streams.size, codec = "aac", channels = 2, sampleRate = 48000, language = "fre", title = "Français - AAC Stéréo", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
+            streams.add(MediaStream(type = MediaStreamType.AUDIO, index = streams.size, codec = "aac", channels = 2, sampleRate = 48000, language = "und", title = "Stereo - AAC", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
 
         // Sidecars
@@ -335,7 +335,8 @@ object LocalVideoManager {
         val sidecars = UsbMediaHelper.findSidecarSubtitles(file)
         sidecars.forEachIndexed { subIndex, subFile ->
             val subUriStr = try { FileProvider.getUriForFile(context, "${context.packageName}.provider", subFile).toString() } catch (e: Exception) { Uri.fromFile(subFile).toString() }
-            streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = baseIndex + subIndex, codec = subFile.extension, language = "fre", title = "${subFile.nameWithoutExtension} (${subFile.extension.uppercase(Locale.ROOT)})", isDefault = false, isForced = false, isExternal = true, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
+            val (formattedTitle, detectedLang) = cleanSubtitleTitleAndLanguage(subFile.name, file.name)
+            streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = baseIndex + subIndex, codec = subFile.extension, language = detectedLang ?: "und", title = formattedTitle, displayTitle = formattedTitle, isDefault = false, isForced = false, isExternal = true, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
         }
 
         val openTime = t1 - t0
@@ -412,14 +413,15 @@ object LocalVideoManager {
 
         val streams = mutableListOf<MediaStream>(
             MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false),
-            MediaStream(type = MediaStreamType.AUDIO, index = 1, codec = "aac", language = "fre", title = "Français - AAC Stéréo", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false)
+            MediaStream(type = MediaStreamType.AUDIO, index = 1, codec = "aac", language = "und", title = "Stereo - AAC", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false)
         )
 
         val baseIndex = streams.size
         val sidecars = UsbMediaHelper.findSidecarSubtitles(file)
         sidecars.forEachIndexed { subIndex, subFile ->
             val subUriStr = try { FileProvider.getUriForFile(context, "${context.packageName}.provider", subFile).toString() } catch (e: Exception) { Uri.fromFile(subFile).toString() }
-            streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = baseIndex + subIndex, codec = subFile.extension, language = "fre", title = subFile.name, isDefault = false, isForced = false, isExternal = true, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
+            val (formattedTitle, detectedLang) = cleanSubtitleTitleAndLanguage(subFile.name, file.name)
+            streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = baseIndex + subIndex, codec = subFile.extension, language = detectedLang ?: "und", title = formattedTitle, displayTitle = formattedTitle, isDefault = false, isForced = false, isExternal = true, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
         }
 
         val mediaSource = MediaSourceInfo(
@@ -477,7 +479,7 @@ object LocalVideoManager {
                 MediaStreamType.AUDIO -> {
                     val channelLayout = when (channels) {
                         1 -> "Mono"
-                        2 -> "Stéréo"
+                        2 -> "Stereo"
                         6 -> "5.1"
                         8 -> "7.1"
                         else -> "$channels ch"
@@ -495,7 +497,7 @@ object LocalVideoManager {
         return "$baseTitle$offsetTag"
     }
 
-    private fun getDisplayNameForLanguage(langCode: String?): String {
+    fun getDisplayNameForLanguage(langCode: String?): String {
         if (langCode.isNullOrBlank()) return "Unknown"
         val locale = Locale.forLanguageTag(langCode)
         val display = locale.getDisplayLanguage(Locale.getDefault())
@@ -506,6 +508,50 @@ object LocalVideoManager {
                 .getOrNull()?.replaceFirstChar { it.uppercase() } ?: langCode
         }
     }
+
+	fun cleanSubtitleTitleAndLanguage(
+		rawTitle: String?,
+		videoName: String?,
+		fallbackLang: String? = null,
+	): Pair<String, String?> {
+		if (rawTitle.isNullOrBlank()) {
+			val langName = fallbackLang?.let { getDisplayNameForLanguage(it) } ?: "Subtitle"
+			return Pair(langName, fallbackLang)
+		}
+
+		var clean = rawTitle.substringBeforeLast('.').ifBlank { rawTitle }.trim()
+
+		if (!videoName.isNullOrBlank()) {
+			val videoBase = videoName.substringBeforeLast('.').trim()
+			if (videoBase.isNotEmpty() && clean.startsWith(videoBase, ignoreCase = true)) {
+				clean = clean.substring(videoBase.length)
+			}
+		}
+
+		clean = clean.dropWhile { it in ".-_ " }
+
+		var detectedLang = fallbackLang
+		val lastDotIndex = clean.lastIndexOf('.')
+
+		if (lastDotIndex != -1) {
+			val segment = clean.substring(lastDotIndex + 1).trim()
+			if (segment.length in 2..3 && segment.all { it.isLetter() }) {
+				detectedLang = segment.lowercase(Locale.ROOT)
+				clean = clean.substring(0, lastDotIndex).trim('.', '-', '_', ' ')
+			}
+		} else if (clean.length in 2..3 && clean.all { it.isLetter() }) {
+			detectedLang = clean.lowercase(Locale.ROOT)
+			clean = ""
+		}
+
+		val finalTitle = if (clean.isNotBlank()) {
+			clean
+		} else {
+			detectedLang?.let { getDisplayNameForLanguage(it) } ?: "Subtitle"
+		}
+
+		return Pair(finalTitle, detectedLang)
+	}
 
     fun buildLocalStreamInfo(item: BaseItemDto): StreamInfo {
         val file = File(item.path ?: "")
