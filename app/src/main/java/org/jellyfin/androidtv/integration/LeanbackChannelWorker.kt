@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.integration.provider.ImageProvider
@@ -49,7 +50,9 @@ import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.extensions.ticks
 import org.koin.core.component.KoinComponent
@@ -87,6 +90,7 @@ class LeanbackChannelWorker(
 	private val api by inject<ApiClient>()
 	private val userPreferences by inject<UserPreferences>()
 	private val userViewsRepository by inject<UserViewsRepository>()
+	private val userRepository by inject<UserRepository>()
 	private val imageHelper by inject<ImageHelper>()
 
 	/**
@@ -303,34 +307,60 @@ class LeanbackChannelWorker(
 
 	private suspend fun getLatestMedia(): Triple<List<BaseItemDto>, List<BaseItemDto>, List<BaseItemDto>> =
 		withContext(Dispatchers.IO) {
+			val configuration = userRepository.currentUser.value?.configuration
+			val latestItemsExcludes = configuration?.latestItemsExcludes.orEmpty()
+			val userViews = api.userViewsApi.getUserViews(includeHidden = false).content.items
+				.filter { userViewsRepository.isSupported(it.collectionType) }
+				.filterNot { it.id in latestItemsExcludes }
+
+			val movieLibraries = userViews.filter { it.collectionType == CollectionType.MOVIES }
+			val tvLibraries = userViews.filter { it.collectionType == CollectionType.TVSHOWS }
+
 			val latestEpisodes = async {
-				api.userLibraryApi.getLatestMedia(
-					fields = ItemRepository.itemFields,
-					limit = 50,
-					includeItemTypes = listOf(BaseItemKind.EPISODE),
-					isPlayed = false
-				).content
+				tvLibraries.flatMap { library ->
+					api.userLibraryApi.getLatestMedia(
+						parentId = library.id,
+						fields = ItemRepository.itemFields,
+						limit = 50,
+						includeItemTypes = listOf(BaseItemKind.EPISODE),
+						isPlayed = false
+					).content
+				}
+				.filter { it.locationType != LocationType.VIRTUAL && it.isPlaceHolder != true }
+				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
+				.take(50)
 			}
 
 			val latestMovies = async {
-				api.userLibraryApi.getLatestMedia(
-					fields = ItemRepository.itemFields,
-					limit = 50,
-					includeItemTypes = listOf(BaseItemKind.MOVIE),
-					isPlayed = false
-				).content
+				movieLibraries.flatMap { library ->
+					api.userLibraryApi.getLatestMedia(
+						parentId = library.id,
+						fields = ItemRepository.itemFields,
+						limit = 50,
+						includeItemTypes = listOf(BaseItemKind.MOVIE),
+						isPlayed = false
+					).content
+				}
+				.filter { it.locationType != LocationType.VIRTUAL && it.isPlaceHolder != true }
+				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
+				.take(50)
 			}
 
 			val latestMedia = async {
-				api.userLibraryApi.getLatestMedia(
-					fields = ItemRepository.itemFields,
-					limit = 50,
-					includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
-					isPlayed = false
-				).content
+				userViews.flatMap { library ->
+					api.userLibraryApi.getLatestMedia(
+						parentId = library.id,
+						fields = ItemRepository.itemFields,
+						limit = 50,
+						includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+						isPlayed = false
+					).content
+				}
+				.filter { it.locationType != LocationType.VIRTUAL && it.isPlaceHolder != true }
+				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
+				.take(50)
 			}
 
-			// Concat
 			Triple(latestEpisodes.await(), latestMovies.await(), latestMedia.await())
 		}
 
