@@ -35,6 +35,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.compat.StreamInfo
@@ -65,6 +67,8 @@ import java.util.Locale
 import java.util.UUID
 
 object LocalVideoManager {
+
+    private val thumbnailMutex = Mutex()
 
     private object LocalProbeConfig {
         const val MAX_READS = 500
@@ -195,7 +199,14 @@ object LocalVideoManager {
             }
         }
 
-        fun detectInterlaced(file: File): Boolean {
+        data class ProbedVideoMetadata(
+            val isInterlaced: Boolean = false,
+            val frameRate: Float? = null,
+        )
+
+        fun probeVideoMetadata(file: File): ProbedVideoMetadata {
+            var isInterlaced = false
+            var frameRate: Float? = null
             val extractor = MediaExtractor()
             return try {
                 extractor.setDataSource(file.absolutePath)
@@ -205,48 +216,26 @@ object LocalVideoManager {
                     if (mime.startsWith("video/")) {
                         if (format.containsKey("scan-type")) {
                             val scanType = format.getString("scan-type")
-                            if (scanType?.lowercase(Locale.ROOT) == "interlaced") return true
+                            if (scanType?.lowercase(Locale.ROOT) == "interlaced") isInterlaced = true
                         }
                         if (format.containsKey("interlaced")) {
-                            if (format.getInteger("interlaced") == 1) return true
+                            if (format.getInteger("interlaced") == 1) isInterlaced = true
                         }
-                    }
-                }
-                false
-            } catch (_: Exception) {
-                false
-            } finally {
-                try {
-                    extractor.release()
-                } catch (_: Exception) {}
-            }
-        }
-
-        fun extractFallbackFrameRate(file: File): Float? {
-            val extractor = MediaExtractor()
-            return try {
-                extractor.setDataSource(file.absolutePath)
-                for (i in 0 until extractor.trackCount) {
-                    val format = extractor.getTrackFormat(i)
-                    val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-                    if (mime.startsWith("video/")) {
                         if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
                             val rate = try {
                                 format.getFloat(MediaFormat.KEY_FRAME_RATE)
                             } catch (_: Exception) {
                                 format.getInteger(MediaFormat.KEY_FRAME_RATE).toFloat()
                             }
-                            if (rate > 0f) return rate
+                            if (rate > 0f) frameRate = rate
                         }
                     }
                 }
-                null
+                ProbedVideoMetadata(isInterlaced, frameRate)
             } catch (_: Exception) {
-                null
+                ProbedVideoMetadata()
             } finally {
-                try {
-                    extractor.release()
-                } catch (_: Exception) {}
+                runCatching { extractor.release() }
             }
         }
 
@@ -508,10 +497,11 @@ object LocalVideoManager {
                         }
 
                         val bitrate = if (format.bitrate != Format.NO_VALUE) format.bitrate else 0
-                        val rawFrameRate = if (format.frameRate > 0f) format.frameRate else VideoHelper.extractFallbackFrameRate(file)
+                        val probedMeta = VideoHelper.probeVideoMetadata(file)
+                        val rawFrameRate = if (format.frameRate > 0f) format.frameRate else probedMeta.frameRate
                         val (videoRangeTypeVal, videoRangeVal) = VideoHelper.detectVideoRange(format)
                         val aspectRatioVal = VideoHelper.calculateAspectRatio(width, height, format)
-                        val isInterlacedVal = VideoHelper.detectInterlaced(file)
+                        val isInterlacedVal = probedMeta.isInterlaced
                         val title = resolveTrackTitle(format, MediaStreamType.VIDEO, displayName, codec.uppercase(Locale.ROOT), 0, isForced)
 
                         streams.add(MediaStream(type = MediaStreamType.VIDEO, index = globalIndex++, codec = codec, width = width, height = height, bitRate = bitrate, realFrameRate = rawFrameRate, averageFrameRate = rawFrameRate, videoRange = videoRangeVal, videoRangeType = videoRangeTypeVal, aspectRatio = aspectRatioVal, profile = format.codecs, isInterlaced = isInterlacedVal, isDefault = isFormatDefault || nbV == 1, isForced = isForced, isExternal = false, isHearingImpaired = false, isTextSubtitleStream = false, supportsExternalStream = false, title = title, language = lang))
@@ -556,7 +546,7 @@ object LocalVideoManager {
                 width = fallbackDim.first
                 height = fallbackDim.second
             }
-            val fallbackFrameRate = VideoHelper.extractFallbackFrameRate(file)
+            val fallbackFrameRate = VideoHelper.probeVideoMetadata(file).frameRate
             streams.add(0, MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, width = width, height = height, realFrameRate = fallbackFrameRate, averageFrameRate = fallbackFrameRate, videoRange = VideoRange.SDR, videoRangeType = VideoRangeType.SDR, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
         if (streams.none { it.type == MediaStreamType.AUDIO }) {
@@ -651,7 +641,7 @@ object LocalVideoManager {
 
         val uriStr = context.getFileProviderUri(file)
 
-        val fallbackFrameRate = if (isVideo) VideoHelper.extractFallbackFrameRate(file) else null
+        val fallbackFrameRate: Float? = null
         val streams = mutableListOf(
             MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, width = LocalProbeConfig.DEFAULT_VIDEO_WIDTH, height = LocalProbeConfig.DEFAULT_VIDEO_HEIGHT, realFrameRate = fallbackFrameRate, averageFrameRate = fallbackFrameRate, videoRange = VideoRange.SDR, videoRangeType = VideoRangeType.SDR, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false),
             MediaStream(type = MediaStreamType.AUDIO, index = 1, codec = "aac", channels = LocalProbeConfig.DEFAULT_AUDIO_CHANNELS, sampleRate = LocalProbeConfig.DEFAULT_AUDIO_SAMPLE_RATE, channelLayout = "Stereo", language = "und", title = "Stereo - AAC", displayTitle = "Stereo - AAC", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false)
@@ -1002,47 +992,49 @@ object LocalVideoManager {
             context: Context
         ) {
             ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
-                val cacheDir = File(context.cacheDir, "chapters")
-                if (!cacheDir.exists()) cacheDir.mkdirs()
+                thumbnailMutex.withLock {
+                    val cacheDir = File(context.cacheDir, "chapters")
+                    if (!cacheDir.exists()) cacheDir.mkdirs()
 
-                var retriever: MediaMetadataRetriever? = null
-                try {
-                    for (index in rawChapters.indices) {
-                        coroutineContext.ensureActive()
-                        if (!file.exists() || !file.canRead()) break
+                    var retriever: MediaMetadataRetriever? = null
+                    try {
+                        for (index in rawChapters.indices) {
+                            coroutineContext.ensureActive()
+                            if (!file.exists() || !file.canRead()) break
 
-                        val chapter = rawChapters[index]
-                        val cacheFile = File(cacheDir, "${file.absolutePath.hashCode()}_chap_${index}.jpg")
-                        if (cacheFile.exists() && cacheFile.length() > 0L) continue
+                            val chapter = rawChapters[index]
+                            val cacheFile = File(cacheDir, "${file.absolutePath.hashCode()}_chap_${index}.jpg")
+                            if (cacheFile.exists() && cacheFile.length() > 0L) continue
 
-                        if (retriever == null) {
-                            retriever = MediaMetadataRetriever().apply {
-                                setDataSource(file.absolutePath)
-                            }
-                        }
-
-                        try {
-                            val timeUs = chapter.startTicks / 10L
-                            val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                            if (bitmap != null) {
-                                val scaled = Bitmap.createScaledBitmap(bitmap, 640, 360, true)
-                                FileOutputStream(cacheFile).use { out ->
-                                    scaled.compress(Bitmap.CompressFormat.JPEG, 94, out)
+                            if (retriever == null) {
+                                retriever = MediaMetadataRetriever().apply {
+                                    setDataSource(file.absolutePath)
                                 }
-                                bitmap.recycle()
-                                if (scaled != bitmap) scaled.recycle()
                             }
-                        } catch (e: Exception) {
-                            if (e is CancellationException) throw e
-                            Timber.w(e, "LocalVideoManager: Error generating chapter thumbnail $index for ${file.name}")
+
+                            try {
+                                val timeUs = chapter.startTicks / 10L
+                                val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                if (bitmap != null) {
+                                    val scaled = Bitmap.createScaledBitmap(bitmap, 640, 360, true)
+                                    FileOutputStream(cacheFile).use { out ->
+                                        scaled.compress(Bitmap.CompressFormat.JPEG, 94, out)
+                                    }
+                                    bitmap.recycle()
+                                    if (scaled != bitmap) scaled.recycle()
+                                }
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                Timber.w(e, "LocalVideoManager: Error generating chapter thumbnail $index for ${file.name}")
+                            }
                         }
+                    } catch (e: Exception) {
+                        if (e !is CancellationException) {
+                            Timber.w(e, "LocalVideoManager: Error in thumbnail generation for ${file.name}")
+                        }
+                    } finally {
+                        runCatching { retriever?.release() }
                     }
-                } catch (e: Exception) {
-                    if (e !is CancellationException) {
-                        Timber.w(e, "LocalVideoManager: Error in thumbnail generation for ${file.name}")
-                    }
-                } finally {
-                    runCatching { retriever?.release() }
                 }
             }
         }

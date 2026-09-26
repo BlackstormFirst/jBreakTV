@@ -11,10 +11,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.data.compat.StreamInfo
+import org.jellyfin.androidtv.data.compat.VideoOptions
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentAction
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentRepository
 import org.jellyfin.androidtv.util.sdk.end
 import org.jellyfin.androidtv.util.sdk.start
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -32,6 +34,39 @@ import org.koin.android.ext.android.inject
 import timber.log.Timber
 import java.io.File
 import java.util.UUID
+
+fun PlaybackController.prepareLocalItemAndPlay(
+	item: BaseItemDto,
+	position: Long,
+	internalOptions: VideoOptions,
+) {
+	val targetFragment = fragment ?: return
+	targetFragment.lifecycleScope.launch {
+		var activeItem = item
+		if (item.path != null && item.runTimeTicks == null) {
+			val file = File(item.path)
+			if (file.exists() && file.canRead()) {
+				activeItem = withContext(Dispatchers.IO) {
+					runCatching {
+						LocalVideoManager.inspectAndBuildBaseItemDto(targetFragment.requireContext(), file)
+					}.getOrDefault(item)
+				}
+				if (mItems != null && mCurrentIndex >= 0 && mCurrentIndex < mItems.size) {
+					mItems[mCurrentIndex] = activeItem
+				}
+			}
+		}
+
+		try {
+			val localStreamInfo = LocalVideoManager.buildLocalStreamInfo(activeItem)
+			mCurrentStreamInfo = localStreamInfo
+			mCurrentOptions = internalOptions
+			startItem(activeItem, position, localStreamInfo)
+		} catch (e: Exception) {
+			Timber.e(e, "UsbDebug: Error building local USB StreamInfo in PlaybackController")
+		}
+	}
+}
 
 fun PlaybackController.getLiveTvChannel(
 	id: UUID,

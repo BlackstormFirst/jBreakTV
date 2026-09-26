@@ -79,7 +79,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     protected long mCurrentPosition = 0;
     private PlaybackState mPlaybackState = PlaybackState.IDLE;
 
-    private StreamInfo mCurrentStreamInfo;
+    StreamInfo mCurrentStreamInfo;
 
     private final InteractionTrackerViewModel interactionTracker;
 
@@ -609,31 +609,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     private void playInternal(final BaseItemDto item, final Long position, final VideoOptions internalOptions) {
         if (isCurrentItemLocal(item)) {
             Timber.i("UsbDebug: Direct Local USB playback for %s", item.getPath());
-            try {
-                // On-demand inspection for USB queue items if they haven't been inspected yet
-                BaseItemDto activeItem = item;
-                if (item != null && item.getPath() != null && item.getRunTimeTicks() == null) {
-                    File file = new File(item.getPath());
-                    if (file.exists() && file.canRead() && mFragment != null) {
-                        try {
-                            activeItem = LocalVideoManager.INSTANCE.inspectAndBuildBaseItemDtoSync(mFragment.getContext(), file);
-                            if (mItems != null && mCurrentIndex >= 0 && mCurrentIndex < mItems.size()) {
-                                mItems.set(mCurrentIndex, activeItem);
-                            }
-                        } catch (Exception e) {
-                            Timber.e(e, "UsbDebug: Error enriching minimal USB item %s", item.getPath());
-                        }
-                    }
-                }
-
-                StreamInfo localStreamInfo = LocalVideoManager.INSTANCE.buildLocalStreamInfo(activeItem);
-                mCurrentStreamInfo = localStreamInfo;
-                mCurrentOptions = internalOptions;
-                startItem(activeItem, position, localStreamInfo);
-                return;
-            } catch (Exception e) {
-                Timber.e(e, "UsbDebug: Error building local USB StreamInfo in PlaybackController");
-            }
+            PlaybackControllerHelperKt.prepareLocalItemAndPlay(this, item, position, internalOptions);
+            return;
         }
 
         if (isLiveTv) {
@@ -703,7 +680,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (mFragment != null) mFragment.closePlayer();
     }
 
-    private void startItem(BaseItemDto item, long position, StreamInfo response) {
+    void startItem(BaseItemDto item, long position, StreamInfo response) {
         if (!hasInitializedVideoManager() || !hasFragment()) {
             Timber.w("Error - attempting to play without:%s%s", hasInitializedVideoManager() ? "" : " [videoManager]", hasFragment() ? "" : " [overlay fragment]");
             return;

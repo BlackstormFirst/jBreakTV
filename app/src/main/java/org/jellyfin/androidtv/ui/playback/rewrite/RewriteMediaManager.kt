@@ -98,8 +98,10 @@ class RewriteMediaManager(
 
 		launch {
 			while (true) {
-				notifyListeners {
-					onProgress(playbackManager.state.positionInfo.active.inWholeMilliseconds, playbackManager.state.positionInfo.duration.inWholeMilliseconds)
+				if (playbackManager.state.playState.value == PlayState.PLAYING) {
+					notifyListeners {
+						onProgress(playbackManager.state.positionInfo.active.inWholeMilliseconds, playbackManager.state.positionInfo.duration.inWholeMilliseconds)
+					}
 				}
 				delay(@Suppress("MagicNumber") 100)
 			}
