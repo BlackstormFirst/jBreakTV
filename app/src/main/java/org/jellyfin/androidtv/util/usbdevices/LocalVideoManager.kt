@@ -3,6 +3,8 @@ package org.jellyfin.androidtv.util.usbdevices
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.annotation.OptIn
@@ -52,6 +54,8 @@ import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.PlayMethod
 import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
 import org.jellyfin.sdk.model.api.UserItemDataDto
+import org.jellyfin.sdk.model.api.VideoRange
+import org.jellyfin.sdk.model.api.VideoRangeType
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -112,6 +116,13 @@ object LocalVideoManager {
                     mimeLower.contains("tx3g") ||
                     mimeLower.contains("ttml") ||
                     mimeLower.contains("webvtt")
+
+        fun isTextSubtitle(codec: String, mimeLower: String): Boolean {
+            val norm = codec.lowercase(Locale.ROOT)
+            return norm == "subrip" || norm == "srt" || norm == "ass" || norm == "ssa" ||
+                    norm == "webvtt" || norm == "ttml" || norm == "tx3g" || norm == "text" ||
+                    mimeLower.startsWith("text/")
+        }
     }
 
     private object AudioChannelHelper {
@@ -129,6 +140,136 @@ object LocalVideoManager {
             14 -> "9.1.4"
             16 -> "9.1.6"
             else -> if (channels > 0) "$channels ch" else ""
+        }
+
+        fun detectAudioProfile(format: Format): String? {
+            val codecsLower = format.codecs?.lowercase(Locale.ROOT) ?: ""
+            val mimeLower = format.sampleMimeType?.lowercase(Locale.ROOT) ?: ""
+
+            return when {
+                mimeLower.contains("eac3-joc") || codecsLower.contains("ec+3") || codecsLower.contains("joc") -> "Atmos"
+                codecsLower.contains("dtshd") || mimeLower.contains("dts-hd") -> "DTS-HD"
+                format.codecs?.isNotBlank() == true -> format.codecs
+                else -> null
+            }
+        }
+    }
+
+    private object VideoHelper {
+        fun detectVideoRange(format: Format): Pair<VideoRangeType, VideoRange> {
+            val mimeLower = format.sampleMimeType?.lowercase(Locale.ROOT) ?: ""
+            val codecsLower = format.codecs?.lowercase(Locale.ROOT) ?: ""
+            val isDovi = mimeLower.contains("dolby-vision") || mimeLower.contains("dovi") ||
+                    codecsLower.startsWith("dvh1") || codecsLower.startsWith("dvhe") ||
+                    codecsLower.startsWith("dva1") || codecsLower.startsWith("dvav")
+
+            val colorInfo = format.colorInfo
+            val transfer = colorInfo?.colorTransfer
+
+            return when {
+                isDovi -> {
+                    if (transfer == C.COLOR_TRANSFER_ST2084) {
+                        Pair(VideoRangeType.DOVI_WITH_HDR10, VideoRange.HDR)
+                    } else {
+                        Pair(VideoRangeType.DOVI, VideoRange.HDR)
+                    }
+                }
+                transfer == C.COLOR_TRANSFER_ST2084 -> Pair(VideoRangeType.HDR10, VideoRange.HDR)
+                transfer == C.COLOR_TRANSFER_HLG -> Pair(VideoRangeType.HLG, VideoRange.HDR)
+                else -> Pair(VideoRangeType.SDR, VideoRange.SDR)
+            }
+        }
+
+        fun calculateAspectRatio(width: Int, height: Int, format: Format): String? {
+            if (width <= 0 || height <= 0) return null
+            val sar = if (format.pixelWidthHeightRatio > 0f) format.pixelWidthHeightRatio else 1.0f
+            val darRatio = (width * sar) / height.toFloat()
+
+            return when {
+                Math.abs(darRatio - 1.777f) < 0.08f -> "16:9"
+                Math.abs(darRatio - 1.333f) < 0.08f -> "4:3"
+                Math.abs(darRatio - 2.35f) < 0.1f -> "2.35:1"
+                Math.abs(darRatio - 2.40f) < 0.1f -> "2.40:1"
+                Math.abs(darRatio - 1.85f) < 0.08f -> "1.85:1"
+                else -> String.format(Locale.US, "%.2f:1", darRatio)
+            }
+        }
+
+        fun detectInterlaced(file: File): Boolean {
+            val extractor = MediaExtractor()
+            return try {
+                extractor.setDataSource(file.absolutePath)
+                for (i in 0 until extractor.trackCount) {
+                    val format = extractor.getTrackFormat(i)
+                    val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                    if (mime.startsWith("video/")) {
+                        if (format.containsKey("scan-type")) {
+                            val scanType = format.getString("scan-type")
+                            if (scanType?.lowercase(Locale.ROOT) == "interlaced") return true
+                        }
+                        if (format.containsKey("interlaced")) {
+                            if (format.getInteger("interlaced") == 1) return true
+                        }
+                    }
+                }
+                false
+            } catch (_: Exception) {
+                false
+            } finally {
+                try {
+                    extractor.release()
+                } catch (_: Exception) {}
+            }
+        }
+
+        fun extractFallbackFrameRate(file: File): Float? {
+            val extractor = MediaExtractor()
+            return try {
+                extractor.setDataSource(file.absolutePath)
+                for (i in 0 until extractor.trackCount) {
+                    val format = extractor.getTrackFormat(i)
+                    val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                    if (mime.startsWith("video/")) {
+                        if (format.containsKey(MediaFormat.KEY_FRAME_RATE)) {
+                            val rate = try {
+                                format.getFloat(MediaFormat.KEY_FRAME_RATE)
+                            } catch (_: Exception) {
+                                format.getInteger(MediaFormat.KEY_FRAME_RATE).toFloat()
+                            }
+                            if (rate > 0f) return rate
+                        }
+                    }
+                }
+                null
+            } catch (_: Exception) {
+                null
+            } finally {
+                try {
+                    extractor.release()
+                } catch (_: Exception) {}
+            }
+        }
+
+        fun extractFallbackDimensions(file: File): Pair<Int, Int>? {
+            val retriever = MediaMetadataRetriever()
+            return try {
+                retriever.setDataSource(file.absolutePath)
+                val wStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                val hStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                val w = wStr?.toIntOrNull()
+                val h = hStr?.toIntOrNull()
+                if (w != null && h != null && w > 0 && h > 0) {
+                    Pair(w, h)
+                } else {
+                    null
+                }
+            } catch (_: Exception) {
+                null
+            } finally {
+                try {
+                    retriever.release()
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -359,7 +500,7 @@ object LocalVideoManager {
                         var height = if (format.height != Format.NO_VALUE) format.height else LocalProbeConfig.DEFAULT_VIDEO_HEIGHT
 
                         if (format.width == Format.NO_VALUE || format.height == Format.NO_VALUE) {
-                            val fallbackDim = extractFallbackVideoDimensions(file)
+                            val fallbackDim = VideoHelper.extractFallbackDimensions(file)
                             if (fallbackDim != null) {
                                 width = fallbackDim.first
                                 height = fallbackDim.second
@@ -367,9 +508,13 @@ object LocalVideoManager {
                         }
 
                         val bitrate = if (format.bitrate != Format.NO_VALUE) format.bitrate else 0
+                        val rawFrameRate = if (format.frameRate > 0f) format.frameRate else VideoHelper.extractFallbackFrameRate(file)
+                        val (videoRangeTypeVal, videoRangeVal) = VideoHelper.detectVideoRange(format)
+                        val aspectRatioVal = VideoHelper.calculateAspectRatio(width, height, format)
+                        val isInterlacedVal = VideoHelper.detectInterlaced(file)
                         val title = resolveTrackTitle(format, MediaStreamType.VIDEO, displayName, codec.uppercase(Locale.ROOT), 0, isForced)
 
-                        streams.add(MediaStream(type = MediaStreamType.VIDEO, index = globalIndex++, codec = codec, width = width, height = height, bitRate = bitrate, isDefault = isFormatDefault || nbV == 1, isForced = isForced, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false, title = title, language = lang))
+                        streams.add(MediaStream(type = MediaStreamType.VIDEO, index = globalIndex++, codec = codec, width = width, height = height, bitRate = bitrate, realFrameRate = rawFrameRate, averageFrameRate = rawFrameRate, videoRange = videoRangeVal, videoRangeType = videoRangeTypeVal, aspectRatio = aspectRatioVal, profile = format.codecs, isInterlaced = isInterlacedVal, isDefault = isFormatDefault || nbV == 1, isForced = isForced, isExternal = false, isHearingImpaired = false, isTextSubtitleStream = false, supportsExternalStream = false, title = title, language = lang))
                     }
                     isAudioTrack -> {
                         nbA++
@@ -377,19 +522,22 @@ object LocalVideoManager {
                         val channels = if (format.channelCount != Format.NO_VALUE) format.channelCount else LocalProbeConfig.DEFAULT_AUDIO_CHANNELS
                         val sampleRate = if (format.sampleRate != Format.NO_VALUE) format.sampleRate else LocalProbeConfig.DEFAULT_AUDIO_SAMPLE_RATE
                         val bitrate = if (format.bitrate != Format.NO_VALUE) format.bitrate else 0
+                        val channelLayoutVal = AudioChannelHelper.formatChannelLayout(channels).ifBlank { null }
+                        val audioProfileVal = AudioChannelHelper.detectAudioProfile(format)
 
                         val title = resolveTrackTitle(format, MediaStreamType.AUDIO, displayName, codec.uppercase(Locale.ROOT), channels, isForced)
 
-                        streams.add(MediaStream(type = MediaStreamType.AUDIO, index = globalIndex++, codec = codec, channels = channels, sampleRate = sampleRate, bitRate = bitrate, language = lang, title = title, displayTitle = title, isDefault = isFormatDefault || nbA == 1, isForced = isForced, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
+                        streams.add(MediaStream(type = MediaStreamType.AUDIO, index = globalIndex++, codec = codec, channels = channels, sampleRate = sampleRate, bitRate = bitrate, channelLayout = channelLayoutVal, profile = audioProfileVal, language = lang, title = title, displayTitle = title, isDefault = isFormatDefault || nbA == 1, isForced = isForced, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
                     }
                     isSubtitleTrack -> {
                         nbS++
                         val codec = MediaCodecHelper.normalizeSubtitleCodec(mimeLower)
                         val isForcedTrack = isForced || (format.label?.lowercase(Locale.ROOT)?.let { it.contains("forced") || it.contains("forcé") } == true)
                         val isSdhTrack = format.label?.lowercase(Locale.ROOT)?.contains("sdh") == true
+                        val isTextSub = MediaCodecHelper.isTextSubtitle(codec, mimeLower)
                         val title = resolveTrackTitle(format, MediaStreamType.SUBTITLE, displayName, codec.uppercase(Locale.ROOT), 0, isForcedTrack, isSdhTrack)
 
-                        streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = globalIndex++, codec = codec, language = lang, title = title, displayTitle = title, isDefault = isFormatDefault, isForced = isForcedTrack, isExternal = false, isHearingImpaired = isSdhTrack, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = false, deliveryMethod = SubtitleDeliveryMethod.EMBED))
+                        streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = globalIndex++, codec = codec, language = lang, title = title, displayTitle = title, isDefault = isFormatDefault, isForced = isForcedTrack, isExternal = false, isHearingImpaired = isSdhTrack, isInterlaced = false, isTextSubtitleStream = isTextSub, supportsExternalStream = false, deliveryMethod = SubtitleDeliveryMethod.EMBED))
                     }
                 }
             }
@@ -403,16 +551,17 @@ object LocalVideoManager {
         if (isVideo && streams.none { it.type == MediaStreamType.VIDEO }) {
             var width = LocalProbeConfig.DEFAULT_VIDEO_WIDTH
             var height = LocalProbeConfig.DEFAULT_VIDEO_HEIGHT
-            val fallbackDim = extractFallbackVideoDimensions(file)
+            val fallbackDim = VideoHelper.extractFallbackDimensions(file)
             if (fallbackDim != null) {
                 width = fallbackDim.first
                 height = fallbackDim.second
             }
-            streams.add(0, MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, width = width, height = height, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
+            val fallbackFrameRate = VideoHelper.extractFallbackFrameRate(file)
+            streams.add(0, MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, width = width, height = height, realFrameRate = fallbackFrameRate, averageFrameRate = fallbackFrameRate, videoRange = VideoRange.SDR, videoRangeType = VideoRangeType.SDR, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
         if (streams.none { it.type == MediaStreamType.AUDIO }) {
             val fallbackTitle = "Stereo - AAC"
-            streams.add(MediaStream(type = MediaStreamType.AUDIO, index = streams.size, codec = "aac", channels = LocalProbeConfig.DEFAULT_AUDIO_CHANNELS, sampleRate = LocalProbeConfig.DEFAULT_AUDIO_SAMPLE_RATE, language = "und", title = fallbackTitle, displayTitle = fallbackTitle, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
+            streams.add(MediaStream(type = MediaStreamType.AUDIO, index = streams.size, codec = "aac", channels = LocalProbeConfig.DEFAULT_AUDIO_CHANNELS, sampleRate = LocalProbeConfig.DEFAULT_AUDIO_SAMPLE_RATE, channelLayout = "Stereo", language = "und", title = fallbackTitle, displayTitle = fallbackTitle, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
 
         // Sidecars (external subtitles) - inserted before embedded subtitles so external subtitles appear first
@@ -502,9 +651,10 @@ object LocalVideoManager {
 
         val uriStr = context.getFileProviderUri(file)
 
+        val fallbackFrameRate = if (isVideo) VideoHelper.extractFallbackFrameRate(file) else null
         val streams = mutableListOf(
-            MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, width = LocalProbeConfig.DEFAULT_VIDEO_WIDTH, height = LocalProbeConfig.DEFAULT_VIDEO_HEIGHT, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false),
-            MediaStream(type = MediaStreamType.AUDIO, index = 1, codec = "aac", channels = LocalProbeConfig.DEFAULT_AUDIO_CHANNELS, sampleRate = LocalProbeConfig.DEFAULT_AUDIO_SAMPLE_RATE, language = "und", title = "Stereo - AAC", displayTitle = "Stereo - AAC", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false)
+            MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, width = LocalProbeConfig.DEFAULT_VIDEO_WIDTH, height = LocalProbeConfig.DEFAULT_VIDEO_HEIGHT, realFrameRate = fallbackFrameRate, averageFrameRate = fallbackFrameRate, videoRange = VideoRange.SDR, videoRangeType = VideoRangeType.SDR, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false),
+            MediaStream(type = MediaStreamType.AUDIO, index = 1, codec = "aac", channels = LocalProbeConfig.DEFAULT_AUDIO_CHANNELS, sampleRate = LocalProbeConfig.DEFAULT_AUDIO_SAMPLE_RATE, channelLayout = "Stereo", language = "und", title = "Stereo - AAC", displayTitle = "Stereo - AAC", isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false)
         )
 
         val sidecars = UsbMediaHelper.findSidecarSubtitles(file)
@@ -555,28 +705,6 @@ object LocalVideoManager {
             canDownload = false,
             isFolder = false
         )
-    }
-
-    private fun extractFallbackVideoDimensions(file: File): Pair<Int, Int>? {
-        val retriever = MediaMetadataRetriever()
-        return try {
-            retriever.setDataSource(file.absolutePath)
-            val wStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-            val hStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-            val w = wStr?.toIntOrNull()
-            val h = hStr?.toIntOrNull()
-            if (w != null && h != null && w > 0 && h > 0) {
-                Pair(w, h)
-            } else {
-                null
-            }
-        } catch (_: Exception) {
-            null
-        } finally {
-            try {
-                retriever.release()
-            } catch (_: Exception) {}
-        }
     }
 
     fun formatSubtitleDisplayTitle(
