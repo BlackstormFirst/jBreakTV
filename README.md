@@ -2,7 +2,7 @@
 <h3 align="center">Based on a fork of <a href="https://github.com/jellyfin/jellyfin-androidtv">Jellyfin Android TV</a></h3>
 
 ---
-<p style="text-align:center"><img width="300" src="https://github.com/BlackstormFirst/jBreakTV/blob/master/app/src/main/res/mipmap-hdpi/app_banner.png?raw=true" alt="jBreakTV" /></p>
+<p align="center"><img width="300" src="https://github.com/BlackstormFirst/jBreakTV/blob/master/app/src/main/res/mipmap-hdpi/app_banner.png?raw=true" alt="jBreakTV" /></p>
 <h4 align="center">Take a break ! Use jBreakTV !</h4>
 <p>
 jBreakTV is an alternative of the original Jellyfin client for Android TV, Nvidia Shield, and Amazon Fire TV devices.
