@@ -35,6 +35,7 @@ import org.jellyfin.androidtv.ui.playback.VideoManager
 import org.jellyfin.androidtv.ui.playback.getSubtitleMediaStreamCodec
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.ChapterInfo
 import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.MediaProtocol
 import org.jellyfin.sdk.model.api.MediaSourceInfo
@@ -48,6 +49,8 @@ import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
 import org.jellyfin.sdk.model.api.UserItemDataDto
 import timber.log.Timber
 import java.io.File
+import java.io.RandomAccessFile
+import java.time.LocalDateTime
 import java.util.Locale
 import java.util.UUID
 
@@ -467,6 +470,8 @@ object LocalVideoManager {
             key = id.toString()
         )
 
+        val chapters = LocalChapterExtractor.extractChapters(file).takeIf { it.isNotEmpty() }
+
         BaseItemDto(
             id = id,
             name = file.nameWithoutExtension,
@@ -477,6 +482,7 @@ object LocalVideoManager {
             path = file.absolutePath,
             runTimeTicks = runTimeTicks,
             userData = userData,
+            chapters = chapters,
             canDownload = false,
             isFolder = false
         )
@@ -811,6 +817,389 @@ object LocalVideoManager {
             container = containerExt
             playSessionId = "local_session_" + file.name.hashCode()
             runTimeTicks = item.runTimeTicks
+        }
+    }
+
+    private object LocalChapterExtractor {
+
+        private data class RawChapter(
+            val startTicks: Long,
+            val title: String
+        )
+
+        fun extractChapters(file: File): List<ChapterInfo> {
+            if (!file.exists() || file.length() <= 0L) return emptyList()
+            val ext = file.extension.lowercase(Locale.ROOT)
+            val rawChapters = when (ext) {
+                "mkv", "webm", "mka" -> extractMatroskaChapters(file)
+                "mp4", "m4v", "mov" -> extractMp4Chapters(file)
+                else -> emptyList()
+            }
+
+            if (rawChapters.isEmpty()) return emptyList()
+
+            val now = LocalDateTime.now()
+            return rawChapters.mapIndexed { index, chapter ->
+                ChapterInfo(
+                    startPositionTicks = chapter.startTicks,
+                    name = chapter.title.ifBlank { "Chapitre ${index + 1}" },
+                    imagePath = null,
+                    imageDateModified = now,
+                    imageTag = null,
+                )
+            }
+        }
+
+        private fun extractMatroskaChapters(file: File): List<RawChapter> {
+            val chapters = mutableListOf<RawChapter>()
+            try {
+                RandomAccessFile(file, "r").use { raf ->
+                    val fileLength = raf.length()
+                    var chaptersHeaderPos = -1L
+                    var segmentDataOffset = -1L
+
+                    var pos = 0L
+                    val maxScan = minOf(fileLength, 8 * 1024 * 1024L)
+
+                    while (pos < maxScan) {
+                        raf.seek(pos)
+                        val id = readEbmlId(raf) ?: break
+                        val size = readEbmlVint(raf) ?: break
+                        val dataPos = raf.filePointer
+
+                        if (id == 0x18538067L) { // Segment
+                            segmentDataOffset = dataPos
+                            pos = dataPos
+                            continue
+                        }
+
+                        if (id == 0x114D9B74L) { // SeekHead
+                            val seekChaptersPos = parseSeekHeadForChapters(raf, dataPos, size, segmentDataOffset)
+                            if (seekChaptersPos > 0L) {
+                                chaptersHeaderPos = seekChaptersPos
+                            }
+                        } else if (id == 0x1043A770L) { // Chapters
+                            chaptersHeaderPos = pos
+                            break
+                        } else if (id == 0x1F43B675L) { // Cluster
+                            break
+                        }
+
+                        pos = dataPos + size
+                    }
+
+                    if (chaptersHeaderPos <= 0L && fileLength > 8 * 1024 * 1024L) {
+                        var tailPos = maxOf(0L, fileLength - 2 * 1024 * 1024L)
+                        while (tailPos < fileLength) {
+                            raf.seek(tailPos)
+                            val id = readEbmlId(raf) ?: break
+                            val size = readEbmlVint(raf) ?: break
+                            if (id == 0x1043A770L) {
+                                chaptersHeaderPos = tailPos
+                                break
+                            }
+                            tailPos = raf.filePointer + size
+                        }
+                    }
+
+                    if (chaptersHeaderPos >= 0L && chaptersHeaderPos < fileLength) {
+                        parseMatroskaChaptersAtom(raf, chaptersHeaderPos, chapters)
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "LocalVideoManager: Error extracting Matroska chapters")
+            }
+            return chapters.sortedBy { it.startTicks }
+        }
+
+        private fun parseSeekHeadForChapters(
+            raf: RandomAccessFile,
+            dataPos: Long,
+            size: Long,
+            segmentDataOffset: Long
+        ): Long {
+            var chaptersPos = -1L
+            val end = minOf(dataPos + size, raf.length())
+            var pos = dataPos
+            while (pos < end) {
+                raf.seek(pos)
+                val id = readEbmlId(raf) ?: break
+                val elemSize = readEbmlVint(raf) ?: break
+                val elemData = raf.filePointer
+
+                if (id == 0x4DBBL) { // Seek
+                    var seekId = 0L
+                    var seekPos = -1L
+                    var seekChildPos = elemData
+                    val seekEnd = elemData + elemSize
+
+                    while (seekChildPos < seekEnd) {
+                        raf.seek(seekChildPos)
+                        val childId = readEbmlId(raf) ?: break
+                        val childSize = readEbmlVint(raf) ?: break
+                        val childData = raf.filePointer
+
+                        if (childId == 0x53ABL) { // SeekID
+                            seekId = readEbmlUint(raf, childSize)
+                        } else if (childId == 0x53ACL) { // SeekPosition
+                            seekPos = readEbmlUint(raf, childSize)
+                        }
+                        seekChildPos = childData + childSize
+                    }
+
+                    if (seekId == 0x1043A770L && seekPos >= 0 && segmentDataOffset >= 0) {
+                        chaptersPos = segmentDataOffset + seekPos
+                        break
+                    }
+                }
+                pos = elemData + elemSize
+            }
+            return chaptersPos
+        }
+
+        private fun parseMatroskaChaptersAtom(
+            raf: RandomAccessFile,
+            chaptersHeaderPos: Long,
+            output: MutableList<RawChapter>
+        ) {
+            raf.seek(chaptersHeaderPos)
+            val chaptersId = readEbmlId(raf) ?: return
+            if (chaptersId != 0x1043A770L) return
+            val chaptersSize = readEbmlVint(raf) ?: return
+            val chaptersEnd = raf.filePointer + chaptersSize
+
+            fun parseAtom(atomDataPos: Long, atomSize: Long) {
+                val atomEnd = atomDataPos + atomSize
+                var curPos = atomDataPos
+                var startNanos = -1L
+                var chapterTitle = ""
+
+                while (curPos < atomEnd) {
+                    raf.seek(curPos)
+                    val id = readEbmlId(raf) ?: break
+                    val size = readEbmlVint(raf) ?: break
+                    val dataPos = raf.filePointer
+
+                    when (id) {
+                        0x91L -> { // ChapterTimeStart
+                            startNanos = readEbmlUint(raf, size)
+                        }
+                        0x80L -> { // ChapterDisplay
+                            var dispPos = dataPos
+                            val dispEnd = dataPos + size
+                            while (dispPos < dispEnd) {
+                                raf.seek(dispPos)
+                                val dId = readEbmlId(raf) ?: break
+                                val dSize = readEbmlVint(raf) ?: break
+                                val dData = raf.filePointer
+                                if (dId == 0x85L) { // ChapterString
+                                    chapterTitle = readEbmlString(raf, dSize)
+                                }
+                                dispPos = dData + dSize
+                            }
+                        }
+                        0xB6L -> { // Nested ChapterAtom
+                            parseAtom(dataPos, size)
+                        }
+                    }
+                    curPos = dataPos + size
+                }
+
+                if (startNanos >= 0L) {
+                    val startTicks = startNanos / 100L // 1 tick = 100 ns
+                    output.add(RawChapter(startTicks, chapterTitle))
+                }
+            }
+
+            var pos = raf.filePointer
+            while (pos < chaptersEnd) {
+                raf.seek(pos)
+                val id = readEbmlId(raf) ?: break
+                val size = readEbmlVint(raf) ?: break
+                val dataPos = raf.filePointer
+
+                if (id == 0x45B9L) { // EditionEntry
+                    var eePos = dataPos
+                    val eeEnd = dataPos + size
+                    while (eePos < eeEnd) {
+                        raf.seek(eePos)
+                        val eId = readEbmlId(raf) ?: break
+                        val eSize = readEbmlVint(raf) ?: break
+                        val eData = raf.filePointer
+                        if (eId == 0xB6L) { // ChapterAtom
+                            parseAtom(eData, eSize)
+                        }
+                        eePos = eData + eSize
+                    }
+                } else if (id == 0xB6L) { // ChapterAtom directly in Chapters
+                    parseAtom(dataPos, size)
+                }
+                pos = dataPos + size
+            }
+        }
+
+        private fun extractMp4Chapters(file: File): List<RawChapter> {
+            val chapters = mutableListOf<RawChapter>()
+            try {
+                RandomAccessFile(file, "r").use { raf ->
+                    val fileLen = raf.length()
+                    var pos = 0L
+
+                    while (pos + 8 <= fileLen) {
+                        raf.seek(pos)
+                        val size = readUint32(raf)
+                        val type = readFourCC(raf)
+                        val boxSize = if (size == 1L) readUint64(raf) else if (size == 0L) fileLen - pos else size
+
+                        if (type == "moov") {
+                            parseMp4ContainerBox(raf, pos + 8, boxSize - 8, chapters)
+                            break
+                        }
+                        if (boxSize < 8) break
+                        pos += boxSize
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "LocalVideoManager: Error extracting MP4 chapters")
+            }
+            return chapters.sortedBy { it.startTicks }
+        }
+
+        private fun parseMp4ContainerBox(
+            raf: RandomAccessFile,
+            dataPos: Long,
+            dataSize: Long,
+            output: MutableList<RawChapter>
+        ) {
+            val end = minOf(dataPos + dataSize, raf.length())
+            var pos = dataPos
+
+            while (pos + 8 <= end) {
+                raf.seek(pos)
+                val size = readUint32(raf)
+                val type = readFourCC(raf)
+                val boxSize = if (size == 1L) readUint64(raf) else if (size == 0L) end - pos else size
+
+                when (type) {
+                    "udta", "trak", "mdia", "minf", "stbl" -> {
+                        parseMp4ContainerBox(raf, pos + 8, boxSize - 8, output)
+                    }
+                    "chpl" -> {
+                        parseMp4ChplBox(raf, pos + 8, boxSize - 8, output)
+                    }
+                }
+                if (boxSize < 8) break
+                pos += boxSize
+            }
+        }
+
+        private fun parseMp4ChplBox(
+            raf: RandomAccessFile,
+            dataPos: Long,
+            dataSize: Long,
+            output: MutableList<RawChapter>
+        ) {
+            raf.seek(dataPos)
+            val version = raf.read()
+            raf.skipBytes(3)
+
+            val count = if (version == 1) {
+                raf.skipBytes(4)
+                readUint32(raf).toInt()
+            } else {
+                readUint32(raf).toInt()
+            }
+
+            for (i in 0 until count) {
+                if (raf.filePointer >= dataPos + dataSize) break
+                val startTime100ns = readUint64(raf)
+                val titleLen = raf.read()
+                if (titleLen <= 0) continue
+                val titleBytes = ByteArray(titleLen)
+                raf.readFully(titleBytes)
+                val title = String(titleBytes, Charsets.UTF_8).trim()
+                output.add(RawChapter(startTime100ns, title))
+            }
+        }
+
+        private fun readEbmlId(raf: RandomAccessFile): Long? {
+            if (raf.filePointer >= raf.length()) return null
+            val b0 = raf.read()
+            if (b0 == -1) return null
+            var mask = 0x80
+            var length = 1
+            while (length <= 8 && (b0 and mask) == 0) {
+                mask = mask ushr 1
+                length++
+            }
+            if (length > 8) return null
+            var id = b0.toLong()
+            for (i in 2..length) {
+                val b = raf.read()
+                if (b == -1) return null
+                id = (id shl 8) or (b.toLong() and 0xFFL)
+            }
+            return id
+        }
+
+        private fun readEbmlVint(raf: RandomAccessFile): Long? {
+            if (raf.filePointer >= raf.length()) return null
+            val b0 = raf.read()
+            if (b0 == -1) return null
+            var mask = 0x80
+            var length = 1
+            while (length <= 8 && (b0 and mask) == 0) {
+                mask = mask ushr 1
+                length++
+            }
+            if (length > 8) return null
+            var value = (b0 and (mask - 1)).toLong()
+            for (i in 2..length) {
+                val b = raf.read()
+                if (b == -1) return null
+                value = (value shl 8) or (b.toLong() and 0xFFL)
+            }
+            return value
+        }
+
+        private fun readEbmlUint(raf: RandomAccessFile, size: Long): Long {
+            var value = 0L
+            for (i in 0 until size.toInt()) {
+                val b = raf.read()
+                if (b == -1) break
+                value = (value shl 8) or (b.toLong() and 0xFFL)
+            }
+            return value
+        }
+
+        private fun readEbmlString(raf: RandomAccessFile, size: Long): String {
+            val bytes = ByteArray(size.toInt())
+            raf.readFully(bytes)
+            return String(bytes, Charsets.UTF_8).trim('\u0000', ' ', '\t', '\n', '\r')
+        }
+
+        private fun readUint32(raf: RandomAccessFile): Long {
+            val b0 = raf.read()
+            val b1 = raf.read()
+            val b2 = raf.read()
+            val b3 = raf.read()
+            if (b0 == -1 || b1 == -1 || b2 == -1 || b3 == -1) return 0L
+            return ((b0.toLong() and 0xFFL) shl 24) or
+                    ((b1.toLong() and 0xFFL) shl 16) or
+                    ((b2.toLong() and 0xFFL) shl 8) or
+                    (b3.toLong() and 0xFFL)
+        }
+
+        private fun readUint64(raf: RandomAccessFile): Long {
+            val hi = readUint32(raf)
+            val lo = readUint32(raf)
+            return (hi shl 32) or (lo and 0xFFFFFFFFL)
+        }
+
+        private fun readFourCC(raf: RandomAccessFile): String {
+            val bytes = ByteArray(4)
+            raf.readFully(bytes)
+            return String(bytes, Charsets.US_ASCII)
         }
     }
 }
