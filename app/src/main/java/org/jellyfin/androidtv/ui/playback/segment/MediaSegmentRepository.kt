@@ -6,9 +6,13 @@ import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.util.sdk.duration
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.mediaSegmentsApi
+import org.jellyfin.sdk.api.client.extensions.pluginsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.ChapterInfo
 import org.jellyfin.sdk.model.api.MediaSegmentDto
 import org.jellyfin.sdk.model.api.MediaSegmentType
+import java.util.Locale
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 interface MediaSegmentRepository {
@@ -103,12 +107,101 @@ class MediaSegmentRepositoryImpl(
 		return action
 	}
 
-	override suspend fun getSegmentsForItem(item: BaseItemDto): List<MediaSegmentDto> = runCatching {
-		withContext(Dispatchers.IO) {
-			api.mediaSegmentsApi.getItemSegments(
-				itemId = item.id,
-				includeSegmentTypes = MediaSegmentRepository.SupportedTypes,
-			).content.items
+	override suspend fun getSegmentsForItem(item: BaseItemDto): List<MediaSegmentDto> {
+		val remoteSegments = runCatching {
+			withContext(Dispatchers.IO) {
+				api.mediaSegmentsApi.getItemSegments(
+					itemId = item.id,
+					includeSegmentTypes = MediaSegmentRepository.SupportedTypes,
+				).content.items
+			}
+		}.getOrNull().orEmpty()
+
+		if (remoteSegments.isNotEmpty()) {
+			return remoteSegments
 		}
-	}.getOrDefault(emptyList())
+
+		val chapters = item.chapters.orEmpty()
+		if (chapters.isEmpty()) {
+			return emptyList()
+		}
+
+		return withContext(Dispatchers.IO) {
+			val serverKeywords = fetchServerSegmentKeywords(api)
+			buildSegmentsFromChapters(item, chapters, serverKeywords)
+		}
+	}
+}
+
+private suspend fun fetchServerSegmentKeywords(api: ApiClient): Map<MediaSegmentType, Set<String>> {
+	val keywordsMap = mutableMapOf<MediaSegmentType, MutableSet<String>>()
+	runCatching {
+		val plugins = api.pluginsApi.getPlugins().content
+		val skipperPlugin = plugins.firstOrNull {
+			val n = it.name.lowercase(Locale.ROOT)
+			n.contains("intro") || n.contains("segment") || n.contains("skipper")
+		}
+		if (skipperPlugin?.id != null) {
+			api.pluginsApi.getPluginConfiguration(skipperPlugin.id)
+		}
+	}
+	return keywordsMap
+}
+
+private fun buildSegmentsFromChapters(
+	item: BaseItemDto,
+	chapters: List<ChapterInfo>,
+	serverKeywords: Map<MediaSegmentType, Set<String>>
+): List<MediaSegmentDto> {
+	val segments = mutableListOf<MediaSegmentDto>()
+	val defaultIntro = setOf("intro", "opening", "op", "générique", "générique de début", "introduction")
+	val defaultOutro = setOf("outro", "ending", "ed", "credits", "crédits", "générique de fin", "générique fin")
+	val defaultRecap = setOf("recap", "résumé", "previously", "précédemment")
+	val defaultPreview = setOf("preview", "teaser", "prochainement", "next episode", "au prochain épisode")
+	val defaultCommercial = setOf("commercial", "pub", "publicité", "sponsor")
+
+	val introKeywords = (serverKeywords[MediaSegmentType.INTRO].orEmpty() + defaultIntro)
+	val outroKeywords = (serverKeywords[MediaSegmentType.OUTRO].orEmpty() + defaultOutro)
+	val recapKeywords = (serverKeywords[MediaSegmentType.RECAP].orEmpty() + defaultRecap)
+	val previewKeywords = (serverKeywords[MediaSegmentType.PREVIEW].orEmpty() + defaultPreview)
+	val commercialKeywords = (serverKeywords[MediaSegmentType.COMMERCIAL].orEmpty() + defaultCommercial)
+
+	for (i in chapters.indices) {
+		val chapter = chapters[i]
+		val rawName = chapter.name.orEmpty().lowercase(Locale.ROOT).trim()
+		if (rawName.isBlank()) continue
+
+		val startTicks = chapter.startPositionTicks
+		val endTicks = if (i < chapters.size - 1) {
+			chapters[i + 1].startPositionTicks
+		} else {
+			item.runTimeTicks ?: (startTicks + 300_000_000L)
+		}
+
+		if (endTicks <= startTicks) continue
+
+		val type = when {
+			introKeywords.any { rawName.contains(it) } -> MediaSegmentType.INTRO
+			outroKeywords.any { rawName.contains(it) } -> MediaSegmentType.OUTRO
+			recapKeywords.any { rawName.contains(it) } -> MediaSegmentType.RECAP
+			previewKeywords.any { rawName.contains(it) } -> MediaSegmentType.PREVIEW
+			commercialKeywords.any { rawName.contains(it) } -> MediaSegmentType.COMMERCIAL
+			else -> null
+		}
+
+		if (type != null) {
+			val segId = UUID.nameUUIDFromBytes("local_seg_${item.id}_$i".toByteArray())
+			segments.add(
+				MediaSegmentDto(
+					id = segId,
+					itemId = item.id,
+					type = type,
+					startTicks = startTicks,
+					endTicks = endTicks
+				)
+			)
+		}
+	}
+
+	return segments
 }

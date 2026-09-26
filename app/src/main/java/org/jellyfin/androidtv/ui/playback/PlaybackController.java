@@ -803,14 +803,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                     }
                 };
 
-                if (isLocal) {
+                PlaybackControllerHelperKt.applyMediaSegments(PlaybackController.this, finalItem, () -> {
                     startAction.run();
-                } else {
-                    PlaybackControllerHelperKt.applyMediaSegments(PlaybackController.this, finalItem, () -> {
-                        startAction.run();
-                        return null;
-                    });
-                }
+                    return null;
+                });
             }
         };
 
