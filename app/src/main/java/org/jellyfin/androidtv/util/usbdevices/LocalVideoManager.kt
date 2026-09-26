@@ -2,11 +2,14 @@
 package org.jellyfin.androidtv.util.usbdevices
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.DataReader
@@ -25,8 +28,10 @@ import androidx.media3.extractor.SeekMap
 import androidx.media3.extractor.TrackOutput
 import androidx.media3.extractor.mkv.MatroskaExtractor
 import androidx.media3.extractor.text.DefaultSubtitleParserFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
@@ -49,6 +54,7 @@ import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
 import org.jellyfin.sdk.model.api.UserItemDataDto
 import timber.log.Timber
 import java.io.File
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.time.LocalDateTime
 import java.util.Locale
@@ -470,7 +476,7 @@ object LocalVideoManager {
             key = id.toString()
         )
 
-        val chapters = LocalChapterExtractor.extractChapters(file).takeIf { it.isNotEmpty() }
+        val chapters = LocalChapterExtractor.extractChapters(file, context).takeIf { it.isNotEmpty() }
 
         BaseItemDto(
             id = id,
@@ -827,7 +833,7 @@ object LocalVideoManager {
             val title: String
         )
 
-        fun extractChapters(file: File): List<ChapterInfo> {
+        fun extractChapters(file: File, context: Context? = null): List<ChapterInfo> {
             if (!file.exists() || file.length() <= 0L) return emptyList()
             val ext = file.extension.lowercase(Locale.ROOT)
             val rawChapters = when (ext) {
@@ -839,14 +845,77 @@ object LocalVideoManager {
             if (rawChapters.isEmpty()) return emptyList()
 
             val now = LocalDateTime.now()
-            return rawChapters.mapIndexed { index, chapter ->
+            val chapters = rawChapters.mapIndexed { index, chapter ->
+                val cacheFile = context?.cacheDir?.let { cacheDir ->
+                    File(cacheDir, "chapters/${file.absolutePath.hashCode()}_chap_${index}.jpg")
+                }
+                val imageTag = cacheFile?.absolutePath?.takeIf { cacheFile.exists() }
+                    ?: cacheFile?.absolutePath.orEmpty()
+
                 ChapterInfo(
                     startPositionTicks = chapter.startTicks,
                     name = chapter.title.ifBlank { "Chapitre ${index + 1}" },
                     imagePath = null,
                     imageDateModified = now,
-                    imageTag = null,
+                    imageTag = imageTag.ifBlank { null },
                 )
+            }
+
+            if (context != null) {
+                generateThumbnailsAsync(file, rawChapters, context)
+            }
+
+            return chapters
+        }
+
+        private fun generateThumbnailsAsync(
+            file: File,
+            rawChapters: List<RawChapter>,
+            context: Context
+        ) {
+            ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
+                val cacheDir = File(context.cacheDir, "chapters")
+                if (!cacheDir.exists()) cacheDir.mkdirs()
+
+                var retriever: MediaMetadataRetriever? = null
+                try {
+                    for (index in rawChapters.indices) {
+                        coroutineContext.ensureActive()
+                        if (!file.exists() || !file.canRead()) break
+
+                        val chapter = rawChapters[index]
+                        val cacheFile = File(cacheDir, "${file.absolutePath.hashCode()}_chap_${index}.jpg")
+                        if (cacheFile.exists() && cacheFile.length() > 0L) continue
+
+                        if (retriever == null) {
+                            retriever = MediaMetadataRetriever().apply {
+                                setDataSource(file.absolutePath)
+                            }
+                        }
+
+                        try {
+                            val timeUs = chapter.startTicks / 10L
+                            val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                            if (bitmap != null) {
+                                val scaled = Bitmap.createScaledBitmap(bitmap, 640, 360, true)
+                                FileOutputStream(cacheFile).use { out ->
+                                    scaled.compress(Bitmap.CompressFormat.JPEG, 94, out)
+                                }
+                                bitmap.recycle()
+                                if (scaled != bitmap) scaled.recycle()
+                            }
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            Timber.w(e, "LocalVideoManager: Error generating chapter thumbnail $index for ${file.name}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    if (e !is CancellationException) {
+                        Timber.w(e, "LocalVideoManager: Error in thumbnail generation for ${file.name}")
+                    }
+                } finally {
+                    runCatching { retriever?.release() }
+                }
             }
         }
 

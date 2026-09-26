@@ -1,11 +1,13 @@
 package org.jellyfin.androidtv.util.apiclient
 
+import android.net.Uri
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemPerson
 import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.UserDto
+import java.io.File
 import java.util.UUID
 
 /**
@@ -27,8 +29,12 @@ fun JellyfinImage.getUrl(
 	maxHeight: Int? = null,
 	fillWidth: Int? = null,
 	fillHeight: Int? = null,
-): String = when (source) {
-	JellyfinImageSource.USER -> api.imageApi.getUserImageUrl(
+): String = when {
+	tag.startsWith("file:") || tag.startsWith("content:") || tag.startsWith("/") -> {
+		if (tag.startsWith("file:") || tag.startsWith("content:")) tag else Uri.fromFile(File(tag)).toString()
+	}
+
+	source == JellyfinImageSource.USER -> api.imageApi.getUserImageUrl(
 		userId = item,
 		tag = tag,
 	)
