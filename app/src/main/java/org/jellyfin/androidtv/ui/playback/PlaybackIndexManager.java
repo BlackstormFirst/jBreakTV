@@ -39,19 +39,19 @@ public class PlaybackIndexManager {
     private Integer matchAudioStream(List<MediaStream> streams, String targetLang, String targetCodec, Boolean targetDefault, Boolean targetHI) {
         if (streams == null || streams.isEmpty() || targetLang == null || targetLang.isEmpty()) return null;
 
+        // 1. Direct match: targetLang + targetCodec
+        if (targetCodec != null && !targetCodec.isEmpty()) {
+            for (MediaStream s : streams) {
+                if (areLanguagesEqual(targetLang, s.getLanguage())
+                        && targetCodec.equalsIgnoreCase(s.getCodec())) {
+                    return s.getIndex();
+                }
+            }
+        }
+
         boolean preferHI = Boolean.TRUE.equals(targetHI) || Boolean.FALSE.equals(targetDefault);
 
         if (preferHI) {
-            if (targetCodec != null) {
-                for (MediaStream s : streams) {
-                    if (areLanguagesEqual(targetLang, s.getLanguage())
-                            && targetCodec.equalsIgnoreCase(s.getCodec())
-                            && (s.isHearingImpaired() || !s.isDefault())) {
-                        return s.getIndex();
-                    }
-                }
-            }
-
             for (MediaStream s : streams) {
                 if (areLanguagesEqual(targetLang, s.getLanguage())
                         && (s.isHearingImpaired() || !s.isDefault())) {
@@ -65,24 +65,11 @@ public class PlaybackIndexManager {
                 }
             }
         } else {
-            if (targetCodec != null) {
-                for (MediaStream s : streams) {
-                    if (areLanguagesEqual(targetLang, s.getLanguage())
-                            && targetCodec.equalsIgnoreCase(s.getCodec())
-                            && s.isDefault()
-                            && !s.isHearingImpaired()) {
-                        return s.getIndex();
-                    }
-                }
-            }
-
-            if (targetCodec != null) {
-                for (MediaStream s : streams) {
-                    if (areLanguagesEqual(targetLang, s.getLanguage())
-                            && targetCodec.equalsIgnoreCase(s.getCodec())
-                            && !s.isHearingImpaired()) {
-                        return s.getIndex();
-                    }
+            for (MediaStream s : streams) {
+                if (areLanguagesEqual(targetLang, s.getLanguage())
+                        && s.isDefault()
+                        && !s.isHearingImpaired()) {
+                    return s.getIndex();
                 }
             }
 
@@ -152,8 +139,12 @@ public class PlaybackIndexManager {
                 }
             }
 
+            if (matchingIndex == null && lastAudioLanguage != null && !lastAudioLanguage.isEmpty()) {
+                matchingIndex = matchAudioStream(allAudioStreams, lastAudioLanguage, lastAudioCodec, lastAudioDefaultState, lastAudioHearingImpairedState);
+            }
+
             if (matchingIndex == null && !userAudioLangRemoteSetting.isEmpty()) {
-                matchingIndex = matchAudioStream(allAudioStreams, userAudioLangRemoteSetting, null, true, false);
+                matchingIndex = matchAudioStream(allAudioStreams, userAudioLangRemoteSetting, lastAudioCodec, true, false);
             }
         }
 
