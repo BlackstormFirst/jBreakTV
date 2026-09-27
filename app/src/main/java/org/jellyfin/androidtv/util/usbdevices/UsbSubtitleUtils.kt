@@ -35,16 +35,18 @@ object UsbSubtitleUtils {
         isForced: Boolean,
         isHearingImpaired: Boolean,
         codecUpper: String,
+        isExternal: Boolean = false,
         context: Context? = null
     ): String {
         val forcedTag = if (isForced) " - Forcé" else ""
         val sdhStr = context?.getString(R.string.indicator_subtitles_hearing_impaired) ?: "SDH"
         val sdhTag = if (isHearingImpaired) " - $sdhStr" else ""
+        val externalTag = if (isExternal) " - Externe" else ""
 
         return if (!title.isNullOrBlank() && title != languageDisplayName) {
-            "$title - $languageDisplayName$forcedTag$sdhTag - $codecUpper"
+            "$title - $languageDisplayName$forcedTag$sdhTag - $codecUpper$externalTag"
         } else {
-            "$languageDisplayName$forcedTag$sdhTag - $codecUpper"
+            "$languageDisplayName$forcedTag$sdhTag - $codecUpper$externalTag"
         }
     }
 
@@ -56,6 +58,7 @@ object UsbSubtitleUtils {
         channels: Int,
         isForced: Boolean,
         isHearingImpaired: Boolean = false,
+        isExternal: Boolean = false,
         context: Context? = null
     ): String {
         val originalTitle = format.label
@@ -78,7 +81,7 @@ object UsbSubtitleUtils {
             }
             MediaStreamType.SUBTITLE -> {
                 val cleanTitle = if (!originalTitle.isNullOrBlank() && originalTitle != languageDisplayName) originalTitle else null
-                formatSubtitleDisplayTitle(cleanTitle, languageDisplayName, isForced, isHearingImpaired, codecUpper, context)
+                formatSubtitleDisplayTitle(cleanTitle, languageDisplayName, isForced, isHearingImpaired, codecUpper, isExternal, context)
             }
             else -> {
                 if (!originalTitle.isNullOrBlank() && originalTitle != languageDisplayName) {
@@ -205,6 +208,7 @@ object UsbSubtitleUtils {
             isForced = isForced,
             isHearingImpaired = isHearingImpaired,
             codecUpper = codecUpper,
+            isExternal = true,
             context = context
         )
 

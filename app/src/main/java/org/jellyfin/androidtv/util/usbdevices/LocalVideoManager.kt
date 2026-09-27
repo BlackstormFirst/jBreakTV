@@ -73,8 +73,9 @@ object LocalVideoManager {
         channels: Int,
         isForced: Boolean,
         isHearingImpaired: Boolean = false,
+        isExternal: Boolean = false,
         context: Context? = null
-    ): String = UsbSubtitleUtils.resolveTrackTitle(format, msType, languageDisplayName, codecUpper, channels, isForced, isHearingImpaired, context)
+    ): String = UsbSubtitleUtils.resolveTrackTitle(format, msType, languageDisplayName, codecUpper, channels, isForced, isHearingImpaired, isExternal, context)
 
     fun parseExternalSubtitleMeta(
         subFile: File,
