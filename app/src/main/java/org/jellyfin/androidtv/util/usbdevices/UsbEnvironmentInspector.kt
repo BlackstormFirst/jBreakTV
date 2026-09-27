@@ -14,9 +14,6 @@ object UsbEnvironmentInspector {
     val isAndroid11OrHigher: Boolean
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
-    val isAndroid13OrHigher: Boolean
-        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-
     fun hasStoragePermissions(context: Context): Boolean {
         return if (isAndroid11OrHigher) {
             Environment.isExternalStorageManager()

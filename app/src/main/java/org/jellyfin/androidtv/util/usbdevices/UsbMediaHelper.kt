@@ -1,12 +1,8 @@
 package org.jellyfin.androidtv.util.usbdevices
 
-import androidx.annotation.OptIn
-import androidx.media3.common.MimeTypes
-import androidx.media3.common.util.UnstableApi
 import java.io.File
 import java.util.Locale
 
-@OptIn(UnstableApi::class)
 object UsbMediaHelper {
 
     val VIDEO_EXTENSIONS = setOf(
@@ -19,10 +15,6 @@ object UsbMediaHelper {
 
     val SUBTITLE_EXTENSIONS = setOf(
         "srt", "vtt", "ssa", "ass"
-    )
-
-    val PLAYLIST_EXTENSIONS = setOf(
-        "m3u", "m3u8", "pls"
     )
 
     fun isMediaFile(file: File): Boolean {
@@ -46,35 +38,6 @@ object UsbMediaHelper {
         if (!file.isFile) return false
         val ext = file.extension.lowercase(Locale.ROOT)
         return SUBTITLE_EXTENSIONS.contains(ext)
-    }
-
-    fun getMimeType(file: File): String {
-        val ext = file.extension.lowercase(Locale.ROOT)
-        return when (ext) {
-            "mp4", "m4v" -> MimeTypes.VIDEO_MP4
-            "mkv" -> MimeTypes.VIDEO_MATROSKA
-            "webm" -> MimeTypes.VIDEO_WEBM
-            "ts", "m2ts", "mts" -> MimeTypes.VIDEO_MP2T
-            "avi" -> MimeTypes.VIDEO_AVI
-            "flv" -> MimeTypes.VIDEO_FLV
-            "3gp", "3g2" -> MimeTypes.VIDEO_H263
-            "vob", "mpg", "mpeg" -> MimeTypes.VIDEO_MPEG
-            "ogv" -> MimeTypes.VIDEO_OGG
-            "mov" -> "video/quicktime"
-            "mp3" -> MimeTypes.AUDIO_MPEG
-            "aac" -> MimeTypes.AUDIO_AAC
-            "flac" -> MimeTypes.AUDIO_FLAC
-            "m4a" -> MimeTypes.AUDIO_MP4
-            "ogg", "oga", "opus" -> MimeTypes.AUDIO_OGG
-            "wav" -> MimeTypes.AUDIO_RAW
-            "wma" -> "audio/x-ms-wma"
-            "amr" -> MimeTypes.AUDIO_AMR_NB
-            "aiff", "aif" -> MimeTypes.AUDIO_ALAW
-            "srt" -> MimeTypes.APPLICATION_SUBRIP
-            "vtt" -> MimeTypes.TEXT_VTT
-            "ssa", "ass" -> MimeTypes.TEXT_SSA
-            else -> if (isVideoFile(file)) "video/*" else if (isAudioFile(file)) "audio/*" else "*/*"
-        }
     }
 
     /**
@@ -129,13 +92,5 @@ object UsbMediaHelper {
      * Find sidecar external subtitle files in the same directory matching the base name of the media file.
      * e.g. "movie.mkv" matches "movie.srt", "movie.fr.vtt", etc.
      */
-    fun findSidecarSubtitles(mediaFile: File): List<File> {
-        val parent = mediaFile.parentFile ?: return emptyList()
-        val mediaNameWithoutExt = mediaFile.nameWithoutExtension.lowercase(Locale.ROOT)
-
-        val files = parent.listFiles() ?: return emptyList()
-        return files.filter { file ->
-            isSubtitleFile(file) && file.nameWithoutExtension.lowercase(Locale.ROOT).startsWith(mediaNameWithoutExt)
-        }.sortedWith(naturalFileComparator)
-    }
+    fun findSidecarSubtitles(mediaFile: File): List<File> = UsbSubtitleUtils.findSidecarSubtitles(mediaFile)
 }
