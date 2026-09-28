@@ -141,11 +141,11 @@ object Destinations {
 	}
 
 	fun videoPlayer(position: Int?) = fragmentDestination<CustomPlaybackOverlayFragment> {
-		putInt("Position", position ?: 0)
+		if (position != null) putInt("Position", position)
 	}
 
 	fun videoPlayerNew(position: Int?) = fragmentDestination<VideoPlayerFragment> {
-		putInt(VideoPlayerFragment.EXTRA_POSITION, position ?: 0)
+		if (position != null) putInt(VideoPlayerFragment.EXTRA_POSITION, position)
 	}
 
 	fun nextUp(item: UUID) = fragmentDestination<NextUpFragment> {

@@ -52,9 +52,11 @@ fun toFormat(stream: MediaStream, track: MediaStreamVideoTrack) = Format.Builder
 	f.setSampleMimeType(getFfmpegVideoMimeType(track.codec))
 }.build()
 
-fun MediaStream.toFormats() = tracks.map { track ->
+fun MediaStream.toFormats(): List<Format> = tracks.mapNotNull { track ->
 	when (track) {
 		is MediaStreamAudioTrack -> toFormat(stream = this, track)
 		is MediaStreamVideoTrack -> toFormat(stream = this, track)
+		else -> null
 	}
 }
+

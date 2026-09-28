@@ -36,7 +36,8 @@ class PlaySessionSocketService(
 		// Player control
 		api.webSocket.subscribe<PlaystateMessage>().onEach { message ->
 			coroutineScope.launch(Dispatchers.Main) {
-				when (message.data?.command) {
+				val command = message.data?.command
+				when (command) {
 					PlaystateCommand.STOP -> state.stop()
 					PlaystateCommand.PAUSE -> state.pause()
 					PlaystateCommand.UNPAUSE -> state.unpause()
@@ -57,7 +58,9 @@ class PlaySessionSocketService(
 					// Do nothing
 					null -> Unit
 				}
-				coroutineScope.launch { playSessionService.sendUpdateIfActive() }
+				if (command != PlaystateCommand.STOP) {
+					coroutineScope.launch { playSessionService.sendUpdateIfActive() }
+				}
 			}
 		}.launchIn(coroutineScope)
 

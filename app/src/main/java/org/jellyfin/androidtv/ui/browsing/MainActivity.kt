@@ -159,7 +159,23 @@ class MainActivity : FragmentActivity() {
 		Timber.i("MainActivity stopped")
 	}
 
+	@Suppress("RestrictedApi")
+	override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+		return try {
+			super.dispatchKeyEvent(event)
+		} catch (e: IllegalArgumentException) {
+			if (e.message?.contains("parameter must be a descendant of this view") == true) {
+				Timber.w(e, "Handled Android TV FocusFinder IllegalArgumentException")
+				true
+			} else {
+				throw e
+			}
+		}
+	}
+
+
 	// Forward key events to fragments
+
 
 	private fun Fragment.onKeyEvent(keyCode: Int, event: KeyEvent?): Boolean {
 		var result = childFragmentManager.fragments.any { it.onKeyEvent(keyCode, event) }

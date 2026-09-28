@@ -7,11 +7,11 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -22,11 +22,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.times
 
 @Immutable
@@ -63,6 +59,7 @@ fun Seekbar(
 	seekForwardAmount: Duration = duration / 100,
 	seekRewindAmount: Duration = duration / 100,
 	onScrubbing: ((scrubbing: Boolean) -> Unit)? = null,
+	onScrubbingPreview: ((progress: Duration) -> Unit)? = null,
 	onSeek: ((progress: Duration) -> Unit)? = null,
 	enabled: Boolean = true,
 	colors: SeekbarColors = SeekbarDefaults.colors(),
@@ -81,7 +78,8 @@ fun Seekbar(
 		seekForwardAmount = seekForwardPercentage,
 		seekRewindAmount = seekRewindPercentage,
 		onScrubbing = onScrubbing,
-		onSeek = if (onSeek == null) null else { progress -> onSeek(progress.toDouble() * duration) },
+		onScrubbingPreview = if (onScrubbingPreview == null) null else { p -> onScrubbingPreview(p.toDouble() * duration) },
+		onSeek = if (onSeek == null) null else { p -> onSeek(p.toDouble() * duration) },
 		enabled = enabled,
 		colors = colors,
 	)
@@ -96,54 +94,64 @@ fun Seekbar(
 	seekForwardAmount: Float = 0.01f,
 	seekRewindAmount: Float = 0.01f,
 	onScrubbing: ((scrubbing: Boolean) -> Unit)? = null,
+	onScrubbingPreview: ((progress: Float) -> Unit)? = null,
 	onSeek: ((progress: Float) -> Unit)? = null,
 	enabled: Boolean = true,
 	colors: SeekbarColors = SeekbarDefaults.colors(),
 ) {
-	val coroutineScope = rememberCoroutineScope()
 	val focused by interactionSource.collectIsFocusedAsState()
 	var progressOverride by remember { mutableStateOf<Float?>(null) }
 	val visibleProgress = progressOverride ?: progress
 	val knobAlpha by animateFloatAsState(if (focused) 1f else 0f)
-	var scrubCancelJob by remember { mutableStateOf<Job?>(null) }
+
+	LaunchedEffect(focused) {
+		if (!focused && progressOverride != null) {
+			progressOverride = null
+			onScrubbing?.invoke(false)
+		}
+	}
 
 	Box(
 		modifier = modifier
-			.onKeyEvent {
+			.onKeyEvent { keyEvent ->
 				if (!enabled) return@onKeyEvent false
 
-				val isForward = it.key == Key.DirectionRight
-				val isRewind = it.key == Key.DirectionLeft
-				val isScrubbing = isForward || isRewind
-				val isKeyUp = it.type == KeyEventType.KeyUp
-				val isKeyDown = it.type == KeyEventType.KeyDown
+				val isForward = keyEvent.key == Key.DirectionRight
+				val isRewind = keyEvent.key == Key.DirectionLeft
+				val isConfirm = keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter
+				val isBack = keyEvent.key == Key.Back || keyEvent.key == Key.Escape
+				val isKeyDown = keyEvent.type == KeyEventType.KeyDown
 
-				val newProgress = when {
-					isKeyDown && isForward -> (visibleProgress + seekForwardAmount).coerceAtMost(1f)
-					isKeyDown && isRewind -> (visibleProgress - seekRewindAmount).coerceAtLeast(0f)
-					else -> visibleProgress
-				}
-
-				if (isScrubbing && isKeyDown && onScrubbing != null) {
-					scrubCancelJob?.cancel()
-					onScrubbing(true)
-				}
-
-				if (visibleProgress != newProgress) {
-					progressOverride = newProgress
-					if (onSeek != null) onSeek(newProgress)
-				}
-
-				if (isScrubbing && isKeyUp && onScrubbing != null) {
-					scrubCancelJob?.cancel()
-					scrubCancelJob = coroutineScope.launch {
-						delay(300.milliseconds)
-						onScrubbing(false)
+				if (isKeyDown) {
+					if (isForward) {
+						onScrubbing?.invoke(true)
+						val current = progressOverride ?: progress
+						progressOverride = (current + seekForwardAmount).coerceAtMost(1f)
+						onScrubbingPreview?.invoke(progressOverride!!)
+						return@onKeyEvent true
+					}
+					if (isRewind) {
+						onScrubbing?.invoke(true)
+						val current = progressOverride ?: progress
+						progressOverride = (current - seekRewindAmount).coerceAtLeast(0f)
+						onScrubbingPreview?.invoke(progressOverride!!)
+						return@onKeyEvent true
+					}
+					if (isConfirm && progressOverride != null) {
+						val targetProgress = progressOverride!!
 						progressOverride = null
+						onScrubbing?.invoke(false)
+						onSeek?.invoke(targetProgress)
+						return@onKeyEvent true
+					}
+					if (isBack && progressOverride != null) {
+						progressOverride = null
+						onScrubbing?.invoke(false)
+						return@onKeyEvent true
 					}
 				}
 
-				return@onKeyEvent isScrubbing
+				return@onKeyEvent false
 			}
 			.focusable(interactionSource = interactionSource, enabled = enabled)
 			.drawWithContent {

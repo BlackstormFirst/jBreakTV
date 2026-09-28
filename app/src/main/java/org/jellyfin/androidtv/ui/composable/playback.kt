@@ -36,16 +36,20 @@ fun rememberPlayerPositionInfo(
 ): MutableState<PositionInfo> {
 	val playState by playbackManager.state.playState.collectAsState()
 	val playing = playState == PlayState.PLAYING
+	val scrubbing by playbackManager.state.scrubbing.collectAsState()
 
 	val positionInfo = remember { mutableStateOf(playbackManager.state.positionInfo) }
 
-	LaunchedEffect(playing, precision) {
+	LaunchedEffect(playing, scrubbing, precision) {
 		val precisionMs = precision.inWholeMilliseconds
 
-		while (playing) {
-			positionInfo.value = playbackManager.state.positionInfo
+		positionInfo.value = playbackManager.state.positionInfo
 
-			delay(precisionMs - (positionInfo.value.active.inWholeMilliseconds % precisionMs))
+		while (playing && !scrubbing) {
+			positionInfo.value = playbackManager.state.positionInfo
+			val currentActiveMs = positionInfo.value.active.inWholeMilliseconds
+			val delayMs = if (precisionMs > 0) precisionMs - (currentActiveMs % precisionMs) else 1000L
+			delay(delayMs.coerceAtLeast(100L))
 		}
 	}
 
@@ -57,13 +61,12 @@ fun rememberPlayerProgress(
 	playbackManager: PlaybackManager = koinInject(),
 ): State<Float> {
 	val playState by playbackManager.state.playState.collectAsState()
-	val active = playbackManager.state.positionInfo.active
-	val duration = playbackManager.state.positionInfo.duration
+	val positionInfo by rememberPlayerPositionInfo(playbackManager, precision = 1.seconds)
 
 	return rememberPlayerProgress(
 		playing = playState == PlayState.PLAYING,
-		active = active,
-		duration = duration,
+		active = positionInfo.active,
+		duration = positionInfo.duration,
 	)
 }
 
@@ -75,21 +78,26 @@ fun rememberPlayerProgress(
 ): State<Float> {
 	val animatable = remember { Animatable(0f, 0f) }
 
-	LaunchedEffect(playing, duration) {
+	LaunchedEffect(playing, duration, active) {
 		val activeMs = active.inWholeMilliseconds.toFloat()
 		val durationMs = duration.inWholeMilliseconds.toFloat()
 
-		if (active == Duration.ZERO) animatable.snapTo(0f)
-		else animatable.snapTo((activeMs / durationMs).coerceIn(0f, 1f))
+		if (active == Duration.ZERO || durationMs <= 0f) {
+			animatable.snapTo(0f)
+		} else {
+			animatable.snapTo((activeMs / durationMs).coerceIn(0f, 1f))
+		}
 
-		if (playing) withContext(FixedMotionDurationScale) {
-			animatable.animateTo(
-				targetValue = 1f,
-				animationSpec = tween(
-					durationMillis = (durationMs - activeMs).roundToInt(),
-					easing = LinearEasing,
+		if (playing && durationMs > 0f) {
+			withContext(FixedMotionDurationScale) {
+				animatable.animateTo(
+					targetValue = 1f,
+					animationSpec = tween(
+						durationMillis = (durationMs - activeMs).roundToInt().coerceAtLeast(0),
+						easing = LinearEasing,
+					)
 				)
-			)
+			}
 		}
 	}
 

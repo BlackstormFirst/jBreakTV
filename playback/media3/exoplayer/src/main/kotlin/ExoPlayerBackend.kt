@@ -2,8 +2,13 @@ package org.jellyfin.playback.media3.exoplayer
 
 import android.app.ActivityManager
 import android.content.Context
+import android.net.Uri
 import android.os.Build
+import android.os.Looper
 import android.view.ViewGroup
+import org.jellyfin.playback.core.mediastream.MediaStreamSubtitleTrack
+import org.jellyfin.playback.media3.exoplayer.mapping.getFfmpegSubtitleMimeType
+
 import androidx.annotation.OptIn
 import androidx.core.content.getSystemService
 import androidx.media3.common.C
@@ -11,6 +16,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
@@ -34,10 +41,15 @@ import io.github.peerless2012.ass.media.widget.AssSubtitleView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.media3.exoplayer.support.AssFontManager
 import org.jellyfin.playback.core.backend.BasePlayerBackend
 import org.jellyfin.playback.core.mediastream.MediaStream
+import org.jellyfin.playback.core.mediastream.MediaStreamAudioTrack
+import org.jellyfin.playback.core.mediastream.MediaStreamVideoTrack
 import org.jellyfin.playback.core.mediastream.PlayableMediaStream
+import java.util.Locale
+
 import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.mediastream.mediatype.MediaType
 import org.jellyfin.playback.core.mediastream.mediatype.mediaType
@@ -51,7 +63,10 @@ import org.jellyfin.playback.core.ui.PlayerSubtitleView
 import org.jellyfin.playback.core.ui.PlayerSurfaceView
 import org.jellyfin.playback.media3.exoplayer.support.getPlaySupportReport
 import org.jellyfin.playback.media3.exoplayer.support.toFormats
+
+
 import timber.log.Timber
+import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -170,14 +185,31 @@ class ExoPlayerBackend(
 			}
 	}
 
+	private var pendingInitialSeekMs: Long? = null
+
 	inner class PlayerListener : Player.Listener {
-		override fun onIsPlayingChanged(isPlaying: Boolean) {
+		private fun checkPendingInitialSeek() {
+			val seekMs = pendingInitialSeekMs ?: return
+			if (exoPlayer.playbackState == Player.STATE_READY && exoPlayer.duration > 0) {
+				pendingInitialSeekMs = null
+				if (exoPlayer.isCurrentMediaItemSeekable && abs(exoPlayer.currentPosition - seekMs) > 1000) {
+					exoPlayer.seekTo(seekMs)
+				}
+			}
+		}
+
+		private fun updatePlayState() {
 			val state = when {
-				isPlaying -> PlayState.PLAYING
 				exoPlayer.playbackState == Player.STATE_IDLE || exoPlayer.playbackState == Player.STATE_ENDED -> PlayState.STOPPED
+				exoPlayer.playWhenReady -> PlayState.PLAYING
 				else -> PlayState.PAUSED
 			}
 			listener?.onPlayStateChange(state)
+		}
+
+		override fun onIsPlayingChanged(isPlaying: Boolean) {
+			checkPendingInitialSeek()
+			updatePlayState()
 		}
 
 		override fun onPlayerError(error: PlaybackException) {
@@ -192,6 +224,7 @@ class ExoPlayerBackend(
 		}
 
 		override fun onEvents(player: Player, events: Player.Events) {
+			checkPendingInitialSeek()
 			if (events.contains(Player.EVENT_VIDEO_SIZE_CHANGED) || events.contains(Player.EVENT_TRACKS_CHANGED)) {
 				val size = player.videoSize
 				if (size != VideoSize.UNKNOWN) {
@@ -206,13 +239,15 @@ class ExoPlayerBackend(
 		}
 
 		override fun onPlaybackStateChanged(playbackState: Int) {
-			onIsPlayingChanged(exoPlayer.isPlaying)
+			checkPendingInitialSeek()
+			updatePlayState()
 		}
 
 		override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
 			if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
 				listener?.onMediaStreamEnd(requireNotNull(currentStream))
 			}
+			updatePlayState()
 		}
 
 		override fun onAudioSessionIdChanged(audioSessionId: Int) {
@@ -225,6 +260,7 @@ class ExoPlayerBackend(
 		}
 
 		override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+			checkPendingInitialSeek()
 			val duration = exoPlayer.duration.takeUnless { it == C.TIME_UNSET }?.milliseconds
 			if (duration == lastKnownDuration) return
 			timedEventState.onDurationChange(exoPlayer, duration)
@@ -245,12 +281,14 @@ class ExoPlayerBackend(
 	}
 
 	override fun setSubtitleView(surfaceView: PlayerSubtitleView?) {
+
 		if (surfaceView != null) {
 			if (subtitleView == null) {
 				subtitleView = SubtitleView(surfaceView.context).apply {
 					if (exoPlayerOptions.enableLibass) {
 						addView(AssSubtitleView(surfaceView.context, assHandler))
 					}
+					exoPlayerOptions.configureSubtitleView?.invoke(this)
 				}
 			}
 
@@ -263,10 +301,30 @@ class ExoPlayerBackend(
 
 	override fun prepareItem(item: QueueEntry) {
 		val stream = requireNotNull(item.mediaStream)
+
+		val subtitleConfigurations = stream.tracks
+			.filterIsInstance<MediaStreamSubtitleTrack>()
+			.filter { it.isExternal && !it.deliveryUrl.isNullOrEmpty() }
+			.map { subTrack ->
+				val uri = Uri.parse(subTrack.deliveryUrl)
+				var flags = 0
+				if (subTrack.isDefault) flags = flags or C.SELECTION_FLAG_DEFAULT
+				if (subTrack.isForced) flags = flags or C.SELECTION_FLAG_FORCED
+
+				MediaItem.SubtitleConfiguration.Builder(uri)
+					.setId("JF_EXTERNAL:${subTrack.index}")
+					.setMimeType(getFfmpegSubtitleMimeType(subTrack.codec))
+					.setLanguage(subTrack.language)
+					.setLabel(subTrack.displayTitle ?: subTrack.title ?: subTrack.language)
+					.setSelectionFlags(flags)
+					.build()
+			}
+
 		val mediaItem = MediaItem.Builder().apply {
 			setTag(item)
 			setMediaId(stream.hashCode().toString())
 			setUri(stream.url)
+			setSubtitleConfigurations(subtitleConfigurations)
 		}.build()
 
 		if (exoPlayerOptions.enableLibass) {
@@ -285,6 +343,7 @@ class ExoPlayerBackend(
 		exoPlayer.prepare()
 	}
 
+
 	override fun playItem(item: QueueEntry) {
 		val stream = requireNotNull(item.mediaStream)
 		if (currentStream == stream) return
@@ -301,13 +360,23 @@ class ExoPlayerBackend(
 			preparedItemIndex = exoPlayer.mediaItemCount - 1
 		}
 
-		// Seek to prepared media item
-		when (preparedItemIndex) {
-			exoPlayer.currentMediaItemIndex - 1 -> exoPlayer.seekToPreviousMediaItem()
-			exoPlayer.currentMediaItemIndex + 1 -> exoPlayer.seekToNextMediaItem()
-			exoPlayer.currentMediaItemIndex -> Unit
-			else -> exoPlayer.seekTo(preparedItemIndex, 0)
+		val startTicks = stream.startPositionTicks
+		val startPositionMs = startTicks / 10000L
+
+		if (startPositionMs > 0) {
+			pendingInitialSeekMs = startPositionMs
+			exoPlayer.seekTo(preparedItemIndex, startPositionMs)
+		} else {
+			pendingInitialSeekMs = null
+			// Seek to prepared media item
+			when (preparedItemIndex) {
+				exoPlayer.currentMediaItemIndex - 1 -> exoPlayer.seekToPreviousMediaItem()
+				exoPlayer.currentMediaItemIndex + 1 -> exoPlayer.seekToNextMediaItem()
+				exoPlayer.currentMediaItemIndex -> Unit
+				else -> exoPlayer.seekTo(preparedItemIndex, 0)
+			}
 		}
+
 
 		// Update audio attributes
 		val contentType = when (item.mediaType) {
@@ -315,6 +384,7 @@ class ExoPlayerBackend(
 			MediaType.Audio -> C.AUDIO_CONTENT_TYPE_MUSIC
 			MediaType.Unknown -> C.AUDIO_CONTENT_TYPE_UNKNOWN
 		}
+
 
 		audioAttributeState.updateAudioAttributes(
 			builder = {
@@ -351,6 +421,7 @@ class ExoPlayerBackend(
 			Timber.w("Trying to seek but ExoPlayer doesn't support it for the current item")
 		}
 
+		lastKnownPositionMs = position.inWholeMilliseconds
 		exoPlayer.seekTo(position.inWholeMilliseconds)
 	}
 
@@ -366,13 +437,176 @@ class ExoPlayerBackend(
 		exoPlayer.setPlaybackSpeed(speed)
 	}
 
-	override fun getPositionInfo(): PositionInfo = PositionInfo(
-		active = exoPlayer.currentPosition.milliseconds,
-		buffer = exoPlayer.bufferedPosition.milliseconds,
-		duration = lastKnownDuration ?: Duration.ZERO,
-	)
+	private var lastKnownPositionMs: Long = 0L
+	private var lastKnownBufferMs: Long = 0L
+
+	override fun getPositionInfo(): PositionInfo {
+		val isMain = Looper.myLooper() == Looper.getMainLooper()
+		if (isMain) {
+			lastKnownPositionMs = runCatching { exoPlayer.currentPosition }.getOrDefault(lastKnownPositionMs)
+			lastKnownBufferMs = runCatching { exoPlayer.bufferedPosition }.getOrDefault(lastKnownBufferMs)
+		}
+		return PositionInfo(
+			active = lastKnownPositionMs.milliseconds,
+			buffer = lastKnownBufferMs.milliseconds,
+			duration = lastKnownDuration ?: Duration.ZERO,
+		)
+	}
+
 
 	override fun setTimedEvents(timedEvents: List<TimedEvent>) {
 		timedEventState.setTimedEvents(exoPlayer, timedEvents)
 	}
+
+	private fun normalizeLanguageCode(langCode: String): String {
+		return when (val lower = langCode.lowercase(Locale.ROOT)) {
+			"fre", "fra" -> "fr"
+			"ger", "deu" -> "de"
+			"eng" -> "en"
+			"spa" -> "es"
+			"ita" -> "it"
+			"jpn" -> "ja"
+			"chi", "zho" -> "zh"
+			"rus" -> "ru"
+			"por" -> "pt"
+			"dut", "nld" -> "nl"
+			"pol" -> "pl"
+			"kor" -> "ko"
+			"swe" -> "sv"
+			"nor" -> "no"
+			"fin" -> "fi"
+			"dan" -> "da"
+			"ara" -> "ar"
+			"hin" -> "hi"
+			"tur" -> "tr"
+			"ukr" -> "uk"
+			"cze", "ces" -> "cs"
+			"gre", "ell" -> "el"
+			"hun" -> "hu"
+			"ron", "rum" -> "ro"
+			else -> lower
+		}
+	}
+
+	private fun getDisplayNameForLanguage(langCode: String?): String? {
+		if (langCode.isNullOrBlank()) return null
+		val norm = normalizeLanguageCode(langCode)
+		val locale = Locale.forLanguageTag(norm)
+		val display = locale.getDisplayLanguage(Locale.getDefault())
+		return if (display.isNotBlank() && display != norm && display != langCode) {
+			display.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+		} else {
+			langCode
+		}
+	}
+
+	override fun getTracks(trackType: Int): List<BackendTrack> {
+		val trackList = mutableListOf<BackendTrack>()
+		val currentTracks = exoPlayer.currentTracks
+
+		val tracksForType = when (trackType) {
+			C.TRACK_TYPE_AUDIO -> currentStream?.tracks?.filterIsInstance<MediaStreamAudioTrack>()
+			C.TRACK_TYPE_TEXT -> currentStream?.tracks?.filterIsInstance<MediaStreamSubtitleTrack>()
+			C.TRACK_TYPE_VIDEO -> currentStream?.tracks?.filterIsInstance<MediaStreamVideoTrack>()
+			else -> null
+		}
+
+		val usedTrackIndices = mutableSetOf<Int>()
+
+		for (groupInfo in currentTracks.groups) {
+			if (groupInfo.type != trackType) continue
+			val group = groupInfo.mediaTrackGroup
+			for (i in 0 until group.length) {
+				val format = group.getFormat(i)
+				val isSelected = groupInfo.isTrackSelected(i)
+				val trackIndexInType = trackList.size
+
+				val lang = format.language?.lowercase(Locale.ROOT)
+
+				var matchedTitle: String? = null
+				var matchedIndex: Int? = null
+
+				// 1. Check direct index match if language matches or is missing
+				val candidateAtIndex = tracksForType?.getOrNull(trackIndexInType)
+				if (candidateAtIndex != null && !usedTrackIndices.contains(trackIndexInType)) {
+					val candLang = when (candidateAtIndex) {
+						is MediaStreamAudioTrack -> candidateAtIndex.language
+						is MediaStreamSubtitleTrack -> candidateAtIndex.language
+						else -> null
+					}?.lowercase(Locale.ROOT)
+
+					if (lang.isNullOrBlank() || candLang.isNullOrBlank() || lang == candLang || normalizeLanguageCode(lang) == normalizeLanguageCode(candLang)) {
+						matchedTitle = when (candidateAtIndex) {
+							is MediaStreamAudioTrack -> candidateAtIndex.displayTitle ?: candidateAtIndex.title
+							is MediaStreamSubtitleTrack -> candidateAtIndex.displayTitle ?: candidateAtIndex.title
+							else -> null
+						}
+						matchedIndex = trackIndexInType
+					}
+				}
+
+				// 2. Search by language among unused tracks if index match failed
+				if (matchedTitle == null && tracksForType != null && !lang.isNullOrBlank()) {
+					tracksForType.forEachIndexed { idx, trk ->
+						if (matchedTitle == null && !usedTrackIndices.contains(idx)) {
+							val trkLang = when (trk) {
+								is MediaStreamAudioTrack -> trk.language
+								is MediaStreamSubtitleTrack -> trk.language
+								else -> null
+							}?.lowercase(Locale.ROOT)
+
+							if (trkLang != null && (lang == trkLang || normalizeLanguageCode(lang) == normalizeLanguageCode(trkLang))) {
+								matchedTitle = when (trk) {
+									is MediaStreamAudioTrack -> trk.displayTitle ?: trk.title
+									is MediaStreamSubtitleTrack -> trk.displayTitle ?: trk.title
+									else -> null
+								}
+								matchedIndex = idx
+							}
+						}
+					}
+				}
+
+				if (matchedIndex != null) {
+					usedTrackIndices.add(matchedIndex)
+				}
+
+				val langDisplayName = format.language?.let { getDisplayNameForLanguage(it) }
+
+				val label = matchedTitle
+					?: format.label?.takeIf { it.isNotBlank() }
+					?: langDisplayName
+					?: format.language
+					?: "Track ${trackIndexInType + 1}"
+
+				trackList.add(
+					BackendTrack(
+						id = "${group.id}:$i",
+						type = trackType,
+						label = label,
+						language = format.language,
+						isSelected = isSelected,
+						group = group,
+						trackIndex = i,
+					)
+				)
+			}
+		}
+		return trackList
+	}
+
+	override fun selectTrack(trackType: Int, track: BackendTrack?) {
+		val builder = exoPlayer.trackSelectionParameters.buildUpon()
+		if (track == null) {
+			builder.setTrackTypeDisabled(trackType, true)
+		} else {
+			builder.setTrackTypeDisabled(trackType, false)
+			val group = track.group as? TrackGroup
+			if (group != null) {
+				builder.setOverrideForType(TrackSelectionOverride(group, track.trackIndex))
+			}
+		}
+		exoPlayer.trackSelectionParameters = builder.build()
+	}
 }
+

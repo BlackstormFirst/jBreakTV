@@ -48,9 +48,12 @@ class PopoverPositionProvider(
 			(anchorBounds.top + insidePosition.y + biasY.dir * popupContentSize.height + offset.y)
 
 		// Return position clamped to fit in window with overscan
+		val maxX = (windowSize.width - popupContentSize.width - OVERSCAN_X).coerceAtLeast(OVERSCAN_X)
+		val maxY = (windowSize.height - popupContentSize.height - OVERSCAN_Y).coerceAtLeast(OVERSCAN_Y)
+
 		return IntOffset(
-			x = x.coerceIn(OVERSCAN_X, windowSize.width - popupContentSize.width - OVERSCAN_X),
-			y = y.coerceIn(OVERSCAN_Y, windowSize.height - popupContentSize.height - OVERSCAN_Y),
+			x = x.coerceIn(OVERSCAN_X, maxX),
+			y = y.coerceIn(OVERSCAN_Y, maxY),
 		)
 	}
 

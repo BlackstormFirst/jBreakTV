@@ -52,7 +52,17 @@ import java.util.UUID
 
 object LocalVideoManager {
 
+    @JvmStatic
+    fun isLocalPath(path: String?): Boolean = org.jellyfin.playback.core.util.isLocalPath(path)
+
+    @JvmStatic
+    fun isLocalItem(item: BaseItemDto?): Boolean = isLocalPath(item?.path)
+
+    @JvmStatic
+    fun isLocalSource(info: MediaSourceInfo?): Boolean = isLocalPath(info?.path)
+
     private object LocalProbeConfig {
+
         const val MAX_READS = 500
         const val MAX_PROBE_BYTES = 2 * 1024 * 1024L
         const val DEFAULT_VIDEO_WIDTH = 1920

@@ -17,25 +17,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.unit.Dp
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.button.Button
 import org.jellyfin.androidtv.ui.base.button.ButtonDefaults
 
+import org.jellyfin.androidtv.ui.base.JellyfinTheme
+
 @Composable
 fun PopoverMenu(
 	modifier: Modifier = Modifier,
 	paddingValues: PaddingValues = PaddingValues(4.dp),
+	maxHeight: Dp = 280.dp,
 	content: @Composable ColumnScope.() -> Unit,
 ) = Column(
 	modifier = Modifier
 		.padding(paddingValues)
 		.width(IntrinsicSize.Max)
+		.heightIn(max = maxHeight)
+		.verticalScroll(rememberScrollState())
 		.then(modifier)
 ) {
 	content()
@@ -46,11 +57,13 @@ fun PopoverMenuItem(
 	onClick: () -> Unit,
 	modifier: Modifier = Modifier,
 	shape: Shape = RoundedCornerShape(3.dp),
+	focusRequester: FocusRequester? = null,
 	content: @Composable RowScope.() -> Unit,
 ) = Button(
 	onClick = onClick,
 	modifier = Modifier
 		.fillMaxWidth()
+		.run { if (focusRequester != null) focusRequester(focusRequester) else this }
 		.then(modifier),
 	shape = shape,
 	colors = ButtonDefaults.colors(
@@ -65,11 +78,14 @@ fun PopoverMenuCheckboxItem(
 	selected: Boolean,
 	onClick: () -> Unit,
 	modifier: Modifier = Modifier,
+	focusRequester: FocusRequester? = null,
 	content: @Composable RowScope.() -> Unit,
 ) = PopoverMenuItem(
 	onClick = onClick,
 	modifier = modifier,
+	focusRequester = focusRequester,
 ) {
+
 	val alpha by animateFloatAsState(
 		targetValue = if (selected) 1f else 0f,
 		animationSpec = tween(durationMillis = 150),
@@ -87,3 +103,5 @@ fun PopoverMenuCheckboxItem(
 
 	content()
 }
+
+

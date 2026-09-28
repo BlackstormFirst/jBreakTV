@@ -41,5 +41,20 @@ interface PlayerBackend {
 	fun setSpeed(speed: Float)
 
 	fun setTimedEvents(timedEvents: List<TimedEvent>)
+
+	fun getTracks(trackType: Int): List<BackendTrack> = emptyList()
+
+	fun selectTrack(trackType: Int, track: BackendTrack?) {}
 }
+
+data class BackendTrack(
+	val id: String,
+	val type: Int,
+	val label: String,
+	val language: String? = null,
+	val isSelected: Boolean = false,
+	val group: Any? = null,
+	val trackIndex: Int = 0,
+)
+
 

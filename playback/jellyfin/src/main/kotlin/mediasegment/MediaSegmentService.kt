@@ -11,16 +11,20 @@ import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.core.timedevent.BlockActivation
 import org.jellyfin.playback.core.timedevent.TimedEvent
 import org.jellyfin.playback.core.timedevent.timedEvents
+import org.jellyfin.playback.core.util.isLocalPath
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.mediaSegmentsApi
+import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.MediaSegmentDto
 import org.jellyfin.sdk.model.api.MediaSegmentType
 import org.jellyfin.sdk.model.extensions.ticks
 
 class MediaSegmentService(
 	private val api: ApiClient,
-	private val skipTypes: Set<MediaSegmentType>,
+	private val skipTypes: Set<MediaSegmentType> = emptySet(),
+	private val segmentProvider: (suspend (BaseItemDto) -> List<MediaSegmentDto>)? = null,
+	private val segmentAutoSkipPredicate: ((MediaSegmentDto) -> Boolean)? = null,
 ) : PlayerService() {
 	companion object {
 		const val TIMED_EVENT_PREFIX = "MediaSegment:"
@@ -39,13 +43,19 @@ class MediaSegmentService(
 		// Already has media segments!
 		if (entry.mediaSegments != null) return
 
-		// BaseItem doesn't exist
 		val baseItem = entry.baseItem ?: return
 
-		// Get via API
-		val mediaSegments by api.mediaSegmentsApi.getItemSegments(baseItem.id)
-		entry.mediaSegments = mediaSegments.items
+		val segments = if (segmentProvider != null) {
+			segmentProvider.invoke(baseItem)
+		} else {
+			if (isLocalPath(baseItem.path)) emptyList()
+			else runCatching { api.mediaSegmentsApi.getItemSegments(baseItem.id).content.items }.getOrNull().orEmpty()
+		}
+
+		entry.mediaSegments = segments.ifEmpty { null }
 	}
+
+
 
 	private fun createTimedEvents(entry: QueueEntry) {
 		val events = entry.timedEvents
@@ -68,7 +78,10 @@ class MediaSegmentService(
 	}
 
 	private fun MediaSegmentDto.asTimedEvents(): List<TimedEvent> {
-		if (!skipTypes.contains(type)) return emptyList()
+		val shouldAutoSkip = segmentAutoSkipPredicate?.invoke(this)
+			?: skipTypes.contains(type)
+
+		if (!shouldAutoSkip) return emptyList()
 
 		return listOf(
 			TimedEvent.Block(

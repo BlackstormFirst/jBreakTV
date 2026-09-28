@@ -28,6 +28,8 @@ import androidx.compose.ui.window.PopupProperties
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.interactionTracker
 
+import kotlinx.coroutines.delay
+
 object PopoverDefaults {
 	val Shape: Shape = RoundedCornerShape(4.dp)
 }
@@ -41,6 +43,7 @@ fun Popover(
 	offset: DpOffset = DpOffset.Zero,
 	shape: Shape = PopoverDefaults.Shape,
 	backgroundColor: Color = JellyfinTheme.colorScheme.surface,
+	initialFocusRequester: FocusRequester? = null,
 	content: @Composable BoxScope.() -> Unit,
 ) {
 	val density = LocalDensity.current
@@ -60,7 +63,7 @@ fun Popover(
 	)
 
 	if (alpha != 0f) {
-		val focusRequester = remember { FocusRequester() }
+		val defaultFocusRequester = remember { FocusRequester() }
 
 		Popup(
 			onDismissRequest = onDismissRequest,
@@ -87,7 +90,7 @@ fun Popover(
 					)
 					.background(backgroundColor, shape)
 					.wrapContentSize()
-					.focusRequester(focusRequester)
+					.focusRequester(defaultFocusRequester)
 					.focusGroup()
 					.interactionTracker()
 			) {
@@ -95,8 +98,13 @@ fun Popover(
 			}
 		}
 
-		LaunchedEffect(focusRequester) {
-			focusRequester.requestFocus()
+		LaunchedEffect(expanded, initialFocusRequester) {
+			if (expanded) {
+				delay(50)
+				val target = initialFocusRequester ?: defaultFocusRequester
+				runCatching { target.requestFocus() }
+			}
 		}
 	}
 }
+

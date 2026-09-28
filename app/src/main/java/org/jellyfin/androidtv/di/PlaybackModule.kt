@@ -1,14 +1,24 @@
+@file:OptIn(UnstableApi::class)
+
 package org.jellyfin.androidtv.di
+
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
+import android.util.TypedValue
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.graphics.TypefaceCompat
 import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.ui.CaptionStyleCompat
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.preference.constant.BufferLength
@@ -18,8 +28,11 @@ import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
+import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentAction
+import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentRepository
 import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.profile.createDeviceProfile
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.playbackManager
 import org.jellyfin.playback.jellyfin.jellyfinPlugin
 import org.jellyfin.playback.media3.exoplayer.ExoPlayerOptions
@@ -28,10 +41,12 @@ import org.jellyfin.playback.media3.session.MediaSessionOptions
 import org.jellyfin.playback.media3.session.media3SessionPlugin
 import org.jellyfin.sdk.api.client.HttpClientOptions
 import org.jellyfin.sdk.api.okhttp.OkHttpFactory
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaSegmentType
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
+import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import org.jellyfin.androidtv.ui.playback.PlaybackManager as LegacyPlaybackManager
@@ -84,8 +99,24 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 		maxBufferDuration = bufferLength.maxBufferDuration,
 		bufferForPlaybackDuration = bufferLength.bufferForPlaybackDuration,
 		bufferForPlaybackAfterRebufferDuration = bufferLength.bufferForPlaybackAfterRebufferDuration,
+		configureSubtitleView = { subtitleView ->
+			val strokeColor = userPreferences[UserPreferences.subtitleTextStrokeColor].toInt()
+			val textWeight = userPreferences[UserPreferences.subtitlesTextWeight]
+			val subtitleStyle = CaptionStyleCompat(
+				userPreferences[UserPreferences.subtitlesTextColor].toInt(),
+				userPreferences[UserPreferences.subtitlesBackgroundColor].toInt(),
+				Color.TRANSPARENT,
+				if (Color.alpha(strokeColor) == 0) CaptionStyleCompat.EDGE_TYPE_NONE else CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+				strokeColor,
+				TypefaceCompat.create(androidContext(), Typeface.DEFAULT, textWeight, false)
+			)
+			subtitleView.setFixedTextSize(TypedValue.COMPLEX_UNIT_DIP, userPreferences[UserPreferences.subtitlesTextSize])
+			subtitleView.setBottomPaddingFraction(userPreferences[UserPreferences.subtitlesOffsetPosition])
+			subtitleView.setStyle(subtitleStyle)
+		},
 	)
 	install(exoPlayerPlugin(get(), exoPlayerOptions))
+
 
 	val mediaSessionOptions = MediaSessionOptions(
 		channelId = notificationChannelId,
@@ -96,10 +127,44 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 	install(media3SessionPlugin(get(), mediaSessionOptions))
 
 	val deviceProfileBuilder = { createDeviceProfile(androidContext(), userPreferences, get()) }
-	install(jellyfinPlugin(get(), deviceProfileBuilder, setOf(MediaSegmentType.INTRO), ProcessLifecycleOwner.get().lifecycle))
+	val mediaSegmentRepository = get<MediaSegmentRepository>()
+	val dataRefreshService = get<DataRefreshService>()
+	val playbackIndexManager = get<PlaybackIndexManager>()
+	install(
+		jellyfinPlugin(
+			api = get(),
+			deviceProfileBuilder = deviceProfileBuilder,
+			segmentAutoSkipPredicate = { segment -> mediaSegmentRepository.getMediaSegmentAction(segment) == MediaSegmentAction.SKIP },
+			lifecycle = ProcessLifecycleOwner.get().lifecycle,
+			mediaSegmentProvider = { item -> mediaSegmentRepository.getSegmentsForItem(item) },
+			localItemInspector = { file -> LocalVideoManager.inspectAndBuildBaseItemDto(androidContext(), file) },
+			streamIndexResolver = { _, mediaSource ->
+				if (mediaSource != null) {
+					val audioIndex = playbackIndexManager.getBestAudioIndex(mediaSource)
+					val activeAudioLang = mediaSource.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
+					val subIndex = playbackIndexManager.getBestSubtitleIndex(mediaSource, androidContext(), activeAudioLang)
+					Pair(audioIndex, subIndex)
+				} else Pair(null, null)
+			},
+			onPlaybackStop = { item ->
+				dataRefreshService.lastPlayback = Instant.now()
+				dataRefreshService.lastPlayedItem = item
+				when (item.type) {
+					BaseItemKind.MOVIE -> dataRefreshService.lastMoviePlayback = Instant.now()
+					BaseItemKind.EPISODE -> dataRefreshService.lastTvPlayback = Instant.now()
+					else -> Unit
+				}
+			},
+
+		)
+	)
+
+
+
 
 	// Options
 	val userSettingPreferences = get<UserSettingPreferences>()
+
 	defaultRewindAmount = { userSettingPreferences[UserSettingPreferences.skipBackLength].milliseconds }
 	defaultFastForwardAmount = { userSettingPreferences[UserSettingPreferences.skipForwardLength].milliseconds }
 }

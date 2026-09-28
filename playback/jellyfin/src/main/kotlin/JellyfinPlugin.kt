@@ -7,23 +7,34 @@ import org.jellyfin.playback.jellyfin.mediasegment.MediaSegmentService
 import org.jellyfin.playback.jellyfin.mediastream.JellyfinMediaStreamResolver
 import org.jellyfin.playback.jellyfin.playsession.PlaySessionService
 import org.jellyfin.playback.jellyfin.playsession.PlaySessionSocketService
+import java.io.File
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.DeviceProfile
+import org.jellyfin.sdk.model.api.MediaSegmentDto
 import org.jellyfin.sdk.model.api.MediaSegmentType
+import org.jellyfin.sdk.model.api.MediaSourceInfo
 
 fun jellyfinPlugin(
 	api: ApiClient,
 	deviceProfileBuilder: () -> DeviceProfile,
 	mediaSegmentSkipTypes: Set<MediaSegmentType> = emptySet(),
 	lifecycle: Lifecycle? = null,
+	mediaSegmentProvider: (suspend (BaseItemDto) -> List<MediaSegmentDto>)? = null,
+	localItemInspector: (suspend (File) -> BaseItemDto)? = null,
+	streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Pair<Int?, Int?>)? = null,
+	onPlaybackStop: ((BaseItemDto) -> Unit)? = null,
+	segmentAutoSkipPredicate: ((MediaSegmentDto) -> Boolean)? = null,
 ) = playbackPlugin {
-	provide(JellyfinMediaStreamResolver(api, deviceProfileBuilder))
+	provide(JellyfinMediaStreamResolver(api, deviceProfileBuilder, localItemInspector, streamIndexResolver))
 
-	val playSessionService = PlaySessionService(api)
+	val playSessionService = PlaySessionService(api, onPlaybackStop)
 	provide(playSessionService)
 	provide(PlaySessionSocketService(api, playSessionService, lifecycle))
 
 	provide(LyricsPlayerService(api))
 
-	if (mediaSegmentSkipTypes.isNotEmpty()) provide(MediaSegmentService(api, mediaSegmentSkipTypes))
+	if (mediaSegmentSkipTypes.isNotEmpty() || segmentAutoSkipPredicate != null) {
+		provide(MediaSegmentService(api, mediaSegmentSkipTypes, mediaSegmentProvider, segmentAutoSkipPredicate))
+	}
 }

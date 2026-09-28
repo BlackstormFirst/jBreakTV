@@ -6,6 +6,7 @@ import androidx.media3.common.C
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player.Commands
 import androidx.media3.common.SimpleBasePlayer
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import com.google.common.util.concurrent.Futures
@@ -64,7 +65,7 @@ internal class MediaSessionPlayer(
 			val allowNext = manager.queue.entryIndex.value < (manager.queue.estimatedSize - 1)
 			addIf(COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, allowNext)
 			addIf(COMMAND_SEEK_TO_NEXT, allowNext)
-			// add(COMMAND_SEEK_TO_MEDIA_ITEM)
+			add(COMMAND_SEEK_TO_MEDIA_ITEM)
 			add(COMMAND_SEEK_BACK)
 			add(COMMAND_SEEK_FORWARD)
 			add(COMMAND_SET_SPEED_AND_PITCH)
@@ -73,19 +74,18 @@ internal class MediaSessionPlayer(
 			add(COMMAND_GET_CURRENT_MEDIA_ITEM)
 			add(COMMAND_GET_TIMELINE)
 			add(COMMAND_GET_MEDIA_ITEMS_METADATA)
-			// add(COMMAND_SET_MEDIA_ITEMS_METADATA)
-			// add(COMMAND_SET_MEDIA_ITEM)
-			// add(COMMAND_CHANGE_MEDIA_ITEMS)
-			// add(COMMAND_GET_AUDIO_ATTRIBUTES)
-			// add(COMMAND_GET_VOLUME)
+			add(COMMAND_SET_MEDIA_ITEMS_METADATA)
+			add(COMMAND_SET_MEDIA_ITEM)
+			add(COMMAND_CHANGE_MEDIA_ITEMS)
+			add(COMMAND_GET_AUDIO_ATTRIBUTES)
+			add(COMMAND_GET_VOLUME)
 			add(COMMAND_GET_DEVICE_VOLUME)
-			// add(COMMAND_SET_VOLUME)
+			add(COMMAND_SET_VOLUME)
 			add(COMMAND_SET_DEVICE_VOLUME_WITH_FLAGS)
 			add(COMMAND_ADJUST_DEVICE_VOLUME_WITH_FLAGS)
-			// add(COMMAND_SET_VIDEO_SURFACE)
-			// add(COMMAND_GET_TEXT)
-			// add(COMMAND_SET_TRACK_SELECTION_PARAMETERS)
-			// add(COMMAND_GET_TRACKS)
+			add(COMMAND_SET_TRACK_SELECTION_PARAMETERS)
+			add(COMMAND_GET_TRACKS)
+
 		}.build())
 
 		val current = manager.queue.entry.value
@@ -160,7 +160,6 @@ internal class MediaSessionPlayer(
 	): ListenableFuture<*> = scope.future(Dispatchers.Main) {
 		Timber.d("handleSeek(mediaItemIndex=$mediaItemIndex, positionMs=$positionMs, seekCommand=$seekCommand)")
 
-		// Queue progress
 		@Suppress("SwitchIntDef")
 		when (seekCommand) {
 			COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
@@ -168,15 +167,27 @@ internal class MediaSessionPlayer(
 
 			COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
 			COMMAND_SEEK_TO_NEXT -> manager.queue.next()
-		}
 
-		// Seeking
-		val to = when (positionMs) {
-			C.TIME_UNSET -> Duration.ZERO
-			else -> positionMs.milliseconds
+			COMMAND_SEEK_BACK -> state.rewind()
+			COMMAND_SEEK_FORWARD -> state.fastForward()
+
+			else -> {
+				val to = when (positionMs) {
+					C.TIME_UNSET -> Duration.ZERO
+					else -> positionMs.milliseconds
+				}
+				state.seek(to)
+			}
 		}
-		state.seek(to)
 	}
+
+	override fun handleSetTrackSelectionParameters(
+		trackSelectionParameters: TrackSelectionParameters
+	): ListenableFuture<*> {
+		Timber.d("handleSetTrackSelectionParameters($trackSelectionParameters)")
+		return Futures.immediateVoidFuture()
+	}
+
 
 	override fun handleSetPlaybackParameters(playbackParameters: PlaybackParameters): ListenableFuture<*> {
 		Timber.d("handleSetPlaybackParameters(playbackParameters=${playbackParameters})")

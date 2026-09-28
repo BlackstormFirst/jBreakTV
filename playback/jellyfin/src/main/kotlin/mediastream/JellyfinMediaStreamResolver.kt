@@ -1,9 +1,13 @@
 package org.jellyfin.playback.jellyfin.mediastream
 
+import android.net.Uri
+import java.io.File
 import org.jellyfin.playback.core.mediastream.MediaConversionMethod
+import org.jellyfin.playback.core.mediastream.MediaStreamContainer
 import org.jellyfin.playback.core.mediastream.MediaStreamResolver
 import org.jellyfin.playback.core.mediastream.PlayableMediaStream
 import org.jellyfin.playback.core.queue.QueueEntry
+import org.jellyfin.playback.core.util.isLocalPath
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.mediaSourceId
 import org.jellyfin.sdk.api.client.ApiClient
@@ -13,12 +17,15 @@ import org.jellyfin.sdk.api.client.extensions.videosApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.DeviceProfile
 import org.jellyfin.sdk.model.api.MediaProtocol
+import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
 
 class JellyfinMediaStreamResolver(
 	private val api: ApiClient,
 	private val deviceProfileBuilder: () -> DeviceProfile,
+	private val localItemInspector: (suspend (File) -> BaseItemDto)? = null,
+	private val streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Pair<Int?, Int?>)? = null,
 ) : MediaStreamResolver {
 	companion object {
 		private val supportedMediaTypes = arrayOf(MediaType.VIDEO, MediaType.AUDIO)
@@ -28,7 +35,39 @@ class JellyfinMediaStreamResolver(
 		val baseItem = queueEntry.baseItem
 		if (baseItem == null || !supportedMediaTypes.contains(baseItem.mediaType)) return null
 
-		val mediaInfo = getPlaybackInfo(baseItem, queueEntry.mediaSourceId)
+		// Local USB/storage media handling
+		if (isLocalPath(baseItem.path)) {
+			val filePath = baseItem.path.orEmpty()
+			val file = File(filePath)
+
+			val itemToUse = if (baseItem.mediaStreams.isNullOrEmpty() || baseItem.chapters == null || baseItem.runTimeTicks == null) {
+				localItemInspector?.let { inspector -> runCatching { inspector.invoke(file) }.getOrNull() } ?: baseItem
+			} else {
+				baseItem
+			}
+
+			if (itemToUse != baseItem) {
+				queueEntry.baseItem = itemToUse
+			}
+
+			val localUrl = if (filePath.startsWith("file:/") || filePath.startsWith("content:")) filePath else Uri.fromFile(file).toString()
+			val containerExt = file.extension.ifBlank { "mkv" }
+			val startTicks = queueEntry.baseItem?.userData?.playbackPositionTicks ?: 0L
+
+			return PlayableMediaStream(
+				identifier = "local_" + file.name.hashCode(),
+				conversionMethod = MediaConversionMethod.None,
+				container = MediaStreamContainer(format = containerExt),
+				tracks = itemToUse.mediaStreams.orEmpty().mapNotNull { it.getMediaStreamTrack(api) },
+				queueEntry = queueEntry,
+				url = localUrl,
+				startPositionTicks = startTicks,
+			)
+		}
+
+		val mediaInfo = runCatching {
+			getPlaybackInfo(baseItem, queueEntry.mediaSourceId)
+		}.getOrNull() ?: return null
 
 		return when {
 			// Direct play video
@@ -82,11 +121,18 @@ class JellyfinMediaStreamResolver(
 		item: BaseItemDto,
 		mediaSourceId: String? = null,
 	): MediaInfo {
+		val initialSource = item.mediaSources?.firstOrNull { mediaSourceId == null || it.id == mediaSourceId }
+			?: item.mediaSources?.firstOrNull()
+
+		val (bestAudioIndex, bestSubIndex) = streamIndexResolver?.invoke(item, initialSource) ?: Pair(null, null)
+		val startTicks = item.userData?.playbackPositionTicks ?: 0L
+
 		val profile = deviceProfileBuilder()
-		val response by api.mediaInfoApi.getPostedPlaybackInfo(
+		val response = api.mediaInfoApi.getPostedPlaybackInfo(
 			itemId = item.id,
 			data = PlaybackInfoDto(
 				mediaSourceId = mediaSourceId,
+				startTimeTicks = startTicks,
 				deviceProfile = profile,
 				enableDirectPlay = true,
 				enableDirectStream = true,
@@ -94,18 +140,18 @@ class JellyfinMediaStreamResolver(
 				allowVideoStreamCopy = true,
 				allowAudioStreamCopy = true,
 				autoOpenLiveStream = false,
+				audioStreamIndex = bestAudioIndex,
+				subtitleStreamIndex = bestSubIndex,
 			)
-		)
+		).content
 
 		if (response.errorCode != null) {
 			error("Failed to get media info for item ${item.id} source ${mediaSourceId}: ${response.errorCode}")
 		}
 
 		val mediaSource = response.mediaSources
-			// Filter out invalid streams (like strm files)
-			.filter { it.protocol == MediaProtocol.FILE && !it.isRemote }
-			// Select first media source
-			.firstOrNull { mediaSourceId == null || it.id == mediaSourceId }
+			.firstOrNull { mediaSourceId != null && it.id == mediaSourceId }
+			?: response.mediaSources.firstOrNull()
 
 		requireNotNull(mediaSource) {
 			"Failed to get media info for item ${item.id} source ${mediaSourceId}: media source missing in response"
@@ -121,12 +167,19 @@ class JellyfinMediaStreamResolver(
 		queueEntry: QueueEntry,
 		conversionMethod: MediaConversionMethod,
 		url: String,
-	) = PlayableMediaStream(
-		identifier = playSessionId,
-		conversionMethod = conversionMethod,
-		container = getMediaStreamContainer(),
-		tracks = getTracks(),
-		queueEntry = queueEntry,
-		url = url,
-	)
+	): PlayableMediaStream {
+		val startTicks = queueEntry.baseItem?.userData?.playbackPositionTicks ?: 0L
+		return PlayableMediaStream(
+			identifier = playSessionId,
+			conversionMethod = conversionMethod,
+			container = getMediaStreamContainer(),
+			tracks = getTracks(api),
+			queueEntry = queueEntry,
+			url = url,
+			startPositionTicks = startTicks,
+			mediaSourceId = mediaSource.id,
+		)
+	}
+
 }
+

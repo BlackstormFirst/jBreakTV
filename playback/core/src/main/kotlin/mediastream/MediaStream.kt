@@ -18,6 +18,8 @@ data class BasicMediaStream(
 	fun toPlayableMediaStream(
 		queueEntry: QueueEntry,
 		url: String,
+		startPositionTicks: Long = 0L,
+		mediaSourceId: String? = null,
 	) = PlayableMediaStream(
 		identifier = identifier,
 		conversionMethod = conversionMethod,
@@ -25,6 +27,8 @@ data class BasicMediaStream(
 		tracks = tracks,
 		queueEntry = queueEntry,
 		url = url,
+		startPositionTicks = startPositionTicks,
+		mediaSourceId = mediaSourceId,
 	)
 }
 
@@ -35,6 +39,8 @@ data class PlayableMediaStream(
 	override val tracks: Collection<MediaStreamTrack>,
 	val queueEntry: QueueEntry,
 	val url: String,
+	val startPositionTicks: Long = 0L,
+	val mediaSourceId: String? = null,
 ) : MediaStream
 
 data class MediaStreamContainer(
@@ -47,9 +53,14 @@ sealed interface MediaStreamTrack {
 
 data class MediaStreamAudioTrack(
 	override val codec: String,
-	val bitrate: Int,
-	val channels: Int,
-	val sampleRate: Int,
+	val index: Int = -1,
+	val language: String? = null,
+	val title: String? = null,
+	val displayTitle: String? = null,
+	val bitrate: Int = 0,
+	val channels: Int = 1,
+	val sampleRate: Int = 0,
+	val isDefault: Boolean = false,
 ) : MediaStreamTrack
 
 data class MediaStreamVideoTrack(
@@ -60,4 +71,14 @@ data class MediaStreamVideoTrack(
 	val videoRange: String?,
 ) : MediaStreamTrack
 
-// TODO: Add subtitle track
+data class MediaStreamSubtitleTrack(
+	override val codec: String,
+	val index: Int,
+	val language: String?,
+	val title: String?,
+	val displayTitle: String?,
+	val isExternal: Boolean,
+	val isDefault: Boolean,
+	val isForced: Boolean,
+	val deliveryUrl: String?,
+) : MediaStreamTrack

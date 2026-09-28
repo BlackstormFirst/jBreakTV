@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.onEach
 import org.jellyfin.playback.core.plugin.PlayerService
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.queue.queue
+import org.jellyfin.playback.core.util.isLocalPath
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.lyricsApi
@@ -25,12 +26,16 @@ class LyricsPlayerService(
 		// Already has lyrics!
 		if (entry.lyrics != null) return
 
-		// BaseItem doesn't exist or doesn't have lyrics
+		// BaseItem doesn't exist, is local, or doesn't have lyrics
 		val baseItem = entry.baseItem ?: return
+		if (isLocalPath(baseItem.path)) return
 		if (baseItem.hasLyrics != true) return
 
 		// Get via API
-		val lyrics by api.lyricsApi.getLyrics(baseItem.id)
-		entry.lyrics = lyrics
+		runCatching {
+			val lyrics by api.lyricsApi.getLyrics(baseItem.id)
+			entry.lyrics = lyrics
+		}
 	}
+
 }

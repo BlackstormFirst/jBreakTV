@@ -24,11 +24,43 @@ import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.model.PlayState
 import org.koin.compose.koinInject
 
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.preference.constant.ZoomMode
+import org.jellyfin.androidtv.ui.composable.rememberQueueEntry
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
+import org.jellyfin.playback.jellyfin.queue.baseItem
+import org.jellyfin.playback.jellyfin.queue.baseItemFlow
+import java.io.File
+
 private const val DefaultVideoAspectRatio = 16f / 9f
 
 @Composable
 fun VideoPlayerScreen() {
 	val playbackManager = koinInject<PlaybackManager>()
+	val context = LocalContext.current
+
+	val entry by rememberQueueEntry(playbackManager)
+	val baseItem = entry?.run { baseItemFlow.collectAsState(baseItem) }?.value
+
+	LaunchedEffect(entry, baseItem?.id) {
+		val currentItem = baseItem
+		if (currentItem != null && LocalVideoManager.isLocalItem(currentItem) && currentItem.runTimeTicks == null) {
+			val path = currentItem.path
+			if (!path.isNullOrEmpty()) {
+				val file = File(path)
+				if (file.exists()) {
+					val enrichedItem = withContext(Dispatchers.IO) {
+						LocalVideoManager.inspectAndBuildBaseItemDto(context, file)
+					}
+					entry?.baseItem = enrichedItem
+				}
+			}
+		}
+	}
 
 	val backgroundService = koinInject<BackgroundService>()
 	LaunchedEffect(backgroundService) {
@@ -45,6 +77,9 @@ fun VideoPlayerScreen() {
 	val videoSize by playbackManager.state.videoSize.collectAsState()
 	val aspectRatio = videoSize.aspectRatio.takeIf { !it.isNaN() && it > 0f } ?: DefaultVideoAspectRatio
 
+	var zoomMode by remember { mutableStateOf(ZoomMode.FIT) }
+
+
 	val coroutineScope = rememberCoroutineScope()
 	val mediaToastRegistry = remember { MediaToastRegistry(coroutineScope) }
 	rememberPlaybackManagerMediaToastEmitter(playbackManager, mediaToastRegistry)
@@ -54,25 +89,36 @@ fun VideoPlayerScreen() {
 			.background(Color.Black)
 			.fillMaxSize()
 	) {
-		PlayerSurface(
-			playbackManager = playbackManager,
-			modifier = Modifier
+		val surfaceModifier = when (zoomMode) {
+			ZoomMode.FIT -> Modifier
 				.aspectRatio(aspectRatio, videoSize.height < videoSize.width)
 				.fillMaxSize()
 				.align(Alignment.Center)
+			ZoomMode.AUTO_CROP,
+			ZoomMode.STRETCH -> Modifier
+				.fillMaxSize()
+				.align(Alignment.Center)
+		}
+
+		PlayerSurface(
+			playbackManager = playbackManager,
+			modifier = surfaceModifier,
 		)
 
 		VideoPlayerOverlay(
 			playbackManager = playbackManager,
 			mediaToastRegistry = mediaToastRegistry,
+			zoomMode = zoomMode,
+			onZoomSelect = { zoomMode = it },
 		)
+
 
 		PlayerSubtitles(
 			playbackManager = playbackManager,
-			modifier = Modifier
-				.aspectRatio(aspectRatio, videoSize.height < videoSize.width)
-				.fillMaxSize()
-				.align(Alignment.Center)
+			modifier = surfaceModifier,
 		)
 	}
 }
+
+
+

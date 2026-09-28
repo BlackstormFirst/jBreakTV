@@ -796,33 +796,17 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     public static boolean isLocalPath(@Nullable String path) {
-        if (path == null || path.trim().isEmpty()) return false;
-
-        // If it is a network URL, it is strictly remote streaming
-        String lower = path.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("http://") || lower.startsWith("https://")) {
-            return false;
-        }
-
-        // File strictly present on local Android physical storage (USB, internal, SD)
-        return path.startsWith("/storage/")
-                || path.startsWith("/mnt/")
-                || lower.startsWith("file:/storage/")
-                || lower.startsWith("file:/mnt/")
-                || lower.startsWith("file:///storage/")
-                || lower.startsWith("file:///mnt/")
-                || lower.startsWith("content:");
+        return LocalVideoManager.isLocalPath(path);
     }
 
     public static boolean isLocalSource(@Nullable MediaSourceInfo info) {
-        if (info == null) return false;
-        return isLocalPath(info.getPath());
+        return LocalVideoManager.isLocalSource(info);
     }
 
     public static boolean isCurrentItemLocal(@Nullable BaseItemDto item) {
-        if (item == null) return false;
-        return isLocalPath(item.getPath());
+        return LocalVideoManager.isLocalItem(item);
     }
+
 
     public void startSpinner() {
         spinnerOff = false;
