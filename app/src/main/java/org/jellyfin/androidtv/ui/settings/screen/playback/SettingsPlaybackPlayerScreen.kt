@@ -13,7 +13,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.rememberAsyncImagePainter
-import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.repository.ExternalAppRepository
 import org.jellyfin.androidtv.preference.UserPreferences
@@ -42,7 +41,6 @@ fun SettingsPlaybackPlayerScreen() {
 	val currentExternalPlayer = remember(context) { externalAppRepository.getCurrentExternalPlayerApp(context) }
 
 	var playbackRewriteVideoEnabled by rememberPreference(userPreferences, UserPreferences.playbackRewriteVideoEnabled)
-	val showNewPlayer = playbackRewriteVideoEnabled || BuildConfig.DEVELOPMENT
 
 	SettingsColumn {
 		item {
@@ -76,7 +74,7 @@ fun SettingsPlaybackPlayerScreen() {
 			)
 		}
 
-		if (showNewPlayer) item {
+		item {
 			ListButton(
 				leadingContent = {
 					Image(
