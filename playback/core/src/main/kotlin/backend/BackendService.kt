@@ -87,8 +87,8 @@ class BackendService {
 			callListeners { onPlayStateChange(state) }
 		}
 
-		override fun onVideoSizeChange(width: Int, height: Int) {
-			callListeners { onVideoSizeChange(width, height) }
+		override fun onVideoSizeChange(width: Int, height: Int, frameRate: Float) {
+			callListeners { onVideoSizeChange(width, height, frameRate) }
 		}
 
 		override fun onMediaStreamEnd(mediaStream: PlayableMediaStream) {

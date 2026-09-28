@@ -89,8 +89,8 @@ class MutablePlayerState(
 				_playState.value = state
 			}
 
-			override fun onVideoSizeChange(width: Int, height: Int) {
-				_videoSize.value = VideoSize(width, height)
+			override fun onVideoSizeChange(width: Int, height: Int, frameRate: Float) {
+				_videoSize.value = VideoSize(width, height, frameRate)
 			}
 
 			override fun onMediaStreamEnd(mediaStream: PlayableMediaStream) {

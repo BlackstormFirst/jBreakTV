@@ -182,7 +182,18 @@ class ExoPlayerBackend(
 
 		override fun onVideoSizeChanged(size: VideoSize) {
 			if (size != VideoSize.UNKNOWN) {
-				listener?.onVideoSizeChange(size.width, size.height)
+				val frameRate = exoPlayer.videoFormat?.frameRate?.takeIf { it > 0f } ?: 0f
+				listener?.onVideoSizeChange(size.width, size.height, frameRate)
+			}
+		}
+
+		override fun onEvents(player: Player, events: Player.Events) {
+			if (events.contains(Player.EVENT_VIDEO_SIZE_CHANGED) || events.contains(Player.EVENT_TRACKS_CHANGED)) {
+				val size = player.videoSize
+				if (size != VideoSize.UNKNOWN) {
+					val frameRate = exoPlayer.videoFormat?.frameRate?.takeIf { it > 0f } ?: 0f
+					listener?.onVideoSizeChange(size.width, size.height, frameRate)
+				}
 			}
 		}
 
