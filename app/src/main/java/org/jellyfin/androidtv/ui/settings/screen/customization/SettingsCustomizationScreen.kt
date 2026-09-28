@@ -101,6 +101,14 @@ fun SettingsCustomizationScreen() {
 			)
 		}
 
+		item {
+			ListButton(
+				headingContent = { Text(stringResource(R.string.pref_image_loader_management)) },
+				onClick = { router.push(Routes.CUSTOMIZATION_IMAGE_LOADER) },
+				modifier = Modifier.focusKey(Routes.CUSTOMIZATION_IMAGE_LOADER)
+			)
+		}
+
 		item { ListSection(headingContent = { Text(stringResource(R.string.pref_browsing)) }) }
 
 		item {

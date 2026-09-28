@@ -460,6 +460,7 @@
     <string name="server_issue_timeout">Connection timed out</string>
     <string name="server_issue_ssl_handshake">SSL handshake failed</string>
     <string name="pref_customization">Customization</string>
+    <string name="pref_image_loader_management">Images loader management</string>
     <string name="sort_accounts_by">Sort accounts by</string>
     <string name="pref_accounts">Accounts</string>
     <string name="pref_behavior">Behavior</string>
