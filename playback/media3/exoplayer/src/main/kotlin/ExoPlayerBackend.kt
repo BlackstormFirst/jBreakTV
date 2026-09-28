@@ -31,6 +31,10 @@ import io.github.peerless2012.ass.media.kt.withAssMkvSupport
 import io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory
 import io.github.peerless2012.ass.media.type.AssRenderType
 import io.github.peerless2012.ass.media.widget.AssSubtitleView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import org.jellyfin.playback.media3.exoplayer.support.AssFontManager
 import org.jellyfin.playback.core.backend.BasePlayerBackend
 import org.jellyfin.playback.core.mediastream.MediaStream
 import org.jellyfin.playback.core.mediastream.PlayableMediaStream
@@ -264,6 +268,12 @@ class ExoPlayerBackend(
 			setMediaId(stream.hashCode().toString())
 			setUri(stream.url)
 		}.build()
+
+		if (exoPlayerOptions.enableLibass) {
+			CoroutineScope(Dispatchers.IO).launch {
+				AssFontManager.preloadFontsForEntry(context, item, assHandler)
+			}
+		}
 
 		// Remove any excessive items from the start
 		while (exoPlayer.mediaItemCount > MEDIA_ITEM_COUNT_MAX - 1) exoPlayer.removeMediaItem(0)
