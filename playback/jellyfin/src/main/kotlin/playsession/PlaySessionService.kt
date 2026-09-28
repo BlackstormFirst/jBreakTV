@@ -1,10 +1,8 @@
 package org.jellyfin.playback.jellyfin.playsession
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jellyfin.playback.core.mediastream.MediaConversionMethod
 import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
@@ -82,7 +80,7 @@ class PlaySessionService(
 					volumeLevel = (state.volume.volume * 100).roundToInt(),
 					isPaused = state.playState.value != PlayState.PLAYING,
 					aspectRatio = state.videoSize.value.aspectRatio.toString(),
-					positionTicks = withContext(Dispatchers.Main) { state.positionInfo.active.inWholeTicks },
+					positionTicks = state.positionInfo.active.inWholeTicks,
 					playMethod = stream.conversionMethod.playMethod,
 					repeatMode = state.repeatMode.value.remoteRepeatMode,
 					nowPlayingQueue = getQueue(),
@@ -112,7 +110,7 @@ class PlaySessionService(
 					volumeLevel = (state.volume.volume * 100).roundToInt(),
 					isPaused = state.playState.value != PlayState.PLAYING,
 					aspectRatio = state.videoSize.value.aspectRatio.toString(),
-					positionTicks = withContext(Dispatchers.Main) { state.positionInfo.active.inWholeTicks },
+					positionTicks = state.positionInfo.active.inWholeTicks,
 					playMethod = stream.conversionMethod.playMethod,
 					repeatMode = state.repeatMode.value.remoteRepeatMode,
 					nowPlayingQueue = getQueue(),
@@ -123,7 +121,7 @@ class PlaySessionService(
 					}
 				)
 			)
-		}.onFailure { error -> Timber.w("Failed to send playback update event", error) }
+		}.onFailure { error -> Timber.w(error, "Failed to send playback update event") }
 	}
 
 	private suspend fun sendStreamStop() {
@@ -137,11 +135,11 @@ class PlaySessionService(
 					itemId = item.id,
 					playSessionId = stream.identifier,
 					playlistItemId = item.playlistItemId,
-					positionTicks = withContext(Dispatchers.Main) { state.positionInfo.active.inWholeTicks },
+					positionTicks = state.positionInfo.active.inWholeTicks,
 					failed = false,
 					nowPlayingQueue = getQueue(),
 				)
 			)
-		}.onFailure { error -> Timber.w("Failed to send playback stop event", error) }
+		}.onFailure { error -> Timber.w(error, "Failed to send playback stop event") }
 	}
 }

@@ -78,8 +78,8 @@ class ExoPlayerBackend(
 			context,
 			exoPlayerOptions.baseDataSourceFactory,
 		)
+		val isLowRamDevice = context.getSystemService<ActivityManager>()?.isLowRamDevice == true
 		val extractorsFactory = DefaultExtractorsFactory().apply {
-			val isLowRamDevice = context.getSystemService<ActivityManager>()?.isLowRamDevice == true
 			setTsExtractorTimestampSearchBytes(
 				when (isLowRamDevice) {
 					true -> TS_SEARCH_BYTES_LM
@@ -111,13 +111,24 @@ class ExoPlayerBackend(
 			else renderersFactory
 		}
 
+		val minBufferMs = exoPlayerOptions.minBufferDuration?.inWholeMilliseconds?.toInt()
+			?: if (isLowRamDevice) 15_000 else DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
+		val maxBufferMs = exoPlayerOptions.maxBufferDuration?.inWholeMilliseconds?.toInt()
+			?: if (isLowRamDevice) 30_000 else DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
+		val bufferForPlaybackMs = exoPlayerOptions.bufferForPlaybackDuration?.inWholeMilliseconds?.toInt()
+			?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS
+		val bufferForPlaybackAfterRebufferMs = exoPlayerOptions.bufferForPlaybackAfterRebufferDuration?.inWholeMilliseconds?.toInt()
+			?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+
 		val loadControl = DefaultLoadControl.Builder()
 			.setBufferDurationsMs(
-				exoPlayerOptions.minBufferDuration?.inWholeMilliseconds?.toInt() ?: DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
-				exoPlayerOptions.maxBufferDuration?.inWholeMilliseconds?.toInt() ?: DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
-				exoPlayerOptions.bufferForPlaybackDuration?.inWholeMilliseconds?.toInt() ?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
-				exoPlayerOptions.bufferForPlaybackAfterRebufferDuration?.inWholeMilliseconds?.toInt() ?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
+				minBufferMs,
+				maxBufferMs,
+				bufferForPlaybackMs,
+				bufferForPlaybackAfterRebufferMs,
 			)
+			.setPrioritizeTimeOverSizeThresholds(true)
+			.setBackBuffer(if (isLowRamDevice) 10_000 else 30_000, false)
 			.build()
 
 		ExoPlayer.Builder(context)
