@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.guava.future
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.model.PlayState
@@ -38,6 +37,7 @@ internal class MediaSessionPlayer(
 	init {
 		// Invalidate mediasession state when certain player state changes
 		manager.queue.entry.invalidateStateOnEach(scope)
+		manager.queue.entries.invalidateStateOnEach(scope)
 		state.playState.invalidateStateOnEach(scope)
 		state.videoSize.invalidateStateOnEach(scope)
 		state.speed.invalidateStateOnEach(scope)
@@ -88,35 +88,36 @@ internal class MediaSessionPlayer(
 			// add(COMMAND_GET_TRACKS)
 		}.build())
 
-		runBlocking {
-			val current = manager.queue.entry.value
+		val current = manager.queue.entry.value
 
-			if (current != null) {
-				val previous = manager.queue.peekPrevious()
-				val next = manager.queue.peekNext()
+		if (current != null) {
+			val currentIndex = manager.queue.entryIndex.value
+			val allEntries = manager.queue.entries.value
 
-				val playlist = listOfNotNull(previous, current, next)
-					.distinctBy { it.metadata.mediaId }
-					.map {
-						MediaItemData.Builder(requireNotNull(it.metadata.mediaId)).apply {
-							setMediaItem(it.metadata.toMediaItem())
-							setDurationUs(it.metadata.duration?.inWholeMicroseconds ?: C.TIME_UNSET)
-						}.build()
-					}
-				setPlaylist(playlist)
+			val previous = if (currentIndex > 0 && currentIndex - 1 < allEntries.size) allEntries[currentIndex - 1] else null
+			val next = if (currentIndex >= 0 && currentIndex + 1 < allEntries.size) allEntries[currentIndex + 1] else null
 
-				setPlaybackState(when (state.playState.value) {
-					PlayState.STOPPED -> STATE_IDLE
-					PlayState.PLAYING -> STATE_READY
-					PlayState.PAUSED -> STATE_READY
-					PlayState.ERROR -> STATE_ENDED
-				})
+			val playlist = listOfNotNull(previous, current, next)
+				.distinctBy { it.metadata.mediaId }
+				.map {
+					MediaItemData.Builder(requireNotNull(it.metadata.mediaId)).apply {
+						setMediaItem(it.metadata.toMediaItem())
+						setDurationUs(it.metadata.duration?.inWholeMicroseconds ?: C.TIME_UNSET)
+					}.build()
+				}
+			setPlaylist(playlist)
 
-				setCurrentMediaItemIndex(if (previous == null || playlist.size <= 1) 0 else 1)
-			} else {
-				setPlaybackState(STATE_IDLE)
-				setCurrentMediaItemIndex(C.INDEX_UNSET)
-			}
+			setPlaybackState(when (state.playState.value) {
+				PlayState.STOPPED -> STATE_IDLE
+				PlayState.PLAYING -> STATE_READY
+				PlayState.PAUSED -> STATE_READY
+				PlayState.ERROR -> STATE_ENDED
+			})
+
+			setCurrentMediaItemIndex(if (previous == null || playlist.size <= 1) 0 else 1)
+		} else {
+			setPlaybackState(STATE_IDLE)
+			setCurrentMediaItemIndex(C.INDEX_UNSET)
 		}
 
 		setContentPositionMs { state.positionInfo.active.inWholeMilliseconds }

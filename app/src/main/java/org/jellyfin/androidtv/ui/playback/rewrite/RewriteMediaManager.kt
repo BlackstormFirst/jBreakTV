@@ -9,7 +9,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.jellyfin.androidtv.integration.dream.visibleInScreensaver
 import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
@@ -151,7 +150,7 @@ class RewriteMediaManager(
 	}
 
 	override fun removeFromAudioQueue(entry: QueueEntry) {
-		runBlocking { playbackManager.queue.removeEntry(entry) }
+		ProcessLifecycleOwner.get().lifecycleScope.launch { playbackManager.queue.removeEntry(entry) }
 	}
 
 	override val isPlayingAudio: Boolean
@@ -171,7 +170,8 @@ class RewriteMediaManager(
 
 	override fun playFrom(entry: QueueEntry): Boolean {
 		val index = playbackManager.queue.indexOf(entry) ?: return false
-		return runBlocking { playbackManager.queue.setIndex(index) != null }
+		ProcessLifecycleOwner.get().lifecycleScope.launch { playbackManager.queue.setIndex(index) }
+		return true
 	}
 
 	override fun shuffleAudioQueue() {
@@ -183,22 +183,28 @@ class RewriteMediaManager(
 		playbackManager.state.setPlaybackOrder(newMode)
 	}
 
-	override fun hasNextAudioItem(): Boolean = runBlocking {
-		playbackManager.queue.peekNext() != null
+	override fun hasNextAudioItem(): Boolean {
+		val currentIndex = playbackManager.queue.entryIndex.value
+		val estimatedSize = playbackManager.queue.estimatedSize
+		return currentIndex >= 0 && currentIndex < estimatedSize - 1
 	}
 
 	override fun hasPrevAudioItem(): Boolean = playbackManager.queue.entryIndex.value > 0
 
 	override fun nextAudioItem(): Int {
-		runBlocking { playbackManager.queue.next() }
-		notifyListeners { onQueueStatusChanged(hasAudioQueueItems()) }
+		ProcessLifecycleOwner.get().lifecycleScope.launch {
+			playbackManager.queue.next()
+			notifyListeners { onQueueStatusChanged(hasAudioQueueItems()) }
+		}
 
 		return playbackManager.queue.entryIndex.value
 	}
 
 	override fun prevAudioItem(): Int {
-		runBlocking { playbackManager.queue.previous() }
-		notifyListeners { onQueueStatusChanged(hasAudioQueueItems()) }
+		ProcessLifecycleOwner.get().lifecycleScope.launch {
+			playbackManager.queue.previous()
+			notifyListeners { onQueueStatusChanged(hasAudioQueueItems()) }
+		}
 
 		return playbackManager.queue.entryIndex.value
 	}
