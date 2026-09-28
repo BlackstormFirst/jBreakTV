@@ -210,7 +210,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		/**
 		 * Show additional debug information
 		 */
-		var debuggingEnabled = booleanPreference("pref_enable_debug", true)
+		var debuggingEnabled = booleanPreference("pref_enable_debug", false)
 
 		/**
 		 * Use playback rewrite module for video

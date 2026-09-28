@@ -652,7 +652,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     }
 
     private void addInfoRows(MutableObjectAdapter<Row> adapter) {
-        if (KoinJavaComponent.<UserPreferences>get(UserPreferences.class).get(UserPreferences.Companion.getDebuggingEnabled()) && mBaseItem.getMediaSources() != null) {
+        if (mBaseItem.getMediaSources() != null) {
             for (MediaSourceInfo ms : mBaseItem.getMediaSources()) {
                 if (ms.getMediaStreams() != null && !ms.getMediaStreams().isEmpty()) {
                     HeaderItem header = new HeaderItem("Media Details" + (ms.getContainer() != null ? " (" + ms.getContainer() + ")" : ""));
