@@ -672,6 +672,8 @@
     <string name="playback_buffer_extra_large">Très grand (Optimisé pour la Shield TV)</string>
     <string name="pref_software_codecs_enabled">Utiliser des codecs logiciels</string>
     <string name="pref_software_codecs_enabled_description">Certaines mises en œuvre basées sur un logiciel peuvent entraîner une dégradation des performances. La désactivation de cette option augmente les chances de transcodage.</string>
+    <string name="pref_codec_tunneling">Codec Tunneling</string>
+    <string name="pref_codec_tunneling_description">L\'activation de ce paramètre décharge le processeur mais peut créer des saccades ou écran noir sur certains équipements</string>
     <string name="preference_enable_ass">Sous-titres ASS en direct</string>
     <string name="preference_enable_pgs_description">Exige un transcodage désactivé</string>
     <string name="preference_enable_ass_description">Fonctionnalité expérimentale, peut ne pas fonctionner de manière fiable</string>

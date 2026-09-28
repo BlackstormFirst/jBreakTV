@@ -332,6 +332,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 */
 		var softwareCodecsEnabled = booleanPreference("software_codecs_enabled", true)
 
+		/**
+		 * Enable Codec Tunneling for video playback.
+		 */
+		var codecTunneling = booleanPreference("codec_tunneling", false)
+
 		var diskMaxCacheSize = longPreference("diskMaxCacheSize", 250L)
 
 		var memoryMaxCachePercent = intPreference("memoryMaxCachePercent", 25)

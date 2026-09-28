@@ -73,6 +73,18 @@ fun SettingsPlaybackCodecScreen() {
 			)
 		}
 
+		item {
+			var codecTunneling by rememberPreference(userPreferences, UserPreferences.codecTunneling)
+
+			ListButton(
+				headingContent = { Text(stringResource(R.string.pref_codec_tunneling)) },
+				captionContent = { Text(stringResource(R.string.pref_codec_tunneling_description)) },
+				trailingContent = { Checkbox(checked = codecTunneling) },
+				onClick = { codecTunneling = !codecTunneling },
+				modifier = Modifier.focusKey("codec_tunneling")
+			)
+		}
+
 		if (AndroidVersion.isAtLeastQ) {
 			item {
 				var softwareCodecsEnabled by rememberPreference(userPreferences, UserPreferences.softwareCodecsEnabled)

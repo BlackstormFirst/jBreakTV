@@ -78,6 +78,7 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 		preferFfmpeg = userPreferences[UserPreferences.preferExoPlayerFfmpeg],
 		enableLibass = userPreferences[UserPreferences.assDirectPlay],
 		enableDebugLogging = userPreferences[UserPreferences.debuggingEnabled],
+		enableTunneling = userPreferences[UserPreferences.codecTunneling],
 		baseDataSourceFactory = get<HttpDataSource.Factory>(),
 		minBufferDuration = bufferLength.minBufferDuration,
 		maxBufferDuration = bufferLength.maxBufferDuration,
