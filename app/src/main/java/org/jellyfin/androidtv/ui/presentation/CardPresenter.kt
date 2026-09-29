@@ -301,11 +301,12 @@ private fun CardViewHolderContent(
 	val context = LocalContext.current
 	val localDensity = LocalDensity.current
 	val userPreferences = koinInject<UserPreferences>()
-	val displayCirclePersonCards by rememberPreference(userPreferences,UserPreferences.displayCirclePersonCards)
+	val api = koinInject<ApiClient>()
+	val displayCirclePersonCards by rememberPreference(userPreferences, UserPreferences.displayCirclePersonCards)
 
 	val title = remember(item, context) { item?.getCardName(context) }
 	val subtitle = remember(item, context) { item?.getSubText(context) }
-	val displayConfig = remember(item, imageType, uniformAspect) { item?.getDisplayConfig(imageType, uniformAspect, displayCirclePersonCards) }
+	val displayConfig = remember(item, imageType, uniformAspect, displayCirclePersonCards) { item?.getDisplayConfig(imageType, uniformAspect, displayCirclePersonCards) }
 	if (item == null || displayConfig == null) return
 
 	val image = displayConfig.image
@@ -330,7 +331,6 @@ private fun CardViewHolderContent(
 		ItemCard(
 			image = {
 				if (image != null) {
-					val api = koinInject<ApiClient>()
 					AsyncImage(
 						url = image.getUrl(
 							api,
@@ -378,7 +378,7 @@ private fun CardViewHolderContent(
 							if (showInfo && title != null) {
 								val focusModifier = if (focused) Modifier.basicMarquee(
 									iterations = Int.MAX_VALUE,
-									initialDelayMillis = 0,
+									initialDelayMillis = 1200,
 								) else Modifier
 
 								Box(
@@ -411,7 +411,7 @@ private fun CardViewHolderContent(
 	if (usePreview) {
 		val focusModifier = if (focused) Modifier.basicMarquee(
 			iterations = Int.MAX_VALUE,
-			initialDelayMillis = 0,
+			initialDelayMillis = 1200,
 		) else Modifier
 
 		ItemPreview(

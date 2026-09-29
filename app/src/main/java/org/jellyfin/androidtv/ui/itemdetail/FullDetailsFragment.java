@@ -5,7 +5,6 @@ import static org.koin.java.KoinJavaComponent.inject;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.graphics.Point;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.DisplayMetrics;
@@ -81,6 +80,7 @@ import org.jellyfin.androidtv.util.apiclient.Response;
 import org.jellyfin.androidtv.util.sdk.BaseItemExtensionsKt;
 import org.jellyfin.androidtv.util.sdk.TrailerUtils;
 import org.jellyfin.androidtv.util.sdk.compat.JavaCompat;
+import org.jellyfin.sdk.api.client.ApiClient;
 import org.jellyfin.sdk.model.api.BaseItemDto;
 import org.jellyfin.sdk.model.api.BaseItemKind;
 import org.jellyfin.sdk.model.api.BaseItemPerson;
@@ -90,6 +90,7 @@ import org.jellyfin.sdk.model.api.MediaType;
 import org.jellyfin.sdk.model.api.PersonKind;
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto;
 import org.jellyfin.sdk.model.api.UserDto;
+import org.jellyfin.sdk.model.api.UserItemDataDto;
 import org.jellyfin.sdk.model.serializer.UUIDSerializerKt;
 import org.koin.java.KoinJavaComponent;
 
@@ -140,7 +141,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     BaseItemDto mBaseItem;
 
     private ArrayList<MediaSourceInfo> versions;
-    private final Lazy<org.jellyfin.sdk.api.client.ApiClient> api = inject(org.jellyfin.sdk.api.client.ApiClient.class);
+    private final Lazy<ApiClient> api = inject(ApiClient.class);
     private final Lazy<UserPreferences> userPreferences = inject(UserPreferences.class);
     private final Lazy<DataRefreshService> dataRefreshService = inject(DataRefreshService.class);
     private final Lazy<BackgroundService> backgroundService = inject(BackgroundService.class);
@@ -407,13 +408,8 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
     }
 
-    private class BuildDorTask extends AsyncTask<BaseItemDto, Integer, MyDetailsOverviewRow> {
-
-        @Override
-        protected MyDetailsOverviewRow doInBackground(BaseItemDto... params) {
-            BaseItemDto item = params[0];
-
-            // Figure image size
+    private void buildDetailsOverviewRow(BaseItemDto item) {
+        CoroutineUtils.runOnLifecycle(getLifecycle(), (scope, continuation) -> {
             Double aspect = imageHelper.getValue().getImageAspectRatio(item, false);
             posterHeight = aspect > 1 ? Utils.convertDpToPixel(requireContext(), 160) : Utils.convertDpToPixel(requireContext(), item.getType() == BaseItemKind.PERSON || item.getType() == BaseItemKind.MUSIC_ARTIST ? 300 : 200);
 
@@ -430,7 +426,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 case MUSIC_ARTIST:
                     break;
                 default:
-
                     BaseItemPerson director = BaseItemExtensionsKt.getFirstPerson(item, PersonKind.DIRECTOR);
 
                     InfoItem firstRow;
@@ -457,19 +452,11 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                         mDetailsOverviewRow.setInfoItem2(new InfoItem());
                         mDetailsOverviewRow.setInfoItem3(new InfoItem());
                     }
-
             }
 
             mDetailsOverviewRow.setImageDrawable(primaryImageUrl);
 
-            return mDetailsOverviewRow;
-        }
-
-        @Override
-        protected void onPostExecute(MyDetailsOverviewRow detailsOverviewRow) {
-            super.onPostExecute(detailsOverviewRow);
-
-            if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
+            if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return null;
 
             ClassPresenterSelector ps = new ClassPresenterSelector();
             ps.addClassPresenter(MyDetailsOverviewRow.class, mDorPresenter);
@@ -477,12 +464,13 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             ps.addClassPresenter(ListRow.class, mListRowPresenter);
             mRowsAdapter = new MutableObjectAdapter<Row>(ps);
             mRowsFragment.setAdapter(mRowsAdapter);
-            mRowsAdapter.add(detailsOverviewRow);
+            mRowsAdapter.add(mDetailsOverviewRow);
 
-            updateInfo(detailsOverviewRow.getItem());
+            updateInfo(mDetailsOverviewRow.getItem());
             addAdditionalRows(mRowsAdapter);
 
-        }
+            return null;
+        });
     }
 
     public void setBaseItem(BaseItemDto item) {
@@ -501,7 +489,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                         mProgramInfo.getRunTimeTicks()
                 );
             }
-            new BuildDorTask().execute(item);
+            buildDetailsOverviewRow(item);
         }
     }
 
@@ -958,7 +946,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             }
         }
 
-        org.jellyfin.sdk.model.api.UserItemDataDto userData = mBaseItem.getUserData();
+        UserItemDataDto userData = mBaseItem.getUserData();
         if (userData != null && mProgramInfo == null) {
             if (mBaseItem.getType() != BaseItemKind.MUSIC_ARTIST && mBaseItem.getType() != BaseItemKind.PERSON) {
                 mWatchedToggleButton = TextUnderButton.create(requireContext(), R.drawable.ic_watch, buttonSize, 0, getString(R.string.lbl_watched), markWatchedListener);

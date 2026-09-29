@@ -20,6 +20,7 @@ import org.jellyfin.androidtv.util.apiclient.getSeriesOverview
 import org.jellyfin.androidtv.util.popupMenu
 import org.jellyfin.androidtv.util.sdk.TrailerUtils.getExternalTrailerIntent
 import org.jellyfin.androidtv.util.sdk.canPlay
+import org.jellyfin.androidtv.util.sdk.isRealAvailableMedia
 import org.jellyfin.androidtv.util.sdk.compat.canResume
 import org.jellyfin.androidtv.util.sdk.compat.copyWithUserData
 import org.jellyfin.androidtv.util.showIfNotEmpty
@@ -34,6 +35,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ItemFilter
 import org.jellyfin.sdk.model.api.ItemSortBy
+import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
 import org.jellyfin.sdk.model.extensions.ticks
@@ -241,6 +243,8 @@ fun FullDetailsFragment.getNextUpEpisode(callback: (BaseItemDto?) -> Unit) {
 	}
 }
 
+private const val NEXT_UP_LIMIT = 24
+
 suspend fun FullDetailsFragment.getNextUpEpisode(): BaseItemDto? {
 	val api by inject<ApiClient>()
 	val userRepository by inject<UserRepository>()
@@ -251,11 +255,14 @@ suspend fun FullDetailsFragment.getNextUpEpisode(): BaseItemDto? {
 			api.tvShowsApi.getNextUp(
 				seriesId = seriesId,
 				fields = ItemRepository.itemFields,
-				limit = 24,
+				limit = NEXT_UP_LIMIT,
 			).content
 		}
-		val nextUp = episodes.items.firstOrNull { it.canPlay() }
+		val nextUp = episodes.items.firstOrNull { it.canPlay() && it.isRealAvailableMedia() }
 		if (nextUp != null) return nextUp
+
+		// Ne pas lancer la requête fallback si la liste de getNextUp a déjà atteint son maximum
+		if (episodes.items.size >= NEXT_UP_LIMIT) return null
 
 		// Fallback: search for the first unplayed episode that is playable
 		val userId = userRepository.currentUser.value?.id
@@ -265,6 +272,8 @@ suspend fun FullDetailsFragment.getNextUpEpisode(): BaseItemDto? {
 				parentId = seriesId,
 				includeItemTypes = listOf(BaseItemKind.EPISODE),
 				isMissing = false,
+				isUnaired = false,
+				excludeLocationTypes = listOf(LocationType.VIRTUAL),
 				filters = listOf(ItemFilter.IS_UNPLAYED),
 				sortBy = listOf(ItemSortBy.AIRED_EPISODE_ORDER),
 				limit = 50,
@@ -273,7 +282,7 @@ suspend fun FullDetailsFragment.getNextUpEpisode(): BaseItemDto? {
 			).content
 		}
 
-		return fallbackResponse.items.firstOrNull { it.canPlay() }
+		return fallbackResponse.items.firstOrNull { it.canPlay() && it.isRealAvailableMedia() }
 	} catch (err: ApiClientException) {
 		Timber.w(err, "Failed to get next up items")
 		return null

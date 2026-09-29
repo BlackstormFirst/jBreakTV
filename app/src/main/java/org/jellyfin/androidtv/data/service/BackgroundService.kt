@@ -99,7 +99,7 @@ class BackgroundService(
 		loadBackgrounds(setOf(splashscreenUrl))
 	}
 
-	private fun loadBackgrounds(backdropUrls: Set<String>) {
+	private fun loadBackgrounds(backdropUrls: Set<String>, debounceMs: Long = 250L) {
 		if (backdropUrls.isEmpty()) return clearBackgrounds()
 
 		// Re-enable backgrounds if disabled
@@ -108,6 +108,9 @@ class BackgroundService(
 		// Cancel current loading job
 		loadBackgroundsJob?.cancel()
 		loadBackgroundsJob = scope.launch(Dispatchers.IO) {
+			if (debounceMs > 0) {
+				delay(debounceMs.milliseconds)
+			}
 			_backgrounds = backdropUrls.mapNotNull { url ->
 				val request = ImageRequest.Builder(context)
 					.data(url)

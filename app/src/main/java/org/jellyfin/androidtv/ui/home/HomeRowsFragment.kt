@@ -61,7 +61,6 @@ import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
 import org.jellyfin.androidtv.util.usbdevices.UsbGridButton
 import org.jellyfin.androidtv.util.usbdevices.UsbHomeDecorator
-import org.jellyfin.androidtv.util.usbdevices.UsbStorageManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.sockets.subscribe
@@ -69,6 +68,7 @@ import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.koin.android.ext.android.inject
 import timber.log.Timber
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyListener {
@@ -97,6 +97,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
+
+	@Suppress("UNCHECKED_CAST")
+	private val rowsAdapter: MutableObjectAdapter<Row>?
+		get() = adapter as? MutableObjectAdapter<Row>
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -138,23 +142,22 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
 				val cardPresenter = CardPresenter()
+				val targetAdapter = rowsAdapter ?: return@withContext
 
 				// Add rows in order
-				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
-				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, targetAdapter)
+				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, targetAdapter)
 				for (row in rows) {
-					row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+					row.addToRowsAdapter(requireContext(), cardPresenter, targetAdapter)
 				}
 
 				// Wire up Live TV sibling rows so the On Now row removes the buttons row when empty
-				@Suppress("UNCHECKED_CAST")
-				val rowsAdapter = adapter as MutableObjectAdapter<Row>
-				for (i in 0 until rowsAdapter.size()) {
-					val listRow = rowsAdapter.get(i) as? ListRow ?: continue
-					val itemAdapter = listRow.adapter as? ItemRowAdapter ?: continue
-					if (itemAdapter.queryType == QueryType.LiveTvProgram && i > 0) {
-						val previousRow = rowsAdapter.get(i - 1)
-						if (previousRow != null) itemAdapter.setSiblingRow(previousRow)
+				for (i in 0 until targetAdapter.size()) {
+					val listRow = (targetAdapter[i] as? ListRow) ?: continue
+					val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
+					if ((itemAdapter.queryType == QueryType.LiveTvProgram) && (i > 0)) {
+						val previousRow = targetAdapter[i - 1]
+						previousRow?.let { itemAdapter.setSiblingRow(it) }
 					}
 				}
 			}
@@ -181,11 +184,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
 				api.webSocket.subscribe<UserDataChangedMessage>()
-					.onEach { refreshRows(force = true, delayed = false) }
+					.onEach { refreshRows(force = false, delayed = true) }
 					.launchIn(this)
 
 				api.webSocket.subscribe<LibraryChangedMessage>()
-					.onEach { refreshRows(force = true, delayed = false) }
+					.onEach { refreshRows(force = false, delayed = true) }
 					.launchIn(this)
 			}
 		}
@@ -209,20 +212,21 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		super.onResume()
 
 		// React to deletion
-		if (currentRow != null && currentItem != null && currentItem?.baseItem != null && currentItem!!.baseItem!!.id == dataRefreshService.lastDeletedItemId) {
-			(currentRow!!.adapter as ItemRowAdapter).remove(currentItem)
+		val deletedId = dataRefreshService.lastDeletedItemId
+		if ((deletedId != null) && (currentItem?.baseItem?.id == deletedId)) {
+			(currentRow?.adapter as? ItemRowAdapter)?.remove(currentItem)
 			currentItem = null
 			dataRefreshService.lastDeletedItemId = null
 		}
 
 		// Re-evaluate USB storage state & force reinjection on return to home
-		val isLocalPlayerUsbEnabled = userPreferences.get(UserPreferences.localPlayerUsbEnabled)
+		val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
+		val currentRowsAdapter = rowsAdapter
 		if (isLocalPlayerUsbEnabled) {
-			val rowsAdapter = adapter as? MutableObjectAdapter<Row>
-			if (rowsAdapter != null) {
-				for (i in 0 until rowsAdapter.size()) {
-					val listRow = rowsAdapter.get(i) as? ListRow ?: continue
-					val itemAdapter = listRow.adapter as? ItemRowAdapter ?: continue
+			currentRowsAdapter?.let { adapter ->
+				for (i in 0 until adapter.size()) {
+					val listRow = (adapter[i] as? ListRow) ?: continue
+					val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
 					if (itemAdapter.queryType == QueryType.Views) {
 						itemAdapter.ensureUsbTilePresent()
 					}
@@ -230,16 +234,15 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			}
 		} else {
 			// Remove USB tile if disabled
-			val rowsAdapter = adapter as? MutableObjectAdapter<Row>
-			if (rowsAdapter != null) {
-				for (i in 0 until rowsAdapter.size()) {
-					val listRow = rowsAdapter.get(i) as? ListRow ?: continue
-					val itemAdapter = listRow.adapter as? ItemRowAdapter ?: continue
+			currentRowsAdapter?.let { adapter ->
+				for (i in 0 until adapter.size()) {
+					val listRow = (adapter[i] as? ListRow) ?: continue
+					val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
 					if (itemAdapter.queryType == QueryType.Views) {
 						var j = 0
 						while (j < itemAdapter.size()) {
-							val item = itemAdapter.get(j)
-							if (item is UsbBaseRowItem || (item is BaseRowItem && item.baseItem?.id == USB_TILE_UUID)) {
+							val item = itemAdapter[j]
+							if ((item is UsbBaseRowItem) || ((item is BaseRowItem) && (item.baseItem?.id == USB_TILE_UUID))) {
 								itemAdapter.remove(item)
 							} else {
 								j++
@@ -251,16 +254,15 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		}
 
 		// Restore focus to current row / item if returning to home
-		val rowsAdapter = adapter as? MutableObjectAdapter<Row>
-		if (rowsAdapter != null && currentRow != null) {
-			val rowIndex = rowsAdapter.indexOf(currentRow as Row)
+		if ((currentRowsAdapter != null) && (currentRow != null)) {
+			val rowIndex = currentRowsAdapter.indexOf(currentRow as Row)
 			if (rowIndex >= 0) {
-				setSelectedPosition(rowIndex)
+				selectedPosition = rowIndex
 				verticalGridView?.post {
 					val rowVh = findRowViewHolderByPosition(rowIndex) as? ListRowPresenter.ViewHolder
 					if (rowVh != null) {
 						val itemAdapter = currentRow?.adapter as? ItemRowAdapter
-						if (itemAdapter != null && currentItem != null) {
+						if ((itemAdapter != null) && (currentItem != null)) {
 							val itemIndex = itemAdapter.indexOf(currentItem)
 							if (itemIndex >= 0) {
 								rowVh.gridView.selectedPosition = itemIndex
@@ -282,14 +284,14 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 		// Update audio queue
 		Timber.i("Updating audio queue in HomeFragment (onResume)")
-		nowPlaying.update(requireContext(), adapter as MutableObjectAdapter<Row>)
+		currentRowsAdapter?.let { nowPlaying.update(requireContext(), it) }
 	}
 
 	override fun onQueueStatusChanged(hasQueue: Boolean) {
-		if (activity == null || requireActivity().isFinishing) return
+		if ((activity == null) || requireActivity().isFinishing) return
 
 		Timber.i("Updating audio queue in HomeFragment (onQueueStatusChanged)")
-		nowPlaying.update(requireContext(), adapter as MutableObjectAdapter<Row>)
+		rowsAdapter?.let { nowPlaying.update(requireContext(), it) }
 	}
 
 	private fun refreshRows(force: Boolean = false, delayed: Boolean = true) {
@@ -297,7 +299,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			if (delayed) delay(1.5.seconds)
 
 			repeat(adapter.size()) { i ->
-				val rowAdapter = (adapter[i] as? ListRow)?.adapter as? ItemRowAdapter ?: return@repeat
+				val rowAdapter = ((adapter[i] as? ListRow)?.adapter as? ItemRowAdapter) ?: return@repeat
 				if (rowAdapter.queryType == QueryType.Views) return@repeat
 
 				if (force) rowAdapter.Retrieve()
@@ -307,7 +309,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	private fun refreshCurrentItem() {
-		val adapter = currentRow?.adapter as? ItemRowAdapter ?: return
+		val adapter = (currentRow?.adapter as? ItemRowAdapter) ?: return
 		val item = currentItem ?: return
 
 		Timber.i("Refresh item ${item.getFullName(requireContext())}")
@@ -344,7 +346,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 						Toast.makeText(
 							context,
 							"Erreur ouverture USB: ${t.javaClass.simpleName} - ${t.message}",
-							Toast.LENGTH_LONG
+							Toast.LENGTH_LONG,
 						).show()
 					}
 					return
@@ -353,7 +355,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				Toast.makeText(
 					context,
 					"Erreur détection USB: ${t.javaClass.simpleName} - ${t.message}",
-					Toast.LENGTH_LONG
+					Toast.LENGTH_LONG,
 				).show()
 				return
 			}
@@ -377,7 +379,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			if (item !is BaseRowItem) return
 			if (row !is ListRow) return
 			@Suppress("UNCHECKED_CAST")
-			itemLauncher.launch(item, row.adapter as MutableObjectAdapter<Any>, requireContext())
+			val itemAdapter = (row.adapter as? MutableObjectAdapter<Any>) ?: return
+			itemLauncher.launch(item, itemAdapter, requireContext())
 		}
 	}
 
@@ -404,7 +407,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				// Delay background update to avoid jank during navigation
 				backgroundJob?.cancel()
 				backgroundJob = lifecycleScope.launch {
-					delay(200)
+					delay(200.milliseconds)
 					backgroundService.setBackground(item.baseItem)
 				}
 			}

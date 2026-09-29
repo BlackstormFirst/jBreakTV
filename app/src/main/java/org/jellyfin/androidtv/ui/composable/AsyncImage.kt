@@ -8,11 +8,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.ui.AsyncImageView
 import org.jellyfin.androidtv.util.BlurHashDecoder
 
@@ -64,13 +69,19 @@ fun blurHashPainter(
 	blurHash: String,
 	size: IntSize,
 	punch: Float = 1f,
-): Painter = remember(blurHash, size, punch) {
-	val bitmap = BlurHashDecoder.decode(
-		blurHash = blurHash,
-		width = size.width,
-		height = size.height,
-		punch = punch,
-	)
-
-	BitmapPainter(requireNotNull(bitmap).asImageBitmap())
+): Painter {
+	val bitmapState = produceState<Painter>(initialValue = remember { ColorPainter(Color.Transparent) }, blurHash, size, punch) {
+		val bitmap = withContext(Dispatchers.Default) {
+			BlurHashDecoder.decode(
+				blurHash = blurHash,
+				width = size.width,
+				height = size.height,
+				punch = punch,
+			)
+		}
+		if (bitmap != null) {
+			value = BitmapPainter(bitmap.asImageBitmap())
+		}
+	}
+	return bitmapState.value
 }

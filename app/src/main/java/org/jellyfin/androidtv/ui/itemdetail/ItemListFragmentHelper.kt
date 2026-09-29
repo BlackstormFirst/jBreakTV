@@ -14,6 +14,7 @@ import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ItemSortBy
+import org.jellyfin.sdk.model.api.LocationType
 import org.koin.android.ext.android.inject
 import java.util.UUID
 
@@ -40,6 +41,9 @@ fun MusicFavoritesListFragment.getFavoritePlaylist(
 				parentId = parentId,
 				includeItemTypes = setOf(BaseItemKind.AUDIO),
 				recursive = true,
+				isMissing = false,
+				isUnaired = false,
+				excludeLocationTypes = setOf(LocationType.VIRTUAL),
 				filters = setOf(org.jellyfin.sdk.model.api.ItemFilter.IS_FAVORITE_OR_LIKES),
 				sortBy = setOf(ItemSortBy.RANDOM),
 				limit = 100,

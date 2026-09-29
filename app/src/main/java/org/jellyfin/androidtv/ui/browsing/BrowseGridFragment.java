@@ -617,18 +617,14 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         }
 
         if (!justLoaded) {
-            //Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
+            // Re-retrieve current item on return so we don't wipe the grid or lose focus position
             if (mAdapter != null) {
                 mHandler.postDelayed(() -> {
                     if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED))
                         return;
 
-                    if (mAdapter != null && mAdapter.size() > 0) {
-                        if (!mAdapter.ReRetrieveIfNeeded()) {
-                            refreshCurrentItem();
-                        }
-                    }
-                }, 500);
+                    refreshCurrentItem();
+                }, 300);
             }
         } else {
             justLoaded = false;

@@ -42,7 +42,6 @@ class AsyncImageView @JvmOverloads constructor(
 	defStyleAttr: Int = 0,
 ) : AppCompatImageView(context, attrs, defStyleAttr), KoinComponent {
 	private val lifeCycleOwner get() = findViewTreeLifecycleOwner()
-	private val styledAttributes = context.obtainStyledAttributes(attrs, R.styleable.AsyncImageView, defStyleAttr, 0)
 	private val imageLoader by inject<ImageLoader>()
 	private var loadJob: Job? = null
 
@@ -51,12 +50,24 @@ class AsyncImageView @JvmOverloads constructor(
 	 * placeholder.
 	 */
 	@Suppress("MagicNumber")
-	var crossFadeDuration = styledAttributes.getInt(R.styleable.AsyncImageView_crossfadeDuration, 100).milliseconds
+	var crossFadeDuration = 100.milliseconds
 
 	/**
 	 * Shape the image to a circle and remove all corners.
 	 */
-	var circleCrop = styledAttributes.getBoolean(R.styleable.AsyncImageView_circleCrop, false)
+	var circleCrop = false
+
+	init {
+		if (attrs != null) {
+			val styledAttributes = context.obtainStyledAttributes(attrs, R.styleable.AsyncImageView, defStyleAttr, 0)
+			try {
+				crossFadeDuration = styledAttributes.getInt(R.styleable.AsyncImageView_crossfadeDuration, 100).milliseconds
+				circleCrop = styledAttributes.getBoolean(R.styleable.AsyncImageView_circleCrop, false)
+			} finally {
+				styledAttributes.recycle()
+			}
+		}
+	}
 
 	/**
 	 * Load an image from the network using [url]. When the [url] is null or returns a bad response

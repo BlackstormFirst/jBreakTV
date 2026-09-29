@@ -50,6 +50,7 @@ import org.jellyfin.sdk.model.api.request.GetResumeItemsRequest
 import org.jellyfin.sdk.model.api.request.GetSeasonsRequest
 import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
 import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
+import org.jellyfin.androidtv.util.sdk.isRealAvailableMedia
 import timber.log.Timber
 import kotlin.math.min
 
@@ -88,8 +89,10 @@ fun ItemRowAdapter.retrieveResumeItems(api: ApiClient, query: GetResumeItemsRequ
 				api.itemsApi.getResumeItems(query).content
 			}
 
+			val filteredItems = response.items.filter { it.isRealAvailableMedia() }
+
 			setItems(
-				items = response.items,
+				items = filteredItems,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
 						item,
@@ -99,7 +102,7 @@ fun ItemRowAdapter.retrieveResumeItems(api: ApiClient, query: GetResumeItemsRequ
 				}
 			)
 
-			if (response.items.isEmpty()) removeRow()
+			if (filteredItems.isEmpty()) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
@@ -114,9 +117,11 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 				api.tvShowsApi.getNextUp(query).content
 			}
 
+			val nextUpItems = response.items.filter { it.isRealAvailableMedia() }
+
 			// Some special flavor for series, used in FullDetailsFragment
-			val firstNextUp = response.items.firstOrNull()
-			if (query.seriesId != null && response.items.size == 1 && firstNextUp?.seasonId != null && firstNextUp.indexNumber != null) {
+			val firstNextUp = nextUpItems.firstOrNull()
+			if (query.seriesId != null && nextUpItems.size == 1 && firstNextUp?.seasonId != null && firstNextUp.indexNumber != null) {
 				// If we have exactly 1 episode returned, the series is currently partially watched
 				// we want to query the server for all episodes in the same season starting from
 				// this one to create a list of all unwatched episodes
@@ -132,7 +137,7 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 				// Combine the next up episode with the additionally retrieved episodes
 				val items = buildList {
 					add(firstNextUp)
-					addAll(episodesResponse.items.dropWhile { it.id == firstNextUp.id })
+					addAll(episodesResponse.items.dropWhile { it.id == firstNextUp.id }.filter { it.isRealAvailableMedia() })
 				}
 
 				setItems(
@@ -149,7 +154,7 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 				if (items.isEmpty()) removeRow()
 			} else {
 				setItems(
-					items = response.items,
+					items = nextUpItems,
 					transform = { item, _ ->
 						BaseItemDtoBaseRowItem(
 							item,
@@ -159,7 +164,7 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 					}
 				)
 
-				if (response.items.isEmpty()) removeRow()
+				if (nextUpItems.isEmpty()) removeRow()
 			}
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
@@ -175,8 +180,10 @@ fun ItemRowAdapter.retrieveLatestMedia(api: ApiClient, query: GetLatestMediaRequ
 				api.userLibraryApi.getLatestMedia(query).content
 			}
 
+			val filteredItems = response.filter { it.isRealAvailableMedia() }
+
 			setItems(
-				items = response,
+				items = filteredItems,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
 						item,
@@ -187,6 +194,8 @@ fun ItemRowAdapter.retrieveLatestMedia(api: ApiClient, query: GetLatestMediaRequ
 					)
 				}
 			)
+
+			if (filteredItems.isEmpty()) removeRow()
 
 			if (response.isEmpty()) removeRow()
 		}.fold(

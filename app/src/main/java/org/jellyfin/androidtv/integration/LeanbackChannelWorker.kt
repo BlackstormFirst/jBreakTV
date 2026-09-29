@@ -39,6 +39,7 @@ import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.androidtv.util.apiclient.parentImages
 import org.jellyfin.androidtv.util.dp
+import org.jellyfin.androidtv.util.sdk.isRealAvailableMedia
 import org.jellyfin.androidtv.util.sdk.isUsable
 import org.jellyfin.androidtv.util.stripHtml
 import org.jellyfin.sdk.api.client.ApiClient
@@ -52,7 +53,6 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ImageType
-import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.extensions.ticks
 import org.koin.core.component.KoinComponent
@@ -302,7 +302,7 @@ class LeanbackChannelWorker(
 			}
 
 			// Concat
-			Pair(resume.await(), nextUp.await())
+			Pair(resume.await().filter { it.isRealAvailableMedia() }, nextUp.await().filter { it.isRealAvailableMedia() })
 		}
 
 	private suspend fun getLatestMedia(): Triple<List<BaseItemDto>, List<BaseItemDto>, List<BaseItemDto>> =
@@ -326,7 +326,7 @@ class LeanbackChannelWorker(
 						isPlayed = false
 					).content
 				}
-				.filter { it.locationType != LocationType.VIRTUAL && it.isPlaceHolder != true }
+				.filter { it.isRealAvailableMedia() }
 				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
 				.take(50)
 			}
@@ -341,7 +341,7 @@ class LeanbackChannelWorker(
 						isPlayed = false
 					).content
 				}
-				.filter { it.locationType != LocationType.VIRTUAL && it.isPlaceHolder != true }
+				.filter { it.isRealAvailableMedia() }
 				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
 				.take(50)
 			}
@@ -356,7 +356,7 @@ class LeanbackChannelWorker(
 						isPlayed = false
 					).content
 				}
-				.filter { it.locationType != LocationType.VIRTUAL && it.isPlaceHolder != true }
+				.filter { it.isRealAvailableMedia() }
 				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
 				.take(50)
 			}

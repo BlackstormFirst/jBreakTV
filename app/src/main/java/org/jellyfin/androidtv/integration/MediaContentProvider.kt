@@ -64,7 +64,7 @@ class MediaContentProvider : ContentProvider(), KoinComponent {
 
 				val limit = uri.getQueryParameter(SearchManager.SUGGEST_PARAMETER_LIMIT)?.toIntOrNull()
 					?: DEFAULT_LIMIT
-				return runBlocking { getSuggestions(query, limit) }
+				return runBlocking(Dispatchers.IO) { getSuggestions(query, limit) }
 			}
 
 			else -> throw IllegalArgumentException("Unknown Uri: $uri")
