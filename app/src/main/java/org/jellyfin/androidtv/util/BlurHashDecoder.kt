@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.util
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.util.LruCache
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
@@ -10,12 +11,19 @@ import kotlin.math.withSign
 @Suppress("MagicNumber", "NestedBlockDepth")
 object BlurHashDecoder {
 	private const val CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~"
+	private val cache = LruCache<String, Bitmap>(60)
 
 	/**
 	 * Decode a blur hash into a new bitmap.
 	 */
 	fun decode(blurHash: String?, width: Int, height: Int, punch: Float = 1f): Bitmap? {
 		if (blurHash == null || blurHash.length < 6 || width <= 0 || height <= 0) return null
+
+		val cacheKey = "$blurHash-$width-$height-$punch"
+		synchronized(cache) {
+			val cached = cache.get(cacheKey)
+			if (cached != null && !cached.isRecycled) return cached
+		}
 
 		val numCompEnc = decode83(blurHash, 0, 1)
 		val numCompX = (numCompEnc % 9) + 1
@@ -35,7 +43,11 @@ object BlurHashDecoder {
 			decodeAc(colorEnc, maxAc * punch, colors, i * 3)
 		}
 
-		return composeBitmap(width, height, numCompX, numCompY, colors)
+		val bitmap = composeBitmap(width, height, numCompX, numCompY, colors)
+		synchronized(cache) {
+			cache.put(cacheKey, bitmap)
+		}
+		return bitmap
 	}
 
 	private fun decode83(str: String, from: Int, to: Int): Int {

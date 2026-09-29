@@ -356,13 +356,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		// Note: Migrations are never executed for fresh installs
 		// Note: Old migrations are removed occasionally
 		runMigrations {
-			// v0.15.z to v0.16.0
-			migration(toVersion = 7) {
-				// Enable playback rewrite for music
-				putBoolean("playback_new_audio", true)
-			}
-
-			// v0.17.z to v0.18.0
+			// v0.0.1 to v0.0.7
 			migration(toVersion = 8) {
 				// Set subtitle background color to black if it was enabled in a previous version
 				val subtitlesBackgroundEnabled = it.getBoolean("subtitles_background_enabled", true)
@@ -373,7 +367,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 				putLong("subtitles_text_stroke_color", if (subtitleStrokeSize > 0) 0XFF000000L else 0X00FFFFFFL)
 			}
 
-			// v0.19.0 to v0.20.0
+			// v0.0.7 to v0.0.8
 			migration(toVersion = 9) {
 				// Reset subtitle text size as we changed from fractional sizing to absolute sizing
 				remove("subtitles_text_size")
@@ -382,7 +376,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 				val backdropEnabled = it.getBoolean("pref_show_backdrop", true)
 				putString(
 					"backdrop_behavior",
-					if (backdropEnabled) BackdropBehavior.BACKDROP_WITH_BLUR.name else BackdropBehavior.DISABLED.name
+					if (backdropEnabled) BackdropBehavior.BACKDROP_WITHOUT_BLUR.name else BackdropBehavior.DISABLED.name
 				)
 			}
 		}
