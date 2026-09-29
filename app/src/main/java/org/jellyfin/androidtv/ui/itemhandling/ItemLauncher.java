@@ -165,11 +165,23 @@ public class ItemLauncher {
                             break;
                         case Play:
                             //Just play it directly
-                            playbackHelper.getValue().getItemsToPlay(context, baseItem, baseItem.getType() == BaseItemKind.MOVIE, false, new Response<List<BaseItemDto>>() {
+                            final BaseItemDto targetItem = baseItem;
+                            playbackHelper.getValue().getItemsToPlay(context, targetItem, targetItem.getType() == BaseItemKind.MOVIE, false, new Response<List<BaseItemDto>>() {
                                 @Override
                                 public void onResponse(List<BaseItemDto> response) {
                                     if (!isActive()) return;
-                                    playbackLauncher.getValue().launch(context, response);
+                                    int itemsPosition = 0;
+                                    for (int i = 0; i < response.size(); i++) {
+                                        if (response.get(i).getId().equals(targetItem.getId())) {
+                                            itemsPosition = i;
+                                            break;
+                                        }
+                                    }
+                                    int pos = 0;
+                                    if (targetItem.getUserData() != null && targetItem.getUserData().getPlaybackPositionTicks() > 0) {
+                                        pos = Math.toIntExact(targetItem.getUserData().getPlaybackPositionTicks() / 10000);
+                                    }
+                                    playbackLauncher.getValue().launch(context, response, pos, false, itemsPosition, false);
                                 }
                             });
                             break;

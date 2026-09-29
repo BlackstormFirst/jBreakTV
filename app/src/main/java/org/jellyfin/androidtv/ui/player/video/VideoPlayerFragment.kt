@@ -47,6 +47,17 @@ class VideoPlayerFragment : Fragment() {
 		val currentMediaPosition = videoQueueManager.getCurrentMediaPosition()
 
 		if (savedInstanceState == null && currentMediaPosition in items.indices) {
+			// Clear playbackPositionTicks for all queue items EXCEPT the initial currentMediaPosition
+			items.indices.forEach { index ->
+				if (index != currentMediaPosition) {
+					val item = items[index]
+					val clearedUserData = item.userData?.copy(playbackPositionTicks = 0L)
+					if (clearedUserData != null) {
+						items[index] = item.copy(userData = clearedUserData)
+					}
+				}
+			}
+
 			val targetItem = items[currentMediaPosition]
 			if (arguments?.containsKey(EXTRA_POSITION) == true) {
 				val startPositionMs = arguments?.getInt(EXTRA_POSITION, 0) ?: 0
@@ -79,14 +90,7 @@ class VideoPlayerFragment : Fragment() {
 		val queueSupplier = RewriteMediaManager.BaseItemQueueSupplier(api, items, false)
 		Timber.i("Created a queue with ${queueSupplier.items.size} items")
 		playbackManager.queue.clear()
-		playbackManager.queue.addSupplier(queueSupplier)
-
-		// Set initial queue item index
-		if (currentMediaPosition in items.indices) {
-			lifecycleScope.launch {
-				playbackManager.queue.setIndex(currentMediaPosition)
-			}
-		}
+		playbackManager.queue.addSupplier(queueSupplier, currentMediaPosition)
 
 		// Observe video size and queue entry to apply refresh rate switching
 		lifecycleScope.launch {
