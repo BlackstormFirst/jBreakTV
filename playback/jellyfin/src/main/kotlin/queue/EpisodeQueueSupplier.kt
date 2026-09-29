@@ -28,7 +28,7 @@ class EpisodeQueueSupplier(
 			recursive = true,
 			mediaTypes = listOf(MediaType.VIDEO),
 			includeItemTypes = listOf(BaseItemKind.EPISODE),
-			sortBy = listOf(ItemSortBy.SORT_NAME),
+			sortBy = listOf(ItemSortBy.PARENT_INDEX_NUMBER, ItemSortBy.INDEX_NUMBER, ItemSortBy.SORT_NAME),
 			fields = listOf(ItemFields.MEDIA_SOURCES),
 			// Pagination
 			startIndex = offset,

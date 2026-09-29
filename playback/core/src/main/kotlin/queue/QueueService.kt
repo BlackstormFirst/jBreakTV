@@ -162,8 +162,11 @@ class QueueService internal constructor() : PlayerService(), Queue {
 
 	// Jumping
 
-	override suspend fun previous(): QueueEntry? = currentQueueIndicesPlayed.removeLastOrNull()?.let {
-		setIndex(it)
+	override suspend fun previous(): QueueEntry? {
+		val prevIndex = currentQueueIndicesPlayed.removeLastOrNull()
+			?: if (_entryIndex.value > 0) _entryIndex.value - 1 else return null
+
+		return setIndex(prevIndex)
 	}
 
 	override suspend fun next(usePlaybackOrder: Boolean, useRepeatMode: Boolean): QueueEntry? {
@@ -185,8 +188,12 @@ class QueueService internal constructor() : PlayerService(), Queue {
 	override suspend fun setIndex(index: Int, saveHistory: Boolean): QueueEntry? {
 		if (index < 0 && index != Queue.INDEX_NONE) return null
 
+		if (_entryIndex.value == index && _entry.value != null && !saveHistory) {
+			return _entry.value
+		}
+
 		// Save previous index
-		if (saveHistory && _entryIndex.value != Queue.INDEX_NONE) {
+		if (saveHistory && _entryIndex.value != Queue.INDEX_NONE && _entryIndex.value != index) {
 			currentQueueIndicesPlayed.add(_entryIndex.value)
 		}
 
@@ -200,8 +207,11 @@ class QueueService internal constructor() : PlayerService(), Queue {
 
 	// Peeking
 
-	override suspend fun peekPrevious(): QueueEntry? = currentQueueIndicesPlayed.lastOrNull()?.let {
-		getOrSupplyEntry(it)
+	override suspend fun peekPrevious(): QueueEntry? {
+		val prevIndex = currentQueueIndicesPlayed.lastOrNull()
+			?: if (_entryIndex.value > 0) _entryIndex.value - 1 else return null
+
+		return getOrSupplyEntry(prevIndex)
 	}
 
 	override suspend fun peekNext(

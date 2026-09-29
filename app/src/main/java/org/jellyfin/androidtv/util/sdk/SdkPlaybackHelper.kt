@@ -74,14 +74,25 @@ class SdkPlaybackHelper(
 		when (mainItem.type) {
 			BaseItemKind.EPISODE -> {
 				val seriesId = mainItem.seriesId
+				val seasonId = mainItem.seasonId
 				if (userPreferences[UserPreferences.mediaQueuingEnabled] && seriesId != null) {
-					val response by api.tvShowsApi.getEpisodes(
-						seriesId = seriesId,
-						startItemId = mainItem.id,
-						isMissing = false,
-						limit = ITEM_QUERY_LIMIT,
-						fields = ItemRepository.itemFields
-					)
+					val response by if (seasonId != null) {
+						api.tvShowsApi.getEpisodes(
+							seriesId = seriesId,
+							seasonId = seasonId,
+							isMissing = false,
+							limit = ITEM_QUERY_LIMIT,
+							fields = ItemRepository.itemFields
+						)
+					} else {
+						api.tvShowsApi.getEpisodes(
+							seriesId = seriesId,
+							startItemId = mainItem.id,
+							isMissing = false,
+							limit = ITEM_QUERY_LIMIT,
+							fields = ItemRepository.itemFields
+						)
+					}
 
 					response.items.filter { it.canPlay() }
 				} else {
@@ -273,13 +284,14 @@ class SdkPlaybackHelper(
 
 			val allowIntros = pos == Duration.ZERO && item.type == BaseItemKind.MOVIE
 			val items = getItems(item, allowIntros, shuffle)
+			val targetIndex = items.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
 
 			playbackLauncher.launch(
 				context,
 				items,
 				pos.inWholeMilliseconds.toInt(),
 				playbackControllerContainer.playbackController?.hasFragment() == true,
-				0,
+				targetIndex,
 				shuffle,
 			)
 		}
