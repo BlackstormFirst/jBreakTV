@@ -54,7 +54,7 @@ object FilterLoader {
 					enableImages = false
 				)
 
-				val genreNames = genresResponse.content.items?.mapNotNull { it.name } ?: emptyList()
+				val genreNames = genresResponse.content.items.mapNotNull { it.name }
 
 				val genresWithCounts = genreNames.map { name ->
 					async {

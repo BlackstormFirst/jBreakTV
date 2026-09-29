@@ -72,10 +72,8 @@ class NavigationRepositoryImpl(
 		val action = when (destination) {
 			is Destination.Fragment -> NavigationAction.NavigateFragment(destination, true, replace, false)
 		}
-		if (destination is Destination.Fragment) {
-			if (replace && fragmentHistory.isNotEmpty()) fragmentHistory[fragmentHistory.lastIndex] = destination
-			else fragmentHistory.push(destination)
-		}
+		if (replace && fragmentHistory.isNotEmpty()) fragmentHistory[fragmentHistory.lastIndex] = destination
+		else fragmentHistory.push(destination)
 		_currentAction.tryEmit(action)
 	}
 

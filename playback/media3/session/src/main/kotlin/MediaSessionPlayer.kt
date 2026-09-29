@@ -52,6 +52,7 @@ internal class MediaSessionPlayer(
 		withContext(Dispatchers.Main) { invalidateState() }
 	}.launchIn(scope)
 
+	@Suppress("DEPRECATION")
 	override fun getState(): State = State.Builder().apply {
 		setAvailableCommands(Commands.Builder().apply {
 			add(COMMAND_PLAY_PAUSE)

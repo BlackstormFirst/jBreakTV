@@ -126,8 +126,8 @@ class PlaySessionService(
 		val item = entry.baseItem ?: activeItem ?: return
 		if (isLocalMedia(item)) return
 
-		val playableStream = stream as? PlayableMediaStream
-		val mediaSourceId = playableStream?.mediaSourceId
+		val playableStream = stream
+		val mediaSourceId = playableStream.mediaSourceId
 			?: item.mediaSources?.firstOrNull { it.id == entry.mediaSourceId }?.id
 			?: item.mediaSources?.firstOrNull()?.id
 			?: entry.mediaSourceId
@@ -176,8 +176,8 @@ class PlaySessionService(
 			if (!isSessionStarted) return
 		}
 
-		val playableStream = stream as? PlayableMediaStream
-		val mediaSourceId = playableStream?.mediaSourceId
+		val playableStream = stream
+		val mediaSourceId = playableStream.mediaSourceId
 			?: item.mediaSources?.firstOrNull { it.id == entry.mediaSourceId }?.id
 			?: item.mediaSources?.firstOrNull()?.id
 			?: entry.mediaSourceId
@@ -223,8 +223,8 @@ class PlaySessionService(
 		if (entry == null || item == null || isLocalMedia(item)) return
 		val stream = entry.mediaStream ?: activeEntry?.mediaStream ?: return
 
-		val playableStream = stream as? PlayableMediaStream
-		val mediaSourceId = playableStream?.mediaSourceId
+		val playableStream = stream
+		val mediaSourceId = playableStream.mediaSourceId
 			?: item.mediaSources?.firstOrNull { it.id == entry.mediaSourceId }?.id
 			?: item.mediaSources?.firstOrNull()?.id
 			?: entry.mediaSourceId

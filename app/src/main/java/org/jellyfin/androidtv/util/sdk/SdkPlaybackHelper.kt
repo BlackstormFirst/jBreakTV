@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package org.jellyfin.androidtv.util.sdk
 
 import android.content.Context

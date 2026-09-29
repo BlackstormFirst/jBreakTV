@@ -215,29 +215,29 @@ class ServerFragment : Fragment() {
 			return ViewHolder(cardView)
 		}
 
-		override fun onBindViewHolder(holder: ViewHolder, user: User) {
-			holder.cardView.name = user.name
-			holder.cardView.image = startupViewModel.getUserImage(server, user)
+		override fun onBindViewHolder(holder: ViewHolder, item: User) {
+			holder.cardView.name = item.name
+			holder.cardView.image = startupViewModel.getUserImage(server, item)
 
 			holder.cardView.setPopupMenu {
 				// Logout button
-				if (user is PrivateUser && user.accessToken != null) {
+				if (item is PrivateUser && item.accessToken != null) {
 					item(context.getString(R.string.lbl_sign_out)) {
-						authenticationRepository.logout(user)
+						authenticationRepository.logout(item)
 					}
 				}
 
 				// Remove button
-				if (user is PrivateUser) {
+				if (item is PrivateUser) {
 					item(context.getString(R.string.lbl_remove)) {
-						serverUserRepository.deleteStoredUser(user)
+						serverUserRepository.deleteStoredUser(item)
 						startupViewModel.loadUsers(server)
 					}
 				}
 			}
 
 			holder.cardView.setOnClickListener {
-				onItemPressed(user)
+				onItemPressed(item)
 			}
 		}
 

@@ -171,6 +171,7 @@ class UsbFileExplorerFragment : VerticalGridSupportFragment() {
         this.adapter = adapter
     }
 
+    @Suppress("DEPRECATION")
     private fun calculateMaxItemWidthPx(context: Context, items: List<File>): Int {
         val paint = TextPaint().apply {
             textSize = 16f * context.resources.displayMetrics.scaledDensity

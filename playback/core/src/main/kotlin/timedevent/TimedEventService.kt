@@ -1,6 +1,7 @@
 package org.jellyfin.playback.core.timedevent
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
@@ -11,6 +12,7 @@ import org.jellyfin.playback.core.queue.queue
 import timber.log.Timber
 
 class TimedEventService : PlayerService() {
+	@OptIn(ExperimentalCoroutinesApi::class)
 	override suspend fun onInitialize() {
 		manager.queue.entry
 			.filterNotNull()

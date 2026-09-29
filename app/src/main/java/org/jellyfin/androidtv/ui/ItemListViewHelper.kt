@@ -21,7 +21,7 @@ fun ItemListView.refresh() {
 			).content
 		}
 
-		response.items?.forEachIndexed { index, item ->
+		response.items.forEachIndexed { index, item ->
 			val view = mList.getChildAt(index)
 			if (view is ItemRowView) view.setItem(item, index)
 		}

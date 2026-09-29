@@ -44,13 +44,13 @@ fun VideoPlayerHeader(
 
 	val titleText = remember(item, isLocal, isEpisode) {
 		val episodeName = item?.name.orEmpty()
-		if (!isLocal && isEpisode && item != null) {
+		if (!isLocal && isEpisode) {
 			val seasonNum = item.parentIndexNumber
 			val episodeNum = item.indexNumber
 			if (seasonNum != null && episodeNum != null) {
 				val sFormatted = "%02d".format(seasonNum)
 				val eFormatted = "%02d".format(episodeNum)
-				"S${sFormatted}E${eFormatted}: $episodeName"
+				"S${sFormatted}E$eFormatted: $episodeName"
 			} else if (episodeNum != null) {
 				val eFormatted = "%02d".format(episodeNum)
 				"E${eFormatted}: $episodeName"

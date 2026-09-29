@@ -17,7 +17,6 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.composable.getResolutionName
 import org.jellyfin.androidtv.util.TimeUtils
@@ -32,7 +31,6 @@ import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.SeriesStatus
 import org.jellyfin.sdk.model.api.VideoRangeType
 import org.jellyfin.sdk.model.extensions.ticks
-import org.koin.compose.koinInject
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -210,7 +208,7 @@ fun InfoRowMediaDetails(mediaSource: MediaSourceInfo) {
 	// Audio stream
 	val audioCodecName = when {
 		audioStream?.profile?.contains("Dolby Atmos", ignoreCase = true) == true -> {
-			when (audioStream?.codec?.uppercase()) {
+			when (audioStream.codec?.uppercase()) {
 				"EAC3" -> stringResource(R.string.eac3_atmos)
 				"TRUEHD" -> stringResource(R.string.truehd_atmos)
 				else -> stringResource(R.string.dolby_atmos)
@@ -256,8 +254,6 @@ fun BaseItemInfoRow(
 	mediaSource: MediaSourceInfo?,
 	includeRuntime: Boolean,
 ) {
-	val userPreferences = koinInject<UserPreferences>()
-
 	Row(
 		horizontalArrangement = Arrangement.spacedBy(8.dp),
 		verticalAlignment = Alignment.CenterVertically,

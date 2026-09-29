@@ -16,7 +16,6 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
-import java.lang.Double
 import java.time.LocalDateTime
 import java.util.Locale
 
@@ -190,7 +189,7 @@ object UsbContainerParser {
                             if (childSize == 4L) {
                                 headerFrameRate = java.lang.Float.intBitsToFloat(readUint32(raf).toInt())
                             } else if (childSize == 8L) {
-                                headerFrameRate = Double.longBitsToDouble(readUint64(raf)).toFloat()
+                                headerFrameRate = Double.fromBits(readUint64(raf)).toFloat()
                             }
                         }
                     }

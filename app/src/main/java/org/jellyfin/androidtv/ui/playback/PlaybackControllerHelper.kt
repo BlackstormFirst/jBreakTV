@@ -1,7 +1,5 @@
 package org.jellyfin.androidtv.ui.playback
 
-import android.net.Uri
-import android.util.Log
 import androidx.annotation.OptIn
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
@@ -43,8 +41,9 @@ fun PlaybackController.prepareLocalItemAndPlay(
 	val targetFragment = fragment ?: return
 	targetFragment.lifecycleScope.launch {
 		var activeItem = item
-		if (item.path != null && item.runTimeTicks == null) {
-			val file = File(item.path)
+		val itemPath = item.path
+		if (itemPath != null && item.runTimeTicks == null) {
+			val file = File(itemPath)
 			if (file.exists() && file.canRead()) {
 				activeItem = withContext(Dispatchers.IO) {
 					runCatching {

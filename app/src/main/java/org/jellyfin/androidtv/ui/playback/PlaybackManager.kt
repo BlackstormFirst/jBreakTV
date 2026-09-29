@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package org.jellyfin.androidtv.ui.playback
 
 import androidx.lifecycle.LifecycleOwner

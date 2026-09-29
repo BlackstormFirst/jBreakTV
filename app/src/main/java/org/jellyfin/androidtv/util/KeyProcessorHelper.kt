@@ -34,7 +34,7 @@ fun FragmentActivity.playFirstUnwatchedItem(parentId: UUID) {
 			)
 		}.fold(
 			onSuccess = { response ->
-				val item = response.content.items?.firstOrNull()
+				val item = response.content.items.firstOrNull()
 				withContext(Dispatchers.Main) {
 					if (item == null) {
 						Toast.makeText(

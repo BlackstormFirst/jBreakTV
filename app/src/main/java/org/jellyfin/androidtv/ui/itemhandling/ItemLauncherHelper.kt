@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package org.jellyfin.androidtv.ui.itemhandling
 
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -13,6 +15,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.koin.java.KoinJavaComponent
 import java.util.UUID
 
+@Suppress("DEPRECATION")
 object ItemLauncherHelper {
 	@JvmStatic
 	fun getItem(itemId: UUID, callback: Response<BaseItemDto>) {

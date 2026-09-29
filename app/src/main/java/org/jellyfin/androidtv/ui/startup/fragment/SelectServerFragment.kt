@@ -234,8 +234,8 @@ class SelectServerFragment : Fragment() {
 			return ViewHolder(view)
 		}
 
-		override fun onBindViewHolder(holder: ViewHolder, statefulServer: StatefulServer) = with(holder.serverButtonView) {
-			val (serverState, server) = statefulServer
+		override fun onBindViewHolder(holder: ViewHolder, item: StatefulServer) = with(holder.serverButtonView) {
+			val (serverState, server) = item
 
 			// Set data
 			name = server.name
@@ -249,7 +249,7 @@ class SelectServerFragment : Fragment() {
 			}
 
 			// Set actions
-			setOnClickListener { serverClickListener(statefulServer) }
+			setOnClickListener { serverClickListener(item) }
 			setPopupMenu { serverPopupBuilder(server) }
 		}
 

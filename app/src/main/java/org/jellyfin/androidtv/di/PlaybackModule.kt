@@ -2,7 +2,6 @@
 
 package org.jellyfin.androidtv.di
 
-
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -13,7 +12,6 @@ import android.util.TypedValue
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.TypefaceCompat
 import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.ui.CaptionStyleCompat
@@ -50,6 +48,9 @@ import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import org.jellyfin.androidtv.ui.playback.PlaybackManager as LegacyPlaybackManager
+
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 
 val playbackModule = module {
 	single { LegacyPlaybackManager(get()) }
