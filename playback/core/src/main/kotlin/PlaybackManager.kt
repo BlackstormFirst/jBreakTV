@@ -5,6 +5,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.jellyfin.playback.core.backend.BackendService
 import org.jellyfin.playback.core.backend.PlayerBackend
+import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.core.plugin.PlayerService
 import timber.log.Timber
 import kotlin.reflect.KClass
@@ -28,6 +29,14 @@ class PlaybackManager internal constructor(
 
 	init {
 		services.forEach { it.initialize(this, state, Job(job)) }
+	}
+
+	fun addListener(listener: PlayerBackendEventListener) {
+		backendService.addListener(listener)
+	}
+
+	fun removeListener(listener: PlayerBackendEventListener) {
+		backendService.removeListener(listener)
 	}
 
 	fun addService(service: PlayerService) {

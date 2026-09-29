@@ -18,6 +18,8 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.DeviceProfile
 import org.jellyfin.sdk.model.api.MediaProtocol
 import org.jellyfin.sdk.model.api.MediaSourceInfo
+import org.jellyfin.sdk.model.api.MediaSourceType
+import org.jellyfin.sdk.model.api.MediaStreamProtocol
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
 
@@ -53,6 +55,30 @@ class JellyfinMediaStreamResolver(
 			val localUrl = if (filePath.startsWith("file:/") || filePath.startsWith("content:")) filePath else Uri.fromFile(file).toString()
 			val containerExt = file.extension.ifBlank { "mkv" }
 			val startTicks = queueEntry.baseItem?.userData?.playbackPositionTicks ?: 0L
+
+			val initialSource = itemToUse.mediaSources?.firstOrNull() ?: MediaSourceInfo(
+				protocol = MediaProtocol.FILE,
+				id = itemToUse.id.toString(),
+				path = itemToUse.path,
+				type = MediaSourceType.DEFAULT,
+				isRemote = false,
+				mediaStreams = itemToUse.mediaStreams,
+				supportsDirectPlay = true,
+				supportsDirectStream = true,
+				supportsTranscoding = false,
+				supportsProbing = false,
+				requiresOpening = false,
+				requiresClosing = false,
+				requiresLooping = false,
+				isInfiniteStream = false,
+				ignoreIndex = false,
+				ignoreDts = false,
+				genPtsInput = false,
+				readAtNativeFramerate = false,
+				hasSegments = false,
+				transcodingSubProtocol = MediaStreamProtocol.HTTP,
+			)
+			streamIndexResolver?.invoke(itemToUse, initialSource)
 
 			return PlayableMediaStream(
 				identifier = "local_" + file.name.hashCode(),
@@ -169,6 +195,13 @@ class JellyfinMediaStreamResolver(
 		url: String,
 	): PlayableMediaStream {
 		val startTicks = queueEntry.baseItem?.userData?.playbackPositionTicks ?: 0L
+		val currentBaseItem = queueEntry.baseItem
+		if (currentBaseItem != null) {
+			val existingSources = currentBaseItem.mediaSources.orEmpty()
+			if (existingSources.none { it.id == mediaSource.id }) {
+				queueEntry.baseItem = currentBaseItem.copy(mediaSources = listOf(mediaSource) + existingSources)
+			}
+		}
 		return PlayableMediaStream(
 			identifier = playSessionId,
 			conversionMethod = conversionMethod,

@@ -11,15 +11,21 @@ import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.base.BaseScreen
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
 import org.jellyfin.androidtv.util.RefreshRateHelper
 import org.jellyfin.playback.core.PlaybackManager
+import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.VideoSize
 import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.MediaProtocol
+import org.jellyfin.sdk.model.api.MediaSourceInfo
+import org.jellyfin.sdk.model.api.MediaSourceType
+import org.jellyfin.sdk.model.api.MediaStreamProtocol
 import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.koin.android.ext.android.inject
@@ -92,6 +98,15 @@ class VideoPlayerFragment : Fragment() {
 		playbackManager.queue.clear()
 		playbackManager.queue.addSupplier(queueSupplier, currentMediaPosition)
 
+		// Sync current media position with VideoQueueManager as playback advances in the queue
+		lifecycleScope.launch {
+			playbackManager.queue.entryIndex.collect { index ->
+				if (index >= 0) {
+					videoQueueManager.setCurrentMediaPosition(index)
+				}
+			}
+		}
+
 		// Observe video size and queue entry to apply refresh rate switching
 		lifecycleScope.launch {
 			playbackManager.state.videoSize.collect { videoSize ->
@@ -116,6 +131,112 @@ class VideoPlayerFragment : Fragment() {
 				}
 			}
 		}
+
+		// Listen for track changes to apply best video/audio/subtitle selections
+		playbackManager.addListener(object : PlayerBackendEventListener() {
+			private var isApplyingAutoTracks = false
+			private var lastAutoSelectedEntryId: String? = null
+
+			override fun onTracksChanged() {
+				if (isApplyingAutoTracks) return
+
+				val entry = playbackManager.queue.entry.value ?: return
+				val baseItem = entry.baseItem ?: return
+				val entryId = baseItem.id.toString()
+				if (lastAutoSelectedEntryId == entryId) {
+					// Initial auto-selection for this media item was already applied.
+					// Do not override user's manual track selection!
+					return
+				}
+
+				isApplyingAutoTracks = true
+				try {
+					val baseItem = entry.baseItem ?: return
+					val backend = playbackManager.backend
+
+					val videoTracks = backend.getTracks(2)
+					val audioTracks = backend.getTracks(1)
+					val subTracks = backend.getTracks(3)
+
+					if (videoTracks.isEmpty() && audioTracks.isEmpty() && subTracks.isEmpty()) {
+						// Tracks not loaded yet in ExoPlayer, retry on next onTracksChanged
+						return
+					}
+
+					val mediaSource = baseItem.mediaSources?.firstOrNull() ?: MediaSourceInfo(
+						protocol = MediaProtocol.FILE,
+						id = baseItem.id.toString(),
+						path = baseItem.path,
+						type = MediaSourceType.DEFAULT,
+						isRemote = false,
+						mediaStreams = baseItem.mediaStreams,
+						supportsDirectPlay = true,
+						supportsDirectStream = true,
+						supportsTranscoding = false,
+						supportsProbing = false,
+						requiresOpening = false,
+						requiresClosing = false,
+						requiresLooping = false,
+						isInfiniteStream = false,
+						ignoreIndex = false,
+						ignoreDts = false,
+						genPtsInput = false,
+						readAtNativeFramerate = false,
+						hasSegments = false,
+						transcodingSubProtocol = MediaStreamProtocol.HTTP,
+					)
+
+					val playbackIndexManager: PlaybackIndexManager by inject()
+					val audioIndex = playbackIndexManager.getBestAudioIndex(mediaSource)
+					val activeAudioLang = baseItem.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
+					val subIndex = playbackIndexManager.getBestSubtitleIndex(mediaSource, context, activeAudioLang)
+					val videoIndex = playbackIndexManager.getBestVideoIndex(mediaSource)
+
+					// Auto-select video track if needed
+					if (videoIndex != null) {
+						val videoStreams = baseItem.mediaStreams?.filter { it.type == MediaStreamType.VIDEO }.orEmpty()
+						val targetStream = videoStreams.firstOrNull { it.index == videoIndex }
+						val targetIndexInVideo = if (targetStream != null) videoStreams.indexOf(targetStream) else -1
+						val targetTrack = videoTracks.getOrNull(targetIndexInVideo) ?: videoTracks.firstOrNull()
+						if (targetTrack != null && !targetTrack.isSelected) {
+							backend.selectTrack(2, targetTrack)
+						}
+					}
+
+					// Auto-select audio track if needed
+					if (audioIndex != null) {
+						val audioStreams = baseItem.mediaStreams?.filter { it.type == MediaStreamType.AUDIO }.orEmpty()
+						val targetStream = audioStreams.firstOrNull { it.index == audioIndex }
+						val targetIndexInAudio = if (targetStream != null) audioStreams.indexOf(targetStream) else -1
+						val targetTrack = audioTracks.getOrNull(targetIndexInAudio)
+							?: audioTracks.firstOrNull { it.language.equals(targetStream?.language, ignoreCase = true) }
+						if (targetTrack != null && !targetTrack.isSelected) {
+							backend.selectTrack(1, targetTrack)
+						}
+					}
+
+					// Auto-select subtitle track if needed
+					if (subIndex == null || subIndex < 0) {
+						if (subTracks.any { it.isSelected }) {
+							backend.selectTrack(3, null)
+						}
+					} else {
+						val subStreams = baseItem.mediaStreams?.filter { it.type == MediaStreamType.SUBTITLE }.orEmpty()
+						val targetStream = subStreams.firstOrNull { it.index == subIndex }
+						val targetIndexInSub = if (targetStream != null) subStreams.indexOf(targetStream) else -1
+						val targetTrack = subTracks.getOrNull(targetIndexInSub)
+							?: subTracks.firstOrNull { it.language.equals(targetStream?.language, ignoreCase = true) }
+						if (targetTrack != null && !targetTrack.isSelected) {
+							backend.selectTrack(3, targetTrack)
+						}
+					}
+
+					lastAutoSelectedEntryId = entryId
+				} finally {
+					isApplyingAutoTracks = false
+				}
+			}
+		})
 
 		// Pause player until the initial resume
 		playbackManager.state.pause()

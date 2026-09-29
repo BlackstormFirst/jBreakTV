@@ -687,6 +687,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         Timber.d("reset audio and video stream index to null");
+        mDefaultAudioIndex = -1;
+        mDefaultVideoIndex = -1;
         mCurrentOptions.setVideoStreamIndex(null);
         mCurrentOptions.setAudioStreamIndex(null); // reset audio stream index to allow auto selection on new item
 
@@ -903,6 +905,16 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
         MediaStream currentMediaStream = currentMediaSource.getMediaStreams().get(index);
         videoQueueManager.getValue().setLastPlayedVideoDefaultState(currentMediaStream.isDefault());
+        if (currentMediaStream.getCodec() != null) {
+            videoQueueManager.getValue().setLastPlayedVideoCodec(currentMediaStream.getCodec());
+        }
+        videoQueueManager.getValue().setLastPlayedVideoTitle(currentMediaStream.getTitle());
+        List<MediaStream> videoStreams = currentMediaSource.getMediaStreams().stream()
+                .filter(s -> s.getType() == MediaStreamType.VIDEO).toList();
+        int videoTypeIndex = videoStreams.indexOf(currentMediaStream);
+        if (videoTypeIndex >= 0) {
+            videoQueueManager.getValue().setLastPlayedVideoIndexInType(videoTypeIndex);
+        }
 
         int currVideoIndex = getVideoStreamIndex();
         Timber.i("trying to switch video stream from %s to %s", currVideoIndex, index);

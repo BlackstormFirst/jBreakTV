@@ -16,13 +16,21 @@ class VideoQueueManager {
 	private var _lastPlayedSubtitleLanguageIsoCode: String? = null
 	private var _lastPlayedSubtitleTitle: String? = null
 	private var _lastPlayedVideoDefaultState: Boolean? = null
+	private var _lastPlayedVideoIndexInType: Int? = null
+	private var _lastPlayedVideoCodec: String? = null
+	private var _lastPlayedVideoTitle: String? = null
 
 	fun setCurrentVideoQueue(items: List<BaseItemDto>?) {
-		clearVideoQueue()
-		if (items.isNullOrEmpty()) return
+		if (items.isNullOrEmpty()) {
+			_currentVideoQueue = emptyList()
+			_currentMediaPosition = -1
+			return
+		}
 
 		_currentVideoQueue = items.toMutableList()
-		_currentMediaPosition = 0
+		if (_currentMediaPosition !in _currentVideoQueue.indices) {
+			_currentMediaPosition = 0
+		}
 	}
 
 	fun getCurrentVideoQueue(): List<BaseItemDto> = _currentVideoQueue
@@ -72,6 +80,30 @@ class VideoQueueManager {
 
 	fun setLastPlayedVideoDefaultState(state: Boolean?) {
 		_lastPlayedVideoDefaultState = state
+	}
+
+	fun getLastPlayedVideoIndexInType(): Int? {
+		return _lastPlayedVideoIndexInType
+	}
+
+	fun setLastPlayedVideoIndexInType(index: Int?) {
+		_lastPlayedVideoIndexInType = index
+	}
+
+	fun getLastPlayedVideoCodec(): String? {
+		return _lastPlayedVideoCodec
+	}
+
+	fun setLastPlayedVideoCodec(codec: String?) {
+		_lastPlayedVideoCodec = codec
+	}
+
+	fun getLastPlayedVideoTitle(): String? {
+		return _lastPlayedVideoTitle
+	}
+
+	fun setLastPlayedVideoTitle(title: String?) {
+		_lastPlayedVideoTitle = title
 	}
 
 	fun getLastPlayedSubtitleCodec(): String? {
@@ -136,5 +168,8 @@ class VideoQueueManager {
 		_lastPlayedSubtitleLanguageIsoCode = null
 		_lastPlayedSubtitleTitle = null
 		_lastPlayedVideoDefaultState = null
+		_lastPlayedVideoIndexInType = null
+		_lastPlayedVideoCodec = null
+		_lastPlayedVideoTitle = null
 	}
 }

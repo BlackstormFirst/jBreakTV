@@ -51,6 +51,10 @@ import org.jellyfin.androidtv.ui.playback.PlaybackManager as LegacyPlaybackManag
 
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
+import org.jellyfin.sdk.model.api.MediaProtocol
+import org.jellyfin.sdk.model.api.MediaSourceInfo
+import org.jellyfin.sdk.model.api.MediaSourceType
+import org.jellyfin.sdk.model.api.MediaStreamProtocol
 
 val playbackModule = module {
 	single { LegacyPlaybackManager(get()) }
@@ -139,13 +143,33 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 			lifecycle = ProcessLifecycleOwner.get().lifecycle,
 			mediaSegmentProvider = { item -> mediaSegmentRepository.getSegmentsForItem(item) },
 			localItemInspector = { file -> LocalVideoManager.inspectAndBuildBaseItemDto(androidContext(), file) },
-			streamIndexResolver = { _, mediaSource ->
-				if (mediaSource != null) {
-					val audioIndex = playbackIndexManager.getBestAudioIndex(mediaSource)
-					val activeAudioLang = mediaSource.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
-					val subIndex = playbackIndexManager.getBestSubtitleIndex(mediaSource, androidContext(), activeAudioLang)
-					Pair(audioIndex, subIndex)
-				} else Pair(null, null)
+			streamIndexResolver = { item, mediaSource ->
+				val sourceToUse = mediaSource ?: item.mediaSources?.firstOrNull() ?: MediaSourceInfo(
+					protocol = MediaProtocol.FILE,
+					id = item.id.toString(),
+					path = item.path,
+					type = MediaSourceType.DEFAULT,
+					isRemote = false,
+					mediaStreams = item.mediaStreams,
+					supportsDirectPlay = true,
+					supportsDirectStream = true,
+					supportsTranscoding = false,
+					supportsProbing = false,
+					requiresOpening = false,
+					requiresClosing = false,
+					requiresLooping = false,
+					isInfiniteStream = false,
+					ignoreIndex = false,
+					ignoreDts = false,
+					genPtsInput = false,
+					readAtNativeFramerate = false,
+					hasSegments = false,
+					transcodingSubProtocol = MediaStreamProtocol.HTTP,
+				)
+				val audioIndex = playbackIndexManager.getBestAudioIndex(sourceToUse)
+				val activeAudioLang = sourceToUse.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
+				val subIndex = playbackIndexManager.getBestSubtitleIndex(sourceToUse, androidContext(), activeAudioLang)
+				Pair(audioIndex, subIndex)
 			},
 			onPlaybackStop = { item ->
 				dataRefreshService.lastPlayback = Instant.now()

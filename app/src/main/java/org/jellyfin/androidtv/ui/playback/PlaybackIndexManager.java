@@ -620,43 +620,57 @@ public class PlaybackIndexManager {
     }
 
     public Integer getBestVideoIndex(MediaSourceInfo info) {
-        boolean isLocal = PlaybackController.isLocalSource(info);
-        if (isLocal && info != null && info.getMediaStreams() != null) {
-            List<MediaStream> allVideoStreams = info.getMediaStreams().stream().filter(stream -> stream.getType() == MediaStreamType.VIDEO).toList();
-            if (allVideoStreams != null && !allVideoStreams.isEmpty()) {
-                Integer videoIndex = allVideoStreams.get(0).getIndex();
-                for (MediaStream stream : allVideoStreams) {
-                    if (stream.isDefault()) {
-                        videoIndex = stream.getIndex();
-                        break;
-                    }
+        if (info == null || info.getMediaStreams() == null) return null;
+
+        List<MediaStream> allVideoStreams = info.getMediaStreams().stream()
+                .filter(stream -> stream.getType() == MediaStreamType.VIDEO).toList();
+        if (allVideoStreams == null || allVideoStreams.isEmpty()) return null;
+
+        String lastVideoTitle = videoQueueManager.getValue().getLastPlayedVideoTitle();
+        String lastVideoCodec = videoQueueManager.getValue().getLastPlayedVideoCodec();
+        Boolean lastVideoDefaultState = videoQueueManager.getValue().getLastPlayedVideoDefaultState();
+        Integer lastVideoIndexInType = videoQueueManager.getValue().getLastPlayedVideoIndexInType();
+
+        // 1. Title + Codec match
+        if (lastVideoTitle != null && lastVideoCodec != null) {
+            for (MediaStream s : allVideoStreams) {
+                if (lastVideoTitle.equalsIgnoreCase(s.getTitle())
+                        && lastVideoCodec.equalsIgnoreCase(s.getCodec())) {
+                    Timber.d("Best video found (title+codec match): %d", s.getIndex());
+                    return s.getIndex();
                 }
-                Timber.i("Best local video found on index: %d", videoIndex);
-                return videoIndex;
             }
         }
 
-        if (info != null && info.getMediaStreams() != null) {
-            Boolean lastVideoDefaultState = videoQueueManager.getValue().getLastPlayedVideoDefaultState();
-            List<MediaStream> allVideoStreams = info.getMediaStreams().stream().filter(stream -> stream.getType() == MediaStreamType.VIDEO).toList();
-            if (allVideoStreams != null) {
-                if (lastVideoDefaultState != null) {
-                    for (MediaStream stream : allVideoStreams) {
-                        if (lastVideoDefaultState.equals(stream.isDefault())) {
-                            return stream.getIndex();
-                        }
-                    }
-                }
-                // fallback to server default
-                for (MediaStream stream : allVideoStreams) {
-                    if (stream.isDefault()) {
-                        return stream.getIndex();
-                    }
-                }
-                // last resort: first video stream
-                if (!allVideoStreams.isEmpty()) return allVideoStreams.get(0).getIndex();
+        // 2. Index in video type + Default state match
+        if (lastVideoIndexInType != null && lastVideoIndexInType >= 0 && lastVideoIndexInType < allVideoStreams.size()) {
+            MediaStream candidate = allVideoStreams.get(lastVideoIndexInType);
+            if (lastVideoDefaultState == null || lastVideoDefaultState.equals(candidate.isDefault())) {
+                Timber.d("Best video found (indexInType match): %d", candidate.getIndex());
+                return candidate.getIndex();
             }
         }
-        return null;
+
+        // 3. Match by Default State
+        if (lastVideoDefaultState != null) {
+            for (MediaStream stream : allVideoStreams) {
+                if (lastVideoDefaultState.equals(stream.isDefault())) {
+                    Timber.d("Best video found (defaultState match): %d", stream.getIndex());
+                    return stream.getIndex();
+                }
+            }
+        }
+
+        // Fallback 1: Stream marked default
+        for (MediaStream stream : allVideoStreams) {
+            if (stream.isDefault()) {
+                Timber.d("Best video found (fallback stream default): %d", stream.getIndex());
+                return stream.getIndex();
+            }
+        }
+
+        // Fallback 2: First video stream
+        Timber.d("Best video found (fallback first stream): %d", allVideoStreams.get(0).getIndex());
+        return allVideoStreams.get(0).getIndex();
     }
 }

@@ -38,6 +38,8 @@ import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.constant.getQualityProfiles
+import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.constant.ZoomMode
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.LocalTextStyle
@@ -51,11 +53,18 @@ import org.jellyfin.androidtv.ui.composable.rememberQueueEntry
 import org.jellyfin.androidtv.ui.player.base.PlayerOverlayVisibilityState
 import org.jellyfin.androidtv.ui.player.base.PlayerSeekbar
 import org.jellyfin.androidtv.ui.player.base.rememberPlayerOverlayVisibility
+import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import org.jellyfin.androidtv.util.apiclient.chapterImages
 import org.jellyfin.androidtv.util.apiclient.getUrl
+import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.backend.BackendTrack
+import org.jellyfin.playback.jellyfin.queue.baseItem
+import org.jellyfin.sdk.model.api.MediaStreamType
+import org.koin.compose.koinInject
+import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
+import org.jellyfin.playback.core.queue.Queue
 import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.baseItemFlow
@@ -101,6 +110,7 @@ fun VideoPlayerControls(
 			AudioButton(playbackManager, visibilityState)
 			VideoButton(playbackManager, visibilityState)
 			PlaybackSpeedButton(playbackManager, visibilityState)
+			MaxBitrateButton(playbackManager, visibilityState)
 			ZoomButton(zoomMode, onZoomSelect, visibilityState)
 
 			MoreOptionsButton(visibilityState) {
@@ -334,6 +344,9 @@ private fun SubtitleButton(
 		if (expanded) visibilityState.pin() else visibilityState.unpin()
 	}
 
+	val videoQueueManager = koinInject<VideoQueueManager>()
+	val entry by rememberQueueEntry(playbackManager)
+	val baseItem = entry?.baseItem
 	val backend = playbackManager.backend
 	var cachedSubTracks by remember { mutableStateOf<List<BackendTrack>>(emptyList()) }
 	val subTracks = if (expanded) backend.getTracks(3).also { cachedSubTracks = it } else cachedSubTracks
@@ -361,17 +374,30 @@ private fun SubtitleButton(
 				selected = isNoneSelected,
 				focusRequester = if (isNoneSelected) selectedFocusRequester else null,
 				onClick = {
+					videoQueueManager.setLastPlayedSubtitleLanguageIsoCode("")
+					videoQueueManager.setLastPlayedSubtitleTitle(null)
+					videoQueueManager.setLastPlayedSubtitleCodec(null)
 					backend.selectTrack(3, null)
 					expanded = false
 				}
 			) {
 				Text(stringResource(R.string.lbl_none))
 			}
-			subTracks.forEach { track ->
+			subTracks.forEachIndexed { trackIndexInList, track ->
 				PopoverMenuCheckboxItem(
 					selected = track.isSelected,
 					focusRequester = if (track.isSelected) selectedFocusRequester else null,
 					onClick = {
+						val subStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.SUBTITLE }.orEmpty()
+						val mediaStream = subStreams.getOrNull(trackIndexInList)
+						val lang = track.language ?: mediaStream?.language
+						videoQueueManager.setLastPlayedSubtitleLanguageIsoCode(lang)
+						videoQueueManager.setLastPlayedSubtitleTitle(track.label)
+						val codec = mediaStream?.codec
+						if (codec != null) videoQueueManager.setLastPlayedSubtitleCodec(codec)
+						videoQueueManager.setLastPlayedSubtitleDefaultState(mediaStream?.isDefault ?: false)
+						videoQueueManager.setLastPlayedSubtitleForcedState(mediaStream?.isForced ?: false)
+						videoQueueManager.setLastPlayedSubtitleHearingImpairedState(mediaStream?.isHearingImpaired ?: false)
 						backend.selectTrack(3, track)
 						expanded = false
 					}
@@ -394,6 +420,9 @@ private fun AudioButton(
 		if (expanded) visibilityState.pin() else visibilityState.unpin()
 	}
 
+	val videoQueueManager = koinInject<VideoQueueManager>()
+	val entry by rememberQueueEntry(playbackManager)
+	val baseItem = entry?.baseItem
 	val backend = playbackManager.backend
 	var cachedAudioTracks by remember { mutableStateOf<List<BackendTrack>>(emptyList()) }
 	val audioTracks = if (expanded) backend.getTracks(1).also { cachedAudioTracks = it } else cachedAudioTracks
@@ -416,11 +445,19 @@ private fun AudioButton(
 		initialFocusRequester = selectedFocusRequester,
 	) {
 		PopoverMenu {
-			audioTracks.forEach { track ->
+			audioTracks.forEachIndexed { trackIndexInList, track ->
 				PopoverMenuCheckboxItem(
 					selected = track.isSelected,
 					focusRequester = if (track.isSelected) selectedFocusRequester else null,
 					onClick = {
+						val audioStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.AUDIO }.orEmpty()
+						val mediaStream = audioStreams.getOrNull(trackIndexInList)
+						val lang = track.language ?: mediaStream?.language
+						if (lang != null) videoQueueManager.setLastPlayedAudioLanguageIsoCode(lang)
+						val codec = mediaStream?.codec
+						if (codec != null) videoQueueManager.setLastPlayedAudioCodec(codec)
+						videoQueueManager.setLastPlayedAudioDefaultState(mediaStream?.isDefault ?: false)
+						videoQueueManager.setLastPlayedAudioHearingImpairedState(mediaStream?.isHearingImpaired ?: false)
 						backend.selectTrack(1, track)
 						expanded = false
 					}
@@ -443,6 +480,9 @@ private fun VideoButton(
 		if (expanded) visibilityState.pin() else visibilityState.unpin()
 	}
 
+	val videoQueueManager = koinInject<VideoQueueManager>()
+	val entry by rememberQueueEntry(playbackManager)
+	val baseItem = entry?.baseItem
 	val backend = playbackManager.backend
 	var cachedVideoTracks by remember { mutableStateOf<List<BackendTrack>>(emptyList()) }
 	val videoTracks = if (expanded) backend.getTracks(2).also { cachedVideoTracks = it } else cachedVideoTracks
@@ -470,12 +510,19 @@ private fun VideoButton(
 			initialFocusRequester = selectedFocusRequester,
 		) {
 			PopoverMenu {
-				videoTracks.forEach { track ->
+				videoTracks.forEachIndexed { trackIndexInList, track ->
 					val isSelected = track.isSelected
 					PopoverMenuCheckboxItem(
 						selected = isSelected,
 						focusRequester = if (isSelected) selectedFocusRequester else null,
 						onClick = {
+							val videoStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.VIDEO }.orEmpty()
+							val mediaStream = videoStreams.getOrNull(trackIndexInList)
+							videoQueueManager.setLastPlayedVideoDefaultState(mediaStream?.isDefault ?: false)
+							val codec = mediaStream?.codec
+							if (codec != null) videoQueueManager.setLastPlayedVideoCodec(codec)
+							videoQueueManager.setLastPlayedVideoTitle(track.label)
+							videoQueueManager.setLastPlayedVideoIndexInType(trackIndexInList)
 							backend.selectTrack(2, track)
 							expanded = false
 						}
@@ -531,6 +578,74 @@ private fun PlaybackSpeedButton(
 					}
 				) {
 					Text("${speed}x")
+				}
+			}
+		}
+	}
+}
+
+@Composable
+private fun MaxBitrateButton(
+	playbackManager: PlaybackManager,
+	visibilityState: PlayerOverlayVisibilityState,
+) = Box {
+	var expanded by remember { mutableStateOf(false) }
+
+	LaunchedEffect(expanded) {
+		if (expanded) visibilityState.pin() else visibilityState.unpin()
+	}
+
+	val context = LocalContext.current
+	val userPreferences = koinInject<UserPreferences>()
+	var maxBitrate by rememberPreference(userPreferences, UserPreferences.maxBitrate)
+	val options = remember(context) { getQualityProfiles(context).toList() }
+	val selectedFocusRequester = remember { FocusRequester() }
+	val coroutineScope = rememberCoroutineScope()
+
+	IconButton(
+		onClick = { expanded = true },
+	) {
+		Icon(
+			imageVector = ImageVector.vectorResource(R.drawable.ic_select_quality),
+			contentDescription = stringResource(R.string.lbl_quality_profile),
+		)
+	}
+
+	Popover(
+		expanded = expanded,
+		onDismissRequest = { expanded = false },
+		alignment = Alignment.TopCenter,
+		offset = DpOffset(0.dp, (-5).dp),
+		initialFocusRequester = selectedFocusRequester,
+	) {
+		PopoverMenu {
+			options.forEach { (value, label) ->
+				val isSelected = maxBitrate == value
+				PopoverMenuCheckboxItem(
+					selected = isSelected,
+					focusRequester = if (isSelected) selectedFocusRequester else null,
+					onClick = {
+						if (maxBitrate != value) {
+							maxBitrate = value
+							coroutineScope.launch {
+								val currentPositionMs = playbackManager.state.positionInfo.active.inWholeMilliseconds
+								val entry = playbackManager.queue.entry.value
+								if (entry != null) {
+									val updatedUserData = entry.baseItem?.userData?.copy(playbackPositionTicks = currentPositionMs * 10000L)
+									entry.baseItem = entry.baseItem?.copy(userData = updatedUserData)
+									entry.mediaStream = null
+									val currentIndex = playbackManager.queue.entryIndex.value
+									if (currentIndex != Queue.INDEX_NONE) {
+										playbackManager.queue.setIndex(Queue.INDEX_NONE)
+										playbackManager.queue.setIndex(currentIndex)
+									}
+								}
+							}
+						}
+						expanded = false
+					}
+				) {
+					Text(label)
 				}
 			}
 		}

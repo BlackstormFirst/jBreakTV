@@ -19,6 +19,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
@@ -254,9 +255,14 @@ class ExoPlayerBackend(
 			audioPipeline.setAudioSessionId(audioSessionId)
 		}
 
+		override fun onTracksChanged(tracks: Tracks) {
+			listener?.onTracksChanged()
+		}
+
 		override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
 			val queueEntry = mediaItem?.localConfiguration?.tag as? QueueEntry
 			audioPipeline.normalizationGain = queueEntry?.normalizationGain
+			exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().clearOverrides().build()
 		}
 
 		override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -596,7 +602,8 @@ class ExoPlayerBackend(
 	}
 
 	override fun selectTrack(trackType: Int, track: BackendTrack?) {
-		val builder = exoPlayer.trackSelectionParameters.buildUpon()
+		val currentParams = exoPlayer.trackSelectionParameters
+		val builder = currentParams.buildUpon()
 		if (track == null) {
 			builder.setTrackTypeDisabled(trackType, true)
 		} else {
@@ -606,7 +613,10 @@ class ExoPlayerBackend(
 				builder.setOverrideForType(TrackSelectionOverride(group, track.trackIndex))
 			}
 		}
-		exoPlayer.trackSelectionParameters = builder.build()
+		val newParams = builder.build()
+		if (currentParams != newParams) {
+			exoPlayer.trackSelectionParameters = newParams
+		}
 	}
 }
 

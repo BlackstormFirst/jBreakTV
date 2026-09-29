@@ -172,7 +172,7 @@ fun VideoPlayerOverlay(
 				modifier = Modifier
 					.fillMaxWidth()
 					.align(Alignment.BottomCenter)
-					.padding(bottom = 150.dp)
+					.padding(bottom = 120.dp)
 			)
 		}
 
@@ -281,8 +281,8 @@ private fun TrickplayFilmstripBar(
 	Box(
 		modifier = modifier
 			.fillMaxWidth()
-			.background(Color.Black.copy(alpha = 0.85f))
-			.padding(vertical = 12.dp),
+			.background(Color.Black.copy(alpha = 0.65f))
+			.padding(vertical = 6.dp),
 		contentAlignment = Alignment.Center,
 	) {
 		Row(
@@ -290,13 +290,17 @@ private fun TrickplayFilmstripBar(
 			verticalAlignment = Alignment.CenterVertically,
 		) {
 			for (offset in -5..5) {
+				val isCenter = (offset == 0)
+				val tileWidth = if (isCenter) 160.dp else 106.dp
+				val tileHeight = if (isCenter) 90.dp else 60.dp
+
 				val tileIndex = centerTileIndex + offset
 				val tileTimeMs = tileIndex * trickPlayInfo.interval
 
 				if (tileTimeMs < 0 || (item.runTimeTicks != null && tileTimeMs * 10000L > item.runTimeTicks!!)) {
 					Box(
 						modifier = Modifier
-							.size(width = if (offset == 0) 110.dp else 72.dp, height = if (offset == 0) 62.dp else 40.dp)
+							.size(width = tileWidth, height = tileHeight)
 							.background(Color.Black.copy(alpha = 0.4f))
 					)
 				} else {
@@ -336,18 +340,14 @@ private fun TrickplayFilmstripBar(
 							.build()
 					}
 
-					val isCenter = (offset == 0)
 					Box(
 						modifier = Modifier
-							.size(
-								width = if (isCenter) 110.dp else 72.dp,
-								height = if (isCenter) 62.dp else 40.dp
-							)
+							.size(width = tileWidth, height = tileHeight)
 							.clip(RoundedCornerShape(4.dp))
 							.background(Color.Black)
 							.border(
 								width = if (isCenter) 2.dp else 1.dp,
-								color = if (isCenter) Color.White else Color.White.copy(alpha = 0.25f),
+								color = if (isCenter) Color.Black else Color.Black.copy(alpha = 0.5f),
 								shape = RoundedCornerShape(4.dp)
 							)
 					) {
