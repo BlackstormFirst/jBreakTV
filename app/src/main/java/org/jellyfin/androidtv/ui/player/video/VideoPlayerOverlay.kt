@@ -117,12 +117,12 @@ fun VideoPlayerOverlay(
 		}
 	}
 
-	LaunchedEffect(activeSegment) {
-		if (activeSegment != null) {
-			delay(100.milliseconds)
-			runCatching { skipFocusRequester.requestFocus() }
-		} else {
-			if (!visibilityState.visible) {
+	LaunchedEffect(activeSegment, visibilityState.visible) {
+		if (!visibilityState.visible) {
+			delay(50.milliseconds)
+			if (activeSegment != null) {
+				runCatching { skipFocusRequester.requestFocus() }
+			} else {
 				runCatching { rootFocusRequester.requestFocus() }
 			}
 		}

@@ -138,8 +138,6 @@ fun PlayerOverlayLayout(
 		if (visibilityState.visible) {
 			delay(50.milliseconds)
 			runCatching { controlsFocusRequester.requestFocus() }
-		} else {
-			runCatching { rootFocusRequester.requestFocus() }
 		}
 	}
 
