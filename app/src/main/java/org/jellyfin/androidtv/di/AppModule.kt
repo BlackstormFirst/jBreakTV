@@ -129,7 +129,6 @@ val appModule = module {
 		val userPreferences = get<UserPreferences>()
 		var diskMaxCacheSize = userPreferences[UserPreferences.diskMaxCacheSize]
 		var memoryMaxCachePercent = userPreferences[UserPreferences.memoryMaxCachePercent]
-		val maxSizeFallback: Long = 32
 		ImageLoader.Builder(androidContext()).apply {
 			diskCache {
 				DiskCache.Builder()
@@ -139,8 +138,7 @@ val appModule = module {
 			}
 			memoryCache {
 				MemoryCache.Builder()
-					.maxSizePercent(androidContext(), (memoryMaxCachePercent / 100).toDouble())
-					.maxSizeBytes(maxSizeFallback * 1024 * 1024) // fallback to minimum
+					.maxSizePercent(androidContext(), (memoryMaxCachePercent / 100.0))
 					.build()
 			}
 
