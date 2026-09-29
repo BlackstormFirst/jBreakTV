@@ -15,8 +15,9 @@ object UsbSubtitleUtils {
     data class SubtitleMeta(
         val displayTitle: String,
         val language: String?,
-        val isForced: Boolean,
-        val isHearingImpaired: Boolean
+        val isDefault: Boolean = false,
+        val isForced: Boolean = false,
+        val isHearingImpaired: Boolean = false
     )
 
     fun findSidecarSubtitles(mediaFile: File): List<File> {
@@ -32,21 +33,24 @@ object UsbSubtitleUtils {
     fun formatSubtitleDisplayTitle(
         title: String?,
         languageDisplayName: String,
-        isForced: Boolean,
-        isHearingImpaired: Boolean,
+        isDefault: Boolean = false,
+        isForced: Boolean = false,
+        isHearingImpaired: Boolean = false,
         codecUpper: String,
         isExternal: Boolean = false,
         context: Context? = null
     ): String {
+        val defaultStr = context?.getString(R.string.indicator_default) ?: "Default"
+        val defaultTag = if (isDefault) " - $defaultStr" else ""
         val forcedTag = if (isForced) " - Forcé" else ""
         val sdhStr = context?.getString(R.string.indicator_subtitles_hearing_impaired) ?: "SDH"
         val sdhTag = if (isHearingImpaired) " - $sdhStr" else ""
         val externalTag = if (isExternal) " - Externe" else ""
 
         return if (!title.isNullOrBlank() && title != languageDisplayName) {
-            "$title - $languageDisplayName$forcedTag$sdhTag - $codecUpper$externalTag"
+            "$title - $languageDisplayName$defaultTag$forcedTag$sdhTag - $codecUpper$externalTag"
         } else {
-            "$languageDisplayName$forcedTag$sdhTag - $codecUpper$externalTag"
+            "$languageDisplayName$defaultTag$forcedTag$sdhTag - $codecUpper$externalTag"
         }
     }
 
@@ -56,7 +60,8 @@ object UsbSubtitleUtils {
         languageDisplayName: String,
         codecUpper: String,
         channels: Int,
-        isForced: Boolean,
+        isDefault: Boolean = false,
+        isForced: Boolean = false,
         isHearingImpaired: Boolean = false,
         isExternal: Boolean = false,
         context: Context? = null
@@ -68,26 +73,28 @@ object UsbSubtitleUtils {
             0L
         }
         val offsetTag = if (offsetMs != 0L) " (Offset ${offsetMs}ms)" else ""
+        val defaultStr = context?.getString(R.string.indicator_default) ?: "Par défaut"
+        val defaultTag = if (isDefault) " - $defaultStr" else ""
 
         val baseTitle = when (msType) {
             MediaStreamType.AUDIO -> {
                 val channelLayout = AudioChannelHelper.formatChannelLayout(channels)
                 val layoutSuffix = if (channelLayout.isNotBlank()) " $channelLayout" else ""
                 if (!originalTitle.isNullOrBlank() && originalTitle != languageDisplayName) {
-                    "$originalTitle - $languageDisplayName - $codecUpper$layoutSuffix"
+                    "$originalTitle - $languageDisplayName - $codecUpper$layoutSuffix$defaultTag"
                 } else {
-                    "$languageDisplayName - $codecUpper$layoutSuffix"
+                    "$languageDisplayName - $codecUpper$layoutSuffix$defaultTag"
                 }
             }
             MediaStreamType.SUBTITLE -> {
                 val cleanTitle = if (!originalTitle.isNullOrBlank() && originalTitle != languageDisplayName) originalTitle else null
-                formatSubtitleDisplayTitle(cleanTitle, languageDisplayName, isForced, isHearingImpaired, codecUpper, isExternal, context)
+                formatSubtitleDisplayTitle(cleanTitle, languageDisplayName, isDefault, isForced, isHearingImpaired, codecUpper, isExternal, context)
             }
             else -> {
                 if (!originalTitle.isNullOrBlank() && originalTitle != languageDisplayName) {
-                    "$originalTitle - $languageDisplayName"
+                    "$originalTitle - $languageDisplayName$defaultTag"
                 } else {
-                    languageDisplayName
+                    "$languageDisplayName$defaultTag"
                 }
             }
         }
@@ -184,13 +191,15 @@ object UsbSubtitleUtils {
     fun parseExternalSubtitleMeta(
         subFile: File,
         videoFile: File,
+        isDefault: Boolean = false,
         context: Context? = null
     ): SubtitleMeta {
         val rawName = subFile.name
         val lower = rawName.lowercase(Locale.ROOT)
 
+        val isDefaultSub = isDefault || lower.contains("default") || lower.contains("défaut") || lower.contains("defaut")
         val isForced = lower.contains("forced") || lower.contains("forcé")
-        val isHearingImpaired = lower.contains("sdh")
+        val isHearingImpaired = lower.contains("sdh") || lower.contains("sme")
 
         val (rawCleanTitle, lang) = cleanSubtitleTitleAndLanguage(rawName, videoFile.name, context = context)
         val langDisplayName = getDisplayNameForLanguage(lang, context)
@@ -205,6 +214,7 @@ object UsbSubtitleUtils {
         val displayTitle = formatSubtitleDisplayTitle(
             title = cleanTitle,
             languageDisplayName = langDisplayName,
+            isDefault = isDefaultSub,
             isForced = isForced,
             isHearingImpaired = isHearingImpaired,
             codecUpper = codecUpper,
@@ -215,6 +225,7 @@ object UsbSubtitleUtils {
         return SubtitleMeta(
             displayTitle = displayTitle,
             language = lang,
+            isDefault = isDefaultSub,
             isForced = isForced,
             isHearingImpaired = isHearingImpaired
         )

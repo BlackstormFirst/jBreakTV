@@ -27,6 +27,7 @@ import androidx.media3.extractor.text.DefaultSubtitleParserFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.compat.StreamInfo
 import org.jellyfin.androidtv.ui.playback.VideoManager
 import org.jellyfin.androidtv.ui.playback.getSubtitleMediaStreamCodec
@@ -81,17 +82,19 @@ object LocalVideoManager {
         languageDisplayName: String,
         codecUpper: String,
         channels: Int,
-        isForced: Boolean,
+        isDefault: Boolean = false,
+        isForced: Boolean = false,
         isHearingImpaired: Boolean = false,
         isExternal: Boolean = false,
         context: Context? = null
-    ): String = UsbSubtitleUtils.resolveTrackTitle(format, msType, languageDisplayName, codecUpper, channels, isForced, isHearingImpaired, isExternal, context)
+    ): String = UsbSubtitleUtils.resolveTrackTitle(format, msType, languageDisplayName, codecUpper, channels, isDefault, isForced, isHearingImpaired, isExternal, context)
 
     fun parseExternalSubtitleMeta(
         subFile: File,
         videoFile: File,
+        isDefault: Boolean = false,
         context: Context? = null
-    ): UsbSubtitleUtils.SubtitleMeta = UsbSubtitleUtils.parseExternalSubtitleMeta(subFile, videoFile, context)
+    ): UsbSubtitleUtils.SubtitleMeta = UsbSubtitleUtils.parseExternalSubtitleMeta(subFile, videoFile, isDefault, context)
 
     private fun Context.getFileProviderUri(file: File): String {
         return try {
@@ -327,10 +330,11 @@ object LocalVideoManager {
                         val (videoRangeTypeVal, videoRangeVal) = VideoHelper.detectVideoRange(format)
                         val aspectRatioVal = VideoHelper.calculateAspectRatio(width, height, format)
                         val isInterlacedVal = probedMeta.isInterlaced
-                        val title = resolveTrackTitle(format, MediaStreamType.VIDEO, displayName, codec.uppercase(Locale.ROOT), 0, isForced)
+                        val isVideoDefault = isFormatDefault || nbV == 1
+                        val title = resolveTrackTitle(format, MediaStreamType.VIDEO, displayName, codec.uppercase(Locale.ROOT), 0, isDefault = isVideoDefault, isForced = isForced, context = context)
 
                         Timber.i("UsbDebug: Video Inspection complete for %s -> realFrameRate=%s, resolution=%dx%d", file.name, rawFrameRate, width, height)
-                        streams.add(MediaStream(type = MediaStreamType.VIDEO, index = globalIndex++, codec = codec, width = width, height = height, bitRate = bitrate, realFrameRate = rawFrameRate, averageFrameRate = rawFrameRate, videoRange = videoRangeVal, videoRangeType = videoRangeTypeVal, aspectRatio = aspectRatioVal, profile = format.codecs, isInterlaced = isInterlacedVal, isDefault = isFormatDefault || nbV == 1, isForced = isForced, isExternal = false, isHearingImpaired = false, isTextSubtitleStream = false, supportsExternalStream = false, title = title, language = lang))
+                        streams.add(MediaStream(type = MediaStreamType.VIDEO, index = globalIndex++, codec = codec, width = width, height = height, bitRate = bitrate, realFrameRate = rawFrameRate, averageFrameRate = rawFrameRate, videoRange = videoRangeVal, videoRangeType = videoRangeTypeVal, aspectRatio = aspectRatioVal, profile = format.codecs, isInterlaced = isInterlacedVal, isDefault = isVideoDefault, isForced = isForced, isExternal = false, isHearingImpaired = false, isTextSubtitleStream = false, supportsExternalStream = false, title = title, language = lang))
                     }
                     isAudioTrack -> {
                         nbA++
@@ -341,9 +345,10 @@ object LocalVideoManager {
                         val channelLayoutVal = AudioChannelHelper.formatChannelLayout(channels).ifBlank { null }
                         val audioProfileVal = AudioChannelHelper.detectAudioProfile(format)
 
-                        val title = resolveTrackTitle(format, MediaStreamType.AUDIO, displayName, codec.uppercase(Locale.ROOT), channels, isForced)
+                        val isAudioDefault = isFormatDefault || nbA == 1
+                        val title = resolveTrackTitle(format, MediaStreamType.AUDIO, displayName, codec.uppercase(Locale.ROOT), channels, isDefault = isAudioDefault, isForced = isForced, context = context)
 
-                        streams.add(MediaStream(type = MediaStreamType.AUDIO, index = globalIndex++, codec = codec, channels = channels, sampleRate = sampleRate, bitRate = bitrate, channelLayout = channelLayoutVal, profile = audioProfileVal, language = lang, title = title, displayTitle = title, isDefault = isFormatDefault || nbA == 1, isForced = isForced, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
+                        streams.add(MediaStream(type = MediaStreamType.AUDIO, index = globalIndex++, codec = codec, channels = channels, sampleRate = sampleRate, bitRate = bitrate, channelLayout = channelLayoutVal, profile = audioProfileVal, language = lang, title = title, displayTitle = title, isDefault = isAudioDefault, isForced = isForced, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
                     }
                     isSubtitleTrack -> {
                         nbS++
@@ -351,9 +356,10 @@ object LocalVideoManager {
                         val isForcedTrack = isForced || (format.label?.lowercase(Locale.ROOT)?.let { it.contains("forced") || it.contains("forcé") } == true)
                         val isSdhTrack = format.label?.lowercase(Locale.ROOT)?.contains("sdh") == true
                         val isTextSub = MediaCodecHelper.isTextSubtitle(codec, mimeLower)
-                        val title = resolveTrackTitle(format, MediaStreamType.SUBTITLE, displayName, codec.uppercase(Locale.ROOT), 0, isForcedTrack, isSdhTrack)
+                        val isSubDefault = isFormatDefault
+                        val title = resolveTrackTitle(format, MediaStreamType.SUBTITLE, displayName, codec.uppercase(Locale.ROOT), 0, isDefault = isSubDefault, isForced = isForcedTrack, isHearingImpaired = isSdhTrack, context = context)
 
-                        streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = globalIndex++, codec = codec, language = lang, title = title, displayTitle = title, isDefault = isFormatDefault, isForced = isForcedTrack, isExternal = false, isHearingImpaired = isSdhTrack, isInterlaced = false, isTextSubtitleStream = isTextSub, supportsExternalStream = false, deliveryMethod = SubtitleDeliveryMethod.EMBED))
+                        streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = globalIndex++, codec = codec, language = lang, title = title, displayTitle = title, isDefault = isSubDefault, isForced = isForcedTrack, isExternal = false, isHearingImpaired = isSdhTrack, isInterlaced = false, isTextSubtitleStream = isTextSub, supportsExternalStream = false, deliveryMethod = SubtitleDeliveryMethod.EMBED))
                     }
                 }
             }
@@ -376,7 +382,8 @@ object LocalVideoManager {
             streams.add(0, MediaStream(type = MediaStreamType.VIDEO, index = 0, codec = containerExt, width = width, height = height, realFrameRate = fallbackFrameRate, averageFrameRate = fallbackFrameRate, videoRange = VideoRange.SDR, videoRangeType = VideoRangeType.SDR, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
         if (streams.none { it.type == MediaStreamType.AUDIO }) {
-            val fallbackTitle = "Stereo - AAC"
+            val defaultStr = context.getString(R.string.indicator_default)
+            val fallbackTitle = "Stereo - AAC - $defaultStr"
             streams.add(MediaStream(type = MediaStreamType.AUDIO, index = streams.size, codec = "aac", channels = LocalProbeConfig.DEFAULT_AUDIO_CHANNELS, sampleRate = LocalProbeConfig.DEFAULT_AUDIO_SAMPLE_RATE, channelLayout = "Stereo", language = "und", title = fallbackTitle, displayTitle = fallbackTitle, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
 
@@ -385,7 +392,7 @@ object LocalVideoManager {
         val externalSubStreams = sidecars.map { subFile ->
             val subUriStr = context.getFileProviderUri(subFile)
             val meta = parseExternalSubtitleMeta(subFile, file, context = context)
-            MediaStream(type = MediaStreamType.SUBTITLE, index = -1, codec = subFile.extension, language = meta.language ?: "und", title = meta.displayTitle, displayTitle = meta.displayTitle, isDefault = false, isForced = meta.isForced, isExternal = true, isHearingImpaired = meta.isHearingImpaired, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr)
+            MediaStream(type = MediaStreamType.SUBTITLE, index = -1, codec = subFile.extension, language = meta.language ?: "und", title = meta.displayTitle, displayTitle = meta.displayTitle, isDefault = meta.isDefault, isForced = meta.isForced, isExternal = true, isHearingImpaired = meta.isHearingImpaired, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr)
         }
         val firstSubIdx = streams.indexOfFirst { it.type == MediaStreamType.SUBTITLE }
         if (firstSubIdx >= 0) {
