@@ -69,6 +69,7 @@ import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.koin.android.ext.android.inject
 import timber.log.Timber
 import kotlin.time.Duration.Companion.milliseconds
+import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyListener {
@@ -184,11 +185,20 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
 				api.webSocket.subscribe<UserDataChangedMessage>()
-					.onEach { refreshRows(force = false, delayed = true) }
+					.onEach {
+						val now = Instant.now()
+						dataRefreshService.lastPlayback = now
+						dataRefreshService.lastTvPlayback = now
+						dataRefreshService.lastMoviePlayback = now
+						refreshRows(force = true, delayed = true)
+					}
 					.launchIn(this)
 
 				api.webSocket.subscribe<LibraryChangedMessage>()
-					.onEach { refreshRows(force = false, delayed = true) }
+					.onEach {
+						dataRefreshService.lastLibraryChange = Instant.now()
+						refreshRows(force = true, delayed = true)
+					}
 					.launchIn(this)
 			}
 		}

@@ -35,6 +35,10 @@ class ItemMutationRepositoryImpl(
 			else -> withContext(Dispatchers.IO) { api.playStateApi.markUnplayedItem(itemId = item) }
 		}
 
+		val now = Instant.now()
+		dataRefreshService.lastPlayback = now
+		dataRefreshService.lastTvPlayback = now
+		dataRefreshService.lastMoviePlayback = now
 		return response
 	}
 }

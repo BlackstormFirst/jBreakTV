@@ -272,6 +272,17 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                             }
                             updateWatched();
                             mLastUpdated = Instant.now();
+
+                            if (mRowsAdapter != null) {
+                                for (int i = 0; i < mRowsAdapter.size(); i++) {
+                                    if (mRowsAdapter.get(i) instanceof ListRow) {
+                                        ListRow listRow = (ListRow) mRowsAdapter.get(i);
+                                        if (listRow != null && listRow.getAdapter() instanceof ItemRowAdapter) {
+                                            ((ItemRowAdapter) listRow.getAdapter()).ReRetrieveIfNeeded();
+                                        }
+                                    }
+                                }
+                            }
                             return null;
                         });
                     }

@@ -617,13 +617,17 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         }
 
         if (!justLoaded) {
-            // Re-retrieve current item on return so we don't wipe the grid or lose focus position
+            // Re-retrieve grid if playback/user-data changed, otherwise refresh current item
             if (mAdapter != null) {
                 mHandler.postDelayed(() -> {
                     if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED))
                         return;
 
-                    refreshCurrentItem();
+                    if (mAdapter != null && mAdapter.size() > 0) {
+                        if (!mAdapter.ReRetrieveIfNeeded()) {
+                            refreshCurrentItem();
+                        }
+                    }
                 }, 300);
             }
         } else {
