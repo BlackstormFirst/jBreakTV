@@ -46,6 +46,7 @@ import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.request.transformations
 import coil3.size.Size
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.constant.ZoomMode
@@ -88,12 +89,14 @@ fun VideoPlayerOverlay(
 	var showPlaybackInfo by remember { mutableStateOf(false) }
 	var scrubbingProgress by remember { mutableStateOf<Duration?>(null) }
 
+	val rootFocusRequester = remember { FocusRequester() }
+	val skipFocusRequester = remember { FocusRequester() }
+
 	LaunchedEffect(visibilityState.visible) {
 		if (!visibilityState.visible) {
 			scrubbingProgress = null
 		}
 	}
-
 
 	val entry by rememberQueueEntry(playbackManager)
 	val item = entry?.run { baseItemFlow.collectAsState(baseItem) }?.value
@@ -103,18 +106,34 @@ fun VideoPlayerOverlay(
 
 	val mediaSegmentRepository = koinInject<MediaSegmentRepository>()
 	val activeSegment = remember(entry, currentPositionMs, mediaSegmentRepository) {
+		val autoHideMs = MediaSegmentRepository.AskToSkipAutoHideDuration.inWholeMilliseconds
 		val segments = entry?.mediaSegments.orEmpty()
 		segments.firstOrNull { segment ->
 			val startMs = segment.startTicks / 10000
 			val endMs = segment.endTicks / 10000
-			currentPositionMs in startMs..endMs &&
+			val hideMs = minOf(endMs, startMs + autoHideMs)
+			currentPositionMs in startMs until hideMs &&
 				mediaSegmentRepository.getMediaSegmentAction(segment) == MediaSegmentAction.ASK_TO_SKIP
+		}
+	}
+
+	LaunchedEffect(activeSegment) {
+		if (activeSegment != null) {
+			delay(100.milliseconds)
+			runCatching { skipFocusRequester.requestFocus() }
+		} else {
+			if (!visibilityState.visible) {
+				runCatching { rootFocusRequester.requestFocus() }
+			}
 		}
 	}
 
 	Box(modifier = modifier) {
 		PlayerOverlayLayout(
 			visibilityState = visibilityState,
+			rootFocusRequester = rootFocusRequester,
+			isSkipButtonPresent = activeSegment != null,
+			onFocusSkipButton = { runCatching { skipFocusRequester.requestFocus() } },
 			header = {
 				Column {
 					VideoPlayerHeader(
@@ -159,15 +178,11 @@ fun VideoPlayerOverlay(
 
 		if (activeSegment != null) {
 			val coroutineScope = rememberCoroutineScope()
-			val skipFocusRequester = remember { FocusRequester() }
-
-			LaunchedEffect(activeSegment) {
-				runCatching { skipFocusRequester.requestFocus() }
-			}
 
 			val onSkip = {
 				coroutineScope.launch {
-					playbackManager.state.seek((activeSegment.endTicks / 10000).milliseconds)
+					val targetMs = (activeSegment.endTicks / 10000) + 200
+					playbackManager.state.seek(targetMs.milliseconds)
 				}
 			}
 
@@ -181,12 +196,34 @@ fun VideoPlayerOverlay(
 					.background(colorResource(R.color.popup_menu_background).copy(alpha = 0.85f))
 					.clickable { onSkip() }
 					.onKeyEvent { keyEvent ->
-						if (keyEvent.type == KeyEventType.KeyDown &&
-							(keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter)
-						) {
-							onSkip()
-							true
-						} else false
+						if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
+
+						when (keyEvent.key) {
+							Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+								onSkip()
+								true
+							}
+							Key.DirectionLeft, Key.MediaRewind -> {
+								runCatching { rootFocusRequester.requestFocus() }
+								true
+							}
+							Key.DirectionRight, Key.MediaFastForward -> {
+								true
+							}
+							Key.DirectionUp, Key.DirectionDown -> {
+								visibilityState.show()
+								true
+							}
+							Key.Back -> {
+								if (visibilityState.visible) {
+									visibilityState.hide()
+								} else {
+									runCatching { rootFocusRequester.requestFocus() }
+								}
+								true
+							}
+							else -> false
+						}
 					}
 					.focusRequester(skipFocusRequester)
 					.focusable()

@@ -123,13 +123,15 @@ fun rememberPlayerOverlayVisibility(
 fun PlayerOverlayLayout(
 	modifier: Modifier = Modifier,
 	visibilityState: PlayerOverlayVisibilityState = rememberPlayerOverlayVisibility(),
+	rootFocusRequester: FocusRequester = remember { FocusRequester() },
 	header: (@Composable () -> Unit)? = null,
 	controls: (@Composable () -> Unit)? = null,
 	onTogglePlayPause: (() -> Unit)? = null,
 	onRewind: (() -> Unit)? = null,
 	onFastForward: (() -> Unit)? = null,
+	isSkipButtonPresent: Boolean = false,
+	onFocusSkipButton: (() -> Unit)? = null,
 ) {
-	val rootFocusRequester = remember { FocusRequester() }
 	val controlsFocusRequester = remember { FocusRequester() }
 
 	LaunchedEffect(visibilityState.visible) {
@@ -167,10 +169,16 @@ fun PlayerOverlayLayout(
 						onTogglePlayPause?.invoke()
 						true
 					} else if (isRewindKey) {
-						onRewind?.invoke()
+						if (!isSkipButtonPresent) {
+							onRewind?.invoke()
+						}
 						true
 					} else if (isFastForwardKey) {
-						onFastForward?.invoke()
+						if (isSkipButtonPresent) {
+							onFocusSkipButton?.invoke()
+						} else {
+							onFastForward?.invoke()
+						}
 						true
 					} else if (isOsdKey) {
 						visibilityState.show()
