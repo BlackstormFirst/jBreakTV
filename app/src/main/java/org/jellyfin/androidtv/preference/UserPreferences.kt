@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.preference
 
 import android.content.Context
 import androidx.preference.PreferenceManager
+import java.time.LocalDateTime
 import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.preference.UserPreferences.Companion.screensaverInAppEnabled
 import org.jellyfin.androidtv.preference.constant.AVCLevel
@@ -350,6 +351,12 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 */
 		var photoPlayerPresentationDelay = longPreference("photo_player_presentation_delay", 8000)
 	}
+
+	val nextUpDateCutoff: LocalDateTime?
+		get() {
+			val maxDays = this[homeNextUpMaxDays]
+			return maxDays.takeIf { it > 0 }?.let { LocalDateTime.now().minusDays(it.toLong()) }
+		}
 
 	init {
 		// Note: Create a single migration per app version

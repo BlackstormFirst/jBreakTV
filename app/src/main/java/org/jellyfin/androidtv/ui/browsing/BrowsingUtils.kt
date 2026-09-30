@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.data.repository.ItemRepository
+import org.jellyfin.androidtv.preference.UserPreferences
+import org.koin.java.KoinJavaComponent
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.extensions.itemsApi
@@ -94,11 +96,16 @@ object BrowsingUtils {
 	}
 
 	@JvmStatic
-	fun createGetNextUpRequest(parentId: UUID) = GetNextUpRequest(
+	@JvmOverloads
+	fun createGetNextUpRequest(
+		parentId: UUID,
+		userPreferences: UserPreferences? = null,
+	) = GetNextUpRequest(
 		limit = 50,
 		parentId = parentId,
 		imageTypeLimit = 1,
-		fields = ItemRepository.itemFields
+		fields = ItemRepository.itemFields,
+		nextUpDateCutoff = (userPreferences ?: runCatching { KoinJavaComponent.get<UserPreferences>(UserPreferences::class.java) }.getOrNull())?.nextUpDateCutoff,
 	)
 
 	@JvmStatic

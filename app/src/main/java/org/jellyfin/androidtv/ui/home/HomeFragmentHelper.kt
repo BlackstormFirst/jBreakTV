@@ -14,7 +14,6 @@ import org.jellyfin.sdk.model.api.request.GetNextUpRequest
 import org.jellyfin.sdk.model.api.request.GetRecommendedProgramsRequest
 import org.jellyfin.sdk.model.api.request.GetRecordingsRequest
 import org.jellyfin.sdk.model.api.request.GetResumeItemsRequest
-import java.time.LocalDateTime
 
 class HomeFragmentHelper(
 	private val context: Context,
@@ -57,15 +56,12 @@ class HomeFragmentHelper(
 	}
 
 	fun loadNextUp(): HomeFragmentRow {
-		val maxDays = userPreferences[UserPreferences.homeNextUpMaxDays]
-		val nextUpDateCutoff = maxDays.takeIf { it > 0 }?.let { LocalDateTime.now().minusDays(it.toLong()) }
-
 		val query = GetNextUpRequest(
 			imageTypeLimit = 1,
 			limit = ITEM_LIMIT_NEXT_UP,
 			enableResumable = false,
 			fields = ItemRepository.nextUpFields,
-			nextUpDateCutoff = nextUpDateCutoff,
+			nextUpDateCutoff = userPreferences.nextUpDateCutoff,
 			enableTotalRecordCount = false
 		)
 

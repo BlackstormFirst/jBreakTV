@@ -22,6 +22,7 @@ import org.jellyfin.sdk.model.api.BaseItemKind;
 import org.jellyfin.sdk.model.api.CollectionType;
 import org.jellyfin.sdk.model.api.TimerInfoDto;
 import org.jellyfin.sdk.model.api.request.GetNextUpRequest;
+import org.jellyfin.androidtv.preference.UserPreferences;
 import org.koin.java.KoinJavaComponent;
 
 import java.time.LocalDateTime;
@@ -61,7 +62,8 @@ public class BrowseViewFragment extends EnhancedBrowseFragment {
                 mRows.add(new BrowseRowDef(getString(R.string.lbl_continue_watching), BrowsingUtils.createResumeItemsRequest(mFolder.getId(), BaseItemKind.EPISODE), 0, new ChangeTriggerType[]{ChangeTriggerType.TvPlayback}));
 
                 //Next up
-                GetNextUpRequest getNextUpRequest = BrowsingUtils.createGetNextUpRequest(mFolder.getId());
+                UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
+                GetNextUpRequest getNextUpRequest = BrowsingUtils.createGetNextUpRequest(mFolder.getId(), userPreferences);
                 mRows.add(new BrowseRowDef(getString(R.string.lbl_next_up), getNextUpRequest, new ChangeTriggerType[]{ChangeTriggerType.TvPlayback}));
 
                 //Latest content added
