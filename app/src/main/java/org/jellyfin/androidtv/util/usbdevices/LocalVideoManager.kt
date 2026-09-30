@@ -104,6 +104,10 @@ object LocalVideoManager {
         }
     }
 
+    /**
+     * Legacy helper used exclusively by PlaybackController (standard player)
+     * to configure ExoPlayer directly for local USB playback.
+     */
     @UnstableApi
     fun configureAndPlayLocal(videoManager: VideoManager, streamInfo: StreamInfo) {
         val tStart = System.currentTimeMillis()
@@ -532,6 +536,10 @@ object LocalVideoManager {
         )
     }
 
+    /**
+     * Legacy helper used by PlaybackController (standard player) to build a StreamInfo
+     * instance from a BaseItemDto for local playback.
+     */
     fun buildLocalStreamInfo(item: BaseItemDto): StreamInfo {
         val file = File(item.path ?: "")
         val fileUriStr = Uri.fromFile(file).toString()

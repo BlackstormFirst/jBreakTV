@@ -48,7 +48,7 @@ fun VideoPlayerScreen() {
 
 	LaunchedEffect(entry, baseItem?.id) {
 		val currentItem = baseItem
-		if (currentItem != null && LocalVideoManager.isLocalItem(currentItem) && currentItem.runTimeTicks == null) {
+		if (currentItem != null && LocalVideoManager.isLocalItem(currentItem) && (currentItem.runTimeTicks == null || currentItem.mediaStreams.isNullOrEmpty())) {
 			val path = currentItem.path
 			if (!path.isNullOrEmpty()) {
 				val file = File(path)

@@ -42,7 +42,7 @@ fun PlaybackController.prepareLocalItemAndPlay(
 	targetFragment.lifecycleScope.launch {
 		var activeItem = item
 		val itemPath = item.path
-		if (itemPath != null && item.runTimeTicks == null) {
+		if (itemPath != null && (item.runTimeTicks == null || item.mediaStreams.isNullOrEmpty())) {
 			val file = File(itemPath)
 			if (file.exists() && file.canRead()) {
 				activeItem = withContext(Dispatchers.IO) {
