@@ -291,4 +291,10 @@ class VideoPlayerFragment : Fragment() {
 		refreshRateHelper?.resetRefreshRate()
 		playbackManager.state.stop()
 	}
+
+	override fun onDestroy() {
+		super.onDestroy()
+
+		videoQueueManager.clearVideoQueue()
+	}
 }

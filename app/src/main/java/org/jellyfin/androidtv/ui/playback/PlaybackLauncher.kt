@@ -64,6 +64,7 @@ class PlaybackLauncher(
 				itemsPosition
 			}
 
+			videoQueueManager.clearVideoQueue()
 			videoQueueManager.setCurrentVideoQueue(items.toList())
 			videoQueueManager.setCurrentMediaPosition(effectiveItemsPosition)
 
