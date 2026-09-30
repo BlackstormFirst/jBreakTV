@@ -19,6 +19,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
@@ -90,6 +95,17 @@ fun Popover(
 					)
 					.background(backgroundColor, shape)
 					.wrapContentSize()
+					.onPreviewKeyEvent { keyEvent ->
+						if (keyEvent.type == KeyEventType.KeyDown) {
+							when (keyEvent.key) {
+								Key.DirectionLeft, Key.SoftLeft, Key.SystemNavigationLeft -> {
+									onDismissRequest()
+									true
+								}
+								else -> false
+							}
+						} else false
+					}
 					.focusRequester(defaultFocusRequester)
 					.focusGroup()
 					.interactionTracker()
