@@ -9,6 +9,8 @@ class VideoQueueManager {
 	private var _lastPlayedAudioCodec: String? = null
 	private var _lastPlayedAudioHearingImpairedState: Boolean = false
 	private var _lastPlayedAudioLanguageIsoCode: String? = null
+	private var _lastPlayedAudioTitle: String? = null
+	private var _lastPlayedAudioIndexInType: Int? = null
 	private var _lastPlayedSubtitleCodec: String? = null
 	private var _lastPlayedSubtitleDefaultState: Boolean = false
 	private var _lastPlayedSubtitleForcedState: Boolean = false
@@ -72,6 +74,22 @@ class VideoQueueManager {
 
 	fun setLastPlayedAudioLanguageIsoCode(isoCode: String) {
 		_lastPlayedAudioLanguageIsoCode = isoCode
+	}
+
+	fun getLastPlayedAudioTitle(): String? {
+		return _lastPlayedAudioTitle
+	}
+
+	fun setLastPlayedAudioTitle(title: String?) {
+		_lastPlayedAudioTitle = title
+	}
+
+	fun getLastPlayedAudioIndexInType(): Int? {
+		return _lastPlayedAudioIndexInType
+	}
+
+	fun setLastPlayedAudioIndexInType(index: Int?) {
+		_lastPlayedAudioIndexInType = index
 	}
 
 	fun getLastPlayedVideoDefaultState(): Boolean? {
@@ -161,6 +179,8 @@ class VideoQueueManager {
 		_lastPlayedAudioDefaultState = false
 		_lastPlayedAudioHearingImpairedState = false
 		_lastPlayedAudioLanguageIsoCode = null
+		_lastPlayedAudioTitle = null
+		_lastPlayedAudioIndexInType = null
 		_lastPlayedSubtitleCodec = null
 		_lastPlayedSubtitleDefaultState = false
 		_lastPlayedSubtitleForcedState = false

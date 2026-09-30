@@ -521,10 +521,19 @@ public class VideoManager {
     public int getExoPlayerTrack(@Nullable org.jellyfin.sdk.model.api.MediaStreamType streamType, @Nullable List<org.jellyfin.sdk.model.api.MediaStream> allStreams) {
         if (!isInitialized() || streamType == null || allStreams == null)
             return -1;
-        if (streamType != org.jellyfin.sdk.model.api.MediaStreamType.SUBTITLE && streamType != org.jellyfin.sdk.model.api.MediaStreamType.AUDIO)
+        if (streamType != MediaStreamType.SUBTITLE && streamType != MediaStreamType.AUDIO && streamType != MediaStreamType.VIDEO)
             return -1;
 
-        int chosenTrackType = streamType == org.jellyfin.sdk.model.api.MediaStreamType.SUBTITLE ? C.TRACK_TYPE_TEXT : C.TRACK_TYPE_AUDIO;
+        int chosenTrackType;
+        if (streamType == MediaStreamType.SUBTITLE) {
+            chosenTrackType = C.TRACK_TYPE_TEXT;
+        } else if (streamType == MediaStreamType.AUDIO) {
+            chosenTrackType = C.TRACK_TYPE_AUDIO;
+        } else if (streamType == MediaStreamType.VIDEO) {
+            chosenTrackType = C.TRACK_TYPE_VIDEO;
+        } else {
+            return -1;
+        }
 
         int matchedIndex = -2;
         Tracks exoTracks = mExoPlayer.getCurrentTracks();

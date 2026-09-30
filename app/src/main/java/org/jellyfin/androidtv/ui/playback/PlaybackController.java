@@ -858,6 +858,23 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
         if (mCurrentOptions != null && mDefaultVideoIndex != -1) {
             mCurrentOptions.setVideoStreamIndex(mDefaultVideoIndex);
+
+            if (info != null && info.getMediaSource() != null && info.getMediaSource().getMediaStreams() != null) {
+                for (MediaStream s : info.getMediaSource().getMediaStreams()) {
+                    if (s.getType() == MediaStreamType.VIDEO && s.getIndex() == mDefaultVideoIndex) {
+                        videoQueueManager.getValue().setLastPlayedVideoDefaultState(s.isDefault());
+                        if (s.getCodec() != null) videoQueueManager.getValue().setLastPlayedVideoCodec(s.getCodec());
+                        videoQueueManager.getValue().setLastPlayedVideoTitle(s.getTitle());
+                        List<MediaStream> videoStreams = info.getMediaSource().getMediaStreams().stream()
+                                .filter(st -> st.getType() == MediaStreamType.VIDEO).toList();
+                        int videoTypeIndex = videoStreams.indexOf(s);
+                        if (videoTypeIndex >= 0) {
+                            videoQueueManager.getValue().setLastPlayedVideoIndexInType(videoTypeIndex);
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -882,8 +899,15 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                         if (s.getLanguage() != null) {
                             videoQueueManager.getValue().setLastPlayedAudioLanguageIsoCode(s.getLanguage());
                             if (s.getCodec() != null) videoQueueManager.getValue().setLastPlayedAudioCodec(s.getCodec());
+                            videoQueueManager.getValue().setLastPlayedAudioTitle(s.getTitle());
                             videoQueueManager.getValue().setLastPlayedAudioDefaultState(s.isDefault());
                             videoQueueManager.getValue().setLastPlayedAudioHearingImpairedState(s.isHearingImpaired());
+                        }
+                        List<MediaStream> audioStreams = info.getMediaSource().getMediaStreams().stream()
+                                .filter(st -> st.getType() == MediaStreamType.AUDIO).toList();
+                        int audioTypeIndex = audioStreams.indexOf(s);
+                        if (audioTypeIndex >= 0) {
+                            videoQueueManager.getValue().setLastPlayedAudioIndexInType(audioTypeIndex);
                         }
                         break;
                     }
@@ -961,8 +985,15 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (currentAudioIsoCode != null) {
             videoQueueManager.getValue().setLastPlayedAudioLanguageIsoCode(currentAudioIsoCode);
             if (currentMediaStream.getCodec() != null) videoQueueManager.getValue().setLastPlayedAudioCodec(currentMediaStream.getCodec());
+            videoQueueManager.getValue().setLastPlayedAudioTitle(currentMediaStream.getTitle());
             videoQueueManager.getValue().setLastPlayedAudioDefaultState(currentMediaStream.isDefault());
             videoQueueManager.getValue().setLastPlayedAudioHearingImpairedState(currentMediaStream.isHearingImpaired());
+        }
+        List<MediaStream> audioStreams = currentMediaSource.getMediaStreams().stream()
+                .filter(st -> st.getType() == MediaStreamType.AUDIO).toList();
+        int audioTypeIndex = audioStreams.indexOf(currentMediaStream);
+        if (audioTypeIndex >= 0) {
+            videoQueueManager.getValue().setLastPlayedAudioIndexInType(audioTypeIndex);
         }
 
         int activeExoAudioTrack = -1;
@@ -1484,13 +1515,9 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                     eligibleVideoTrack = mCurrentOptions.getVideoStreamIndex();
                 }
 
-                // Protection: force track ONLY if it is not already selected
-                int currentVideoTrack = getVideoStreamIndex();
-                if (eligibleVideoTrack != -1 && eligibleVideoTrack != currentVideoTrack && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
-                    Timber.i("onPrepared: Applying video track %d (current was %d)", eligibleVideoTrack, currentVideoTrack);
+                if (eligibleVideoTrack != -1 && getCurrentMediaSource() != null && getCurrentMediaSource().getMediaStreams() != null) {
+                    Timber.i("onPrepared: Applying video track %d", eligibleVideoTrack);
                     mVideoManager.setExoPlayerTrack(eligibleVideoTrack, MediaStreamType.VIDEO, getCurrentMediaSource().getMediaStreams());
-                } else {
-                    Timber.d("onPrepared: Video track %d already applied, skipping override", eligibleVideoTrack);
                 }
             }
         }
