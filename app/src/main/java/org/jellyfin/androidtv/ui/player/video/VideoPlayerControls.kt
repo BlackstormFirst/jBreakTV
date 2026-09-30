@@ -209,7 +209,8 @@ private fun PreviousEntryButton(
 	playbackManager: PlaybackManager,
 ) {
 	val entryIndex by playbackManager.queue.entryIndex.collectAsState()
-	if (entryIndex <= 0) return
+	val entries by playbackManager.queue.entries.collectAsState()
+	if (entryIndex <= 0 || entries.size <= 1) return
 
 	val coroutineScope = rememberCoroutineScope()
 
@@ -232,8 +233,12 @@ private fun NextEntryButton(
 	playbackManager: PlaybackManager,
 ) {
 	val entryIndex by playbackManager.queue.entryIndex.collectAsState()
-	val estimatedSize = playbackManager.queue.estimatedSize
-	if (entryIndex < 0 || entryIndex >= estimatedSize - 1) return
+	val entries by playbackManager.queue.entries.collectAsState()
+	val estimatedSize = remember(entries, entryIndex) { playbackManager.queue.estimatedSize }
+	val hasNext = remember(entryIndex, estimatedSize, entries) {
+		entryIndex in 0 until (maxOf(estimatedSize, entries.size) - 1)
+	}
+	if (!hasNext) return
 
 	val coroutineScope = rememberCoroutineScope()
 

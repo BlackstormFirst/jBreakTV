@@ -76,25 +76,14 @@ class SdkPlaybackHelper(
 		when (mainItem.type) {
 			BaseItemKind.EPISODE -> {
 				val seriesId = mainItem.seriesId
-				val seasonId = mainItem.seasonId
 				if (userPreferences[UserPreferences.mediaQueuingEnabled] && seriesId != null) {
-					val response by if (seasonId != null) {
-						api.tvShowsApi.getEpisodes(
-							seriesId = seriesId,
-							seasonId = seasonId,
-							isMissing = false,
-							limit = ITEM_QUERY_LIMIT,
-							fields = ItemRepository.itemFields
-						)
-					} else {
-						api.tvShowsApi.getEpisodes(
-							seriesId = seriesId,
-							startItemId = mainItem.id,
-							isMissing = false,
-							limit = ITEM_QUERY_LIMIT,
-							fields = ItemRepository.itemFields
-						)
-					}
+					val response by api.tvShowsApi.getEpisodes(
+						seriesId = seriesId,
+						isMissing = false,
+						sortBy = ItemSortBy.SORT_NAME,
+						limit = ITEM_QUERY_LIMIT,
+						fields = ItemRepository.itemFields
+					)
 
 					response.items.filter { it.canPlay() }
 				} else {
