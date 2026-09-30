@@ -25,6 +25,7 @@ import androidx.leanback.widget.RowPresenter;
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.preference.UserPreferences;
 import org.jellyfin.androidtv.preference.constant.ClockBehavior;
+import org.jellyfin.androidtv.ui.playback.CustomPlaybackOverlayFragment;
 import org.jellyfin.androidtv.ui.playback.PlaybackController;
 import org.jellyfin.androidtv.ui.playback.overlay.action.AndroidAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.ChannelBarChannelAction;
@@ -426,7 +427,18 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
         if (focused == null) return false;
 
         View next = focused.focusSearch(direction);
-        if (next != null && next != focused) next.requestFocus(direction);
+        if (next != null && next != focused) {
+            next.requestFocus(direction);
+            return true;
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            CustomPlaybackOverlayFragment masterFragment = getPlayerAdapter().getMasterOverlayFragment();
+            if (masterFragment != null) {
+                masterFragment.hideOverlayAndFocusPlayer();
+                return true;
+            }
+        }
 
         return true;
     }

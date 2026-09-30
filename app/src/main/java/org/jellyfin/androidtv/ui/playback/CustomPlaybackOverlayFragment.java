@@ -734,6 +734,19 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         binding.skipOverlay.resetAutoHideTimer();
     }
 
+    public void hideOverlayAndFocusPlayer() {
+        if (leanbackOverlayFragment != null) {
+            leanbackOverlayFragment.hideOverlay();
+        }
+        if (mIsVisible) {
+            hide();
+        } else if (binding != null && binding.skipOverlay != null && binding.skipOverlay.getVisible()) {
+            binding.skipOverlay.focusSkipButton();
+        } else {
+            focusPlayer();
+        }
+    }
+
     public void hide() {
         // Can't hide what's already hidden
         if (!mIsVisible) return;
