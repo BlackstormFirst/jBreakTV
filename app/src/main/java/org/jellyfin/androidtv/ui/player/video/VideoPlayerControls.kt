@@ -394,10 +394,11 @@ private fun SubtitleButton(
 					focusRequester = if (track.isSelected) selectedFocusRequester else null,
 					onClick = {
 						val subStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.SUBTITLE }.orEmpty()
-						val mediaStream = subStreams.getOrNull(trackIndexInList)
+						val mediaStream = subStreams.firstOrNull { it.index == track.mediaStreamIndex }
+							?: subStreams.getOrNull(trackIndexInList)
 						val lang = track.language ?: mediaStream?.language
 						videoQueueManager.setLastPlayedSubtitleLanguageIsoCode(lang)
-						videoQueueManager.setLastPlayedSubtitleTitle(track.label)
+						videoQueueManager.setLastPlayedSubtitleTitle(mediaStream?.title ?: track.label)
 						val codec = mediaStream?.codec
 						if (codec != null) videoQueueManager.setLastPlayedSubtitleCodec(codec)
 						videoQueueManager.setLastPlayedSubtitleDefaultState(mediaStream?.isDefault ?: false)
@@ -456,13 +457,17 @@ private fun AudioButton(
 					focusRequester = if (track.isSelected) selectedFocusRequester else null,
 					onClick = {
 						val audioStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.AUDIO }.orEmpty()
-						val mediaStream = audioStreams.getOrNull(trackIndexInList)
+						val mediaStream = audioStreams.firstOrNull { it.index == track.mediaStreamIndex }
+							?: audioStreams.getOrNull(trackIndexInList)
 						val lang = track.language ?: mediaStream?.language
 						if (lang != null) videoQueueManager.setLastPlayedAudioLanguageIsoCode(lang)
 						val codec = mediaStream?.codec
 						if (codec != null) videoQueueManager.setLastPlayedAudioCodec(codec)
+						videoQueueManager.setLastPlayedAudioTitle(mediaStream?.title ?: track.label)
 						videoQueueManager.setLastPlayedAudioDefaultState(mediaStream?.isDefault ?: false)
 						videoQueueManager.setLastPlayedAudioHearingImpairedState(mediaStream?.isHearingImpaired ?: false)
+						val audioTypeIndex = if (mediaStream != null) audioStreams.indexOf(mediaStream) else trackIndexInList
+						if (audioTypeIndex >= 0) videoQueueManager.setLastPlayedAudioIndexInType(audioTypeIndex)
 						backend.selectTrack(1, track)
 						expanded = false
 					}
@@ -522,12 +527,14 @@ private fun VideoButton(
 						focusRequester = if (isSelected) selectedFocusRequester else null,
 						onClick = {
 							val videoStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.VIDEO }.orEmpty()
-							val mediaStream = videoStreams.getOrNull(trackIndexInList)
+							val mediaStream = videoStreams.firstOrNull { it.index == track.mediaStreamIndex }
+								?: videoStreams.getOrNull(trackIndexInList)
+							val videoTypeIndex = if (mediaStream != null) videoStreams.indexOf(mediaStream) else trackIndexInList
 							videoQueueManager.setLastPlayedVideoDefaultState(mediaStream?.isDefault ?: false)
 							val codec = mediaStream?.codec
 							if (codec != null) videoQueueManager.setLastPlayedVideoCodec(codec)
-							videoQueueManager.setLastPlayedVideoTitle(track.label)
-							videoQueueManager.setLastPlayedVideoIndexInType(trackIndexInList)
+							videoQueueManager.setLastPlayedVideoTitle(mediaStream?.title ?: track.label)
+							if (videoTypeIndex >= 0) videoQueueManager.setLastPlayedVideoIndexInType(videoTypeIndex)
 							backend.selectTrack(2, track)
 							expanded = false
 						}

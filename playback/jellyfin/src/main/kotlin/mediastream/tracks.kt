@@ -44,6 +44,7 @@ private fun getAudioTrack(stream: MediaStream) = MediaStreamAudioTrack(
 
 private fun getVideoTrack(stream: MediaStream) = MediaStreamVideoTrack(
 	codec = stream.codec.orEmpty(),
+	index = stream.index,
 	bitrate = stream.bitRate ?: 0,
 	width = stream.width ?: 0,
 	height = stream.height ?: 0,

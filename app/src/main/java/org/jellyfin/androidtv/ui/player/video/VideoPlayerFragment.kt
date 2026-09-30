@@ -194,10 +194,8 @@ class VideoPlayerFragment : Fragment() {
 
 					// Auto-select video track if needed
 					if (videoIndex != null) {
-						val videoStreams = baseItem.mediaStreams?.filter { it.type == MediaStreamType.VIDEO }.orEmpty()
-						val targetStream = videoStreams.firstOrNull { it.index == videoIndex }
-						val targetIndexInVideo = if (targetStream != null) videoStreams.indexOf(targetStream) else -1
-						val targetTrack = videoTracks.getOrNull(targetIndexInVideo) ?: videoTracks.firstOrNull()
+						val targetTrack = videoTracks.firstOrNull { it.mediaStreamIndex == videoIndex }
+							?: videoTracks.firstOrNull()
 						if (targetTrack != null && !targetTrack.isSelected) {
 							backend.selectTrack(2, targetTrack)
 						}
@@ -205,11 +203,8 @@ class VideoPlayerFragment : Fragment() {
 
 					// Auto-select audio track if needed
 					if (audioIndex != null) {
-						val audioStreams = baseItem.mediaStreams?.filter { it.type == MediaStreamType.AUDIO }.orEmpty()
-						val targetStream = audioStreams.firstOrNull { it.index == audioIndex }
-						val targetIndexInAudio = if (targetStream != null) audioStreams.indexOf(targetStream) else -1
-						val targetTrack = audioTracks.getOrNull(targetIndexInAudio)
-							?: audioTracks.firstOrNull { it.language.equals(targetStream?.language, ignoreCase = true) }
+						val targetTrack = audioTracks.firstOrNull { it.mediaStreamIndex == audioIndex }
+							?: audioTracks.firstOrNull { it.language.equals(activeAudioLang, ignoreCase = true) }
 						if (targetTrack != null && !targetTrack.isSelected) {
 							backend.selectTrack(1, targetTrack)
 						}
@@ -221,17 +216,18 @@ class VideoPlayerFragment : Fragment() {
 							backend.selectTrack(3, null)
 						}
 					} else {
-						val subStreams = baseItem.mediaStreams?.filter { it.type == MediaStreamType.SUBTITLE }.orEmpty()
-						val targetStream = subStreams.firstOrNull { it.index == subIndex }
-						val targetIndexInSub = if (targetStream != null) subStreams.indexOf(targetStream) else -1
-						val targetTrack = subTracks.getOrNull(targetIndexInSub)
+						val targetStream = baseItem.mediaStreams?.firstOrNull { it.index == subIndex }
+						val targetTrack = subTracks.firstOrNull { it.mediaStreamIndex == subIndex }
 							?: subTracks.firstOrNull { it.language.equals(targetStream?.language, ignoreCase = true) }
 						if (targetTrack != null && !targetTrack.isSelected) {
 							backend.selectTrack(3, targetTrack)
 						}
 					}
 
-					lastAutoSelectedEntryId = entryId
+					val hasSubtitleStreams = baseItem.mediaStreams?.any { it.type == MediaStreamType.SUBTITLE } == true
+					if (!hasSubtitleStreams || subTracks.isNotEmpty()) {
+						lastAutoSelectedEntryId = entryId
+					}
 				} finally {
 					isApplyingAutoTracks = false
 				}

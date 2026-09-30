@@ -65,6 +65,7 @@ data class MediaStreamAudioTrack(
 
 data class MediaStreamVideoTrack(
 	override val codec: String,
+	val index: Int = -1,
 	val bitrate: Int,
 	val width: Int,
 	val height: Int,

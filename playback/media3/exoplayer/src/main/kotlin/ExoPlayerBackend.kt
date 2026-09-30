@@ -577,6 +577,15 @@ class ExoPlayerBackend(
 					usedTrackIndices.add(matchedIndex)
 				}
 
+				val matchedMediaStreamIndex = if (matchedIndex != null) {
+					when (val trk = tracksForType?.getOrNull(matchedIndex)) {
+						is MediaStreamAudioTrack -> trk.index
+						is MediaStreamSubtitleTrack -> trk.index
+						is MediaStreamVideoTrack -> trk.index
+						else -> -1
+					}
+				} else -1
+
 				val langDisplayName = format.language?.let { getDisplayNameForLanguage(it) }
 
 				val label = matchedTitle
@@ -594,6 +603,7 @@ class ExoPlayerBackend(
 						isSelected = isSelected,
 						group = group,
 						trackIndex = i,
+						mediaStreamIndex = matchedMediaStreamIndex,
 					)
 				)
 			}

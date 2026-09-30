@@ -55,6 +55,7 @@ data class BackendTrack(
 	val isSelected: Boolean = false,
 	val group: Any? = null,
 	val trackIndex: Int = 0,
+	val mediaStreamIndex: Int = -1,
 )
 
 
