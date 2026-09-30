@@ -23,10 +23,11 @@ fun jellyfinPlugin(
 	mediaSegmentProvider: (suspend (BaseItemDto) -> List<MediaSegmentDto>)? = null,
 	localItemInspector: (suspend (File) -> BaseItemDto)? = null,
 	streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Pair<Int?, Int?>)? = null,
+	maxBitrateProvider: (() -> Int)? = null,
 	onPlaybackStop: ((BaseItemDto) -> Unit)? = null,
 	segmentAutoSkipPredicate: ((MediaSegmentDto) -> Boolean)? = null,
 ) = playbackPlugin {
-	provide(JellyfinMediaStreamResolver(api, deviceProfileBuilder, localItemInspector, streamIndexResolver))
+	provide(JellyfinMediaStreamResolver(api, deviceProfileBuilder, localItemInspector, streamIndexResolver, maxBitrateProvider))
 
 	val playSessionService = PlaySessionService(api, onPlaybackStop)
 	provide(playSessionService)

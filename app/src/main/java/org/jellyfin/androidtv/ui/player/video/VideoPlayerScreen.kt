@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.graphicsLayer
 import org.jellyfin.androidtv.preference.constant.ZoomMode
 import org.jellyfin.androidtv.ui.composable.rememberQueueEntry
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
@@ -94,7 +95,18 @@ fun VideoPlayerScreen() {
 				.aspectRatio(aspectRatio, videoSize.height < videoSize.width)
 				.fillMaxSize()
 				.align(Alignment.Center)
-			ZoomMode.AUTO_CROP,
+			ZoomMode.AUTO_CROP -> {
+				val screenRatio = 16f / 9f
+				val cropScale = when {
+					aspectRatio > screenRatio -> aspectRatio / screenRatio
+					aspectRatio < screenRatio -> screenRatio / aspectRatio
+					else -> 1f
+				}
+				Modifier
+					.graphicsLayer(scaleX = cropScale, scaleY = cropScale)
+					.fillMaxSize()
+					.align(Alignment.Center)
+			}
 			ZoomMode.STRETCH -> Modifier
 				.fillMaxSize()
 				.align(Alignment.Center)

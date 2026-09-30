@@ -402,6 +402,11 @@ class ExoPlayerBackend(
 			}
 		)
 
+		// Apply current playback speed
+		if (currentSpeed != 1.0f) {
+			exoPlayer.setPlaybackSpeed(currentSpeed)
+		}
+
 		// Enjoy!
 		Timber.i("Playing ${item.mediaStream?.url}")
 		exoPlayer.play()
@@ -435,7 +440,10 @@ class ExoPlayerBackend(
 		exoPlayer.isScrubbingModeEnabled = scrubbing
 	}
 
+	private var currentSpeed: Float = 1.0f
+
 	override fun setSpeed(speed: Float) {
+		currentSpeed = speed
 		if (!exoPlayer.isCommandAvailable(Player.COMMAND_SET_SPEED_AND_PITCH)) {
 			Timber.w("Trying to change speed but ExoPlayer doesn't support it for the current item")
 		}

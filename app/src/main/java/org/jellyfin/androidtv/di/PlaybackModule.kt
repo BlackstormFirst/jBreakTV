@@ -171,6 +171,10 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 				val subIndex = playbackIndexManager.getBestSubtitleIndex(sourceToUse, androidContext(), activeAudioLang)
 				Pair(audioIndex, subIndex)
 			},
+			maxBitrateProvider = {
+				val mbps = userPreferences[UserPreferences.maxBitrate].toFloatOrNull() ?: 200f
+				(mbps * 1_000_000f).toInt()
+			},
 			onPlaybackStop = { item ->
 				dataRefreshService.lastPlayback = Instant.now()
 				dataRefreshService.lastPlayedItem = item

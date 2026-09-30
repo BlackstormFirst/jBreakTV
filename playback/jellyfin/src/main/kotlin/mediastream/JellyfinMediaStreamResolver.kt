@@ -28,6 +28,7 @@ class JellyfinMediaStreamResolver(
 	private val deviceProfileBuilder: () -> DeviceProfile,
 	private val localItemInspector: (suspend (File) -> BaseItemDto)? = null,
 	private val streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Pair<Int?, Int?>)? = null,
+	private val maxBitrateProvider: (() -> Int)? = null,
 ) : MediaStreamResolver {
 	companion object {
 		private val supportedMediaTypes = arrayOf(MediaType.VIDEO, MediaType.AUDIO)
@@ -156,12 +157,14 @@ class JellyfinMediaStreamResolver(
 		val startTicks = item.userData?.playbackPositionTicks ?: 0L
 
 		val profile = deviceProfileBuilder()
+		val maxBitrate = maxBitrateProvider?.invoke() ?: 0
 		val response = api.mediaInfoApi.getPostedPlaybackInfo(
 			itemId = item.id,
 			data = PlaybackInfoDto(
 				mediaSourceId = mediaSourceId,
 				startTimeTicks = startTicks,
 				deviceProfile = profile,
+				maxStreamingBitrate = maxBitrate.takeIf { it > 0 },
 				enableDirectPlay = true,
 				enableDirectStream = true,
 				enableTranscoding = true,
