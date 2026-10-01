@@ -72,6 +72,7 @@ import io.github.peerless2012.ass.media.kt.AssPlayerKt;
 import io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory;
 import io.github.peerless2012.ass.media.type.AssRenderType;
 import io.github.peerless2012.ass.media.widget.AssSubtitleView;
+import org.jellyfin.playback.media3.exoplayer.support.AssFontManager;
 import timber.log.Timber;
 
 @OptIn(markerClass = UnstableApi.class)
@@ -488,6 +489,10 @@ public class VideoManager {
                         Timber.w(e, "Could not set frame rate on surface view directly");
                     }
                 }
+            }
+
+            if (mAssHandler != null) {
+                AssFontManager.preloadFonts(mActivity, path, mAssHandler);
             }
 
             mExoPlayer.setMediaItem(mediaItem);

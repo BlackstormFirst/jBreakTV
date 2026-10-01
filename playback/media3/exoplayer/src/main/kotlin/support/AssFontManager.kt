@@ -2,7 +2,9 @@ package org.jellyfin.playback.media3.exoplayer.support
 
 import android.content.Context
 import io.github.peerless2012.ass.media.AssHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.queue.QueueEntry
@@ -20,14 +22,25 @@ object AssFontManager {
 		return dir
 	}
 
-	suspend fun preloadFontsForEntry(
+	@JvmStatic
+	fun preloadFonts(
 		context: Context,
-		entry: QueueEntry,
+		url: String?,
+		assHandler: AssHandler?,
+	) {
+		if (assHandler == null || url.isNullOrEmpty()) return
+		CoroutineScope(Dispatchers.IO).launch {
+			preloadFontsForUrl(context, url, assHandler)
+		}
+	}
+
+	suspend fun preloadFontsForUrl(
+		context: Context,
+		url: String?,
 		assHandler: AssHandler?,
 	) = withContext(Dispatchers.IO) {
-		if (assHandler == null) return@withContext
+		if (assHandler == null || url.isNullOrEmpty()) return@withContext
 
-		val url = entry.mediaStream?.url ?: return@withContext
 		val isLocalFile = url.startsWith("file://") || url.startsWith("/")
 
 		runCatching {
@@ -55,4 +68,10 @@ object AssFontManager {
 			Timber.w(error, "Failed to preload ASS fonts")
 		}
 	}
+
+	suspend fun preloadFontsForEntry(
+		context: Context,
+		entry: QueueEntry,
+		assHandler: AssHandler?,
+	) = preloadFontsForUrl(context, entry.mediaStream?.url, assHandler)
 }
