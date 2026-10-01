@@ -34,10 +34,14 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.rememberAsyncImagePainter
@@ -274,6 +278,7 @@ private fun TrickplayFilmstripBar(
 		?: return
 
 	val trickPlayInfo = trickPlayResolutions.values.firstOrNull() ?: return
+	if (trickPlayInfo.interval <= 0) return
 
 	val mediaSourceId = item.mediaSources?.firstOrNull()?.id?.toUUIDOrNull()
 		?: item.trickplay?.keys?.firstOrNull()?.toUUIDOrNull()
@@ -281,35 +286,26 @@ private fun TrickplayFilmstripBar(
 
 	val currentTimeMs = scrubbingProgress.inWholeMilliseconds
 	val centerTileIndex = currentTimeMs.floorDiv(trickPlayInfo.interval).toInt()
+	val maxDurationMs = item.runTimeTicks?.let { it / 10000L } ?: 0L
 
 	val context = LocalContext.current
 
-	Box(
+	Layout(
 		modifier = modifier
 			.fillMaxWidth()
 			.background(Color.Black.copy(alpha = 0.65f))
-			.padding(vertical = 6.dp),
-		contentAlignment = Alignment.Center,
-	) {
-		Row(
-			horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-			verticalAlignment = Alignment.CenterVertically,
-		) {
+			.padding(vertical = 8.dp),
+		content = {
 			for (offset in -5..5) {
-				val isCenter = (offset == 0)
-				val tileWidth = if (isCenter) 160.dp else 106.dp
-				val tileHeight = if (isCenter) 90.dp else 60.dp
-
 				val tileIndex = centerTileIndex + offset
 				val tileTimeMs = tileIndex * trickPlayInfo.interval
+				val isValid = tileTimeMs >= 0 && (maxDurationMs <= 0 || tileTimeMs <= maxDurationMs)
 
-				if (tileTimeMs < 0 || (item.runTimeTicks != null && tileTimeMs * 10000L > item.runTimeTicks!!)) {
-					Box(
-						modifier = Modifier
-							.size(width = tileWidth, height = tileHeight)
-							.background(Color.Black.copy(alpha = 0.4f))
-					)
-				} else {
+				if (isValid) {
+					val isCenter = (offset == 0)
+					val tileWidth = if (isCenter) 160.dp else 106.dp
+					val tileHeight = if (isCenter) 90.dp else 60.dp
+
 					val tileSize = trickPlayInfo.tileWidth * trickPlayInfo.tileHeight
 					val tileOffset = tileIndex % tileSize
 					val sheetIndex = tileIndex / tileSize
@@ -349,24 +345,70 @@ private fun TrickplayFilmstripBar(
 
 					Box(
 						modifier = Modifier
+							.layoutId(offset)
 							.size(width = tileWidth, height = tileHeight)
 							.clip(RoundedCornerShape(4.dp))
 							.background(Color.Black)
 							.border(
 								width = if (isCenter) 2.dp else 1.dp,
-								color = if (isCenter) Color.Black else Color.Black.copy(alpha = 0.5f),
+								color = if (isCenter) Color.White else Color.White.copy(alpha = 0.3f),
 								shape = RoundedCornerShape(4.dp)
 							)
 					) {
 						Image(
 							painter = rememberAsyncImagePainter(imageRequest),
 							contentDescription = null,
-							modifier = Modifier.fillMaxSize()
+							modifier = Modifier.fillMaxSize(),
+							contentScale = ContentScale.Crop,
 						)
 					}
 				}
 			}
 		}
+	) { measurables, constraints ->
+		val childConstraints = Constraints(
+			minWidth = 0,
+			maxWidth = constraints.maxWidth,
+			minHeight = 0,
+			maxHeight = constraints.maxHeight,
+		)
+		val placeables = measurables.associate { measurable ->
+			val offset = measurable.layoutId as Int
+			offset to measurable.measure(childConstraints)
+		}
 
+		val centerPlaceable = placeables[0]
+		val maxTileHeight = placeables.values.maxOfOrNull { it.height } ?: 0
+		val layoutWidth = constraints.maxWidth
+		val layoutHeight = maxTileHeight
+		val centerX = layoutWidth / 2
+		val spacingPx = 8.dp.roundToPx()
+
+		layout(layoutWidth, layoutHeight) {
+			if (centerPlaceable != null) {
+				val centerLeft = centerX - (centerPlaceable.width / 2)
+				val centerTop = (layoutHeight - centerPlaceable.height) / 2
+				centerPlaceable.place(centerLeft, centerTop)
+
+				// Place left tiles: offset -1 downTo -5
+				var currentLeft = centerLeft - spacingPx
+				for (offset in -1 downTo -5) {
+					val placeable = placeables[offset] ?: break
+					currentLeft -= placeable.width
+					val top = (layoutHeight - placeable.height) / 2
+					placeable.place(currentLeft, top)
+					currentLeft -= spacingPx
+				}
+
+				// Place right tiles: offset 1..5
+				var currentRight = centerLeft + centerPlaceable.width + spacingPx
+				for (offset in 1..5) {
+					val placeable = placeables[offset] ?: break
+					val top = (layoutHeight - placeable.height) / 2
+					placeable.place(currentRight, top)
+					currentRight += placeable.width + spacingPx
+				}
+			}
+		}
 	}
 }
