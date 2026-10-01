@@ -12,7 +12,10 @@ import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.ui.GuideChannelHeader
 import org.jellyfin.androidtv.ui.asTimerInfoDto
+import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.livetv.TvManager
+import org.jellyfin.androidtv.ui.player.base.toast.MediaToastRegistry
+import org.jellyfin.androidtv.ui.player.base.toast.MediaToasts
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
@@ -191,3 +194,27 @@ fun CustomPlaybackOverlayFragment.recordProgram(program: BaseItemDto, isSeries: 
 fun CustomPlaybackOverlayFragment.askToSkip(position: Duration) {
 	binding.skipOverlay.targetPosition = position
 }
+
+fun CustomPlaybackOverlayFragment.setupToastOverlay() {
+	val registry = MediaToastRegistry(viewLifecycleOwner.lifecycleScope)
+	binding.toastOverlay.setContent {
+		JellyfinTheme {
+			MediaToasts(registry)
+		}
+	}
+	binding.toastOverlay.setTag(R.id.toast_overlay, registry)
+}
+
+fun CustomPlaybackOverlayFragment.onPlayStateChanged(isPlaying: Boolean) {
+	val registry = binding.toastOverlay.getTag(R.id.toast_overlay) as? MediaToastRegistry ?: return
+	val isInitializedKey = R.id.toast_overlay + 1
+	val isInitialized = binding.toastOverlay.getTag(isInitializedKey) as? Boolean ?: false
+	if (!isInitialized) {
+		if (isPlaying) {
+			binding.toastOverlay.setTag(isInitializedKey, true)
+		}
+		return
+	}
+	registry.emit(if (isPlaying) R.drawable.ic_play else R.drawable.ic_pause)
+}
+

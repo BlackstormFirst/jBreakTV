@@ -213,6 +213,8 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        CustomPlaybackOverlayFragmentHelperKt.setupToastOverlay(this);
+
         if (mItemsToPlay == null || mItemsToPlay.isEmpty()) {
             Utils.showToast(requireContext(), getString(R.string.msg_no_playable_items));
             closePlayer();
@@ -1266,6 +1268,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
 
     public void setPlayPauseActionState(final int state) {
         leanbackOverlayFragment.updatePlayState();
+        PlaybackController pc = playbackControllerContainer.getValue().getPlaybackController();
+        if (pc != null) {
+            CustomPlaybackOverlayFragmentHelperKt.onPlayStateChanged(this, pc.isPlaying());
+        }
     }
 
     public void updateDisplay() {
