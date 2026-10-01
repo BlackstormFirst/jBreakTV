@@ -134,15 +134,6 @@ public class PlaybackIndexManager {
             }
         }
 
-        if (isLocal && (lastAudioLanguage == null || lastAudioLanguage.isEmpty())) {
-            for (MediaStream stream : allAudioStreams) {
-                if (stream.isDefault()) {
-                    return stream.getIndex();
-                }
-            }
-            return allAudioStreams.get(0).getIndex();
-        }
-
         var userAudioLangRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getAudioLangRemoteSetting());
         boolean userAudioAlwaysDefaultRemoteSetting = userPreferences.getValue().get(UserSettingPreferences.Companion.getUserAlwaysUseAudioDefault());
         var userSubMode = userPreferences.getValue().get(UserSettingPreferences.Companion.getSubMode());

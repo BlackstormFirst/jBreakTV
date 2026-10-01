@@ -349,7 +349,7 @@ object LocalVideoManager {
                         val channelLayoutVal = AudioChannelHelper.formatChannelLayout(channels).ifBlank { null }
                         val audioProfileVal = AudioChannelHelper.detectAudioProfile(format)
 
-                        val isAudioDefault = isFormatDefault || nbA == 1
+                        val isAudioDefault = isFormatDefault
                         val title = resolveTrackTitle(format, MediaStreamType.AUDIO, displayName, codec.uppercase(Locale.ROOT), channels, isDefault = isAudioDefault, isForced = isForced, context = context)
 
                         streams.add(MediaStream(type = MediaStreamType.AUDIO, index = globalIndex++, codec = codec, channels = channels, sampleRate = sampleRate, bitRate = bitrate, channelLayout = channelLayoutVal, profile = audioProfileVal, language = lang, title = title, displayTitle = title, isDefault = isAudioDefault, isForced = isForced, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
