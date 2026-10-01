@@ -428,6 +428,7 @@ private fun SubtitleButton(
 					onClick = {
 						val subStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.SUBTITLE }.orEmpty()
 						val mediaStream = subStreams.firstOrNull { it.index == track.mediaStreamIndex }
+							?: subStreams.firstOrNull { (it.language != null && it.language.equals(track.language, ignoreCase = true)) || it.displayTitle == track.label || it.title == track.label }
 							?: subStreams.getOrNull(trackIndexInList)
 						val lang = track.language ?: mediaStream?.language
 						videoQueueManager.setLastPlayedSubtitleLanguageIsoCode(lang)
@@ -491,6 +492,7 @@ private fun AudioButton(
 					onClick = {
 						val audioStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.AUDIO }.orEmpty()
 						val mediaStream = audioStreams.firstOrNull { it.index == track.mediaStreamIndex }
+							?: audioStreams.firstOrNull { (it.language != null && it.language.equals(track.language, ignoreCase = true)) || it.displayTitle == track.label || it.title == track.label }
 							?: audioStreams.getOrNull(trackIndexInList)
 						val lang = track.language ?: mediaStream?.language
 						if (lang != null) videoQueueManager.setLastPlayedAudioLanguageIsoCode(lang)
@@ -561,6 +563,7 @@ private fun VideoButton(
 						onClick = {
 							val videoStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.VIDEO }.orEmpty()
 							val mediaStream = videoStreams.firstOrNull { it.index == track.mediaStreamIndex }
+								?: videoStreams.firstOrNull { it.displayTitle == track.label || it.title == track.label }
 								?: videoStreams.getOrNull(trackIndexInList)
 							val videoTypeIndex = if (mediaStream != null) videoStreams.indexOf(mediaStream) else trackIndexInList
 							videoQueueManager.setLastPlayedVideoDefaultState(mediaStream?.isDefault ?: false)

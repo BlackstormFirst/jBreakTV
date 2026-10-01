@@ -459,7 +459,7 @@ public class PlaybackIndexManager {
 
         // MODE SMART
         if (userSubMode.equals(R.string.subtitle_mode_smart)) {
-            boolean audioMatchesUserPreference = areLanguagesEqual(audioLang, userAudioLangRemoteSetting);
+            boolean audioMatchesUserPreference = userAudioLangRemoteSetting.isEmpty() || audioLang == null || "und".equalsIgnoreCase(audioLang) || "null".equalsIgnoreCase(audioLang) || areLanguagesEqual(audioLang, userAudioLangRemoteSetting);
 
             if (audioMatchesUserPreference) {
                 // Audio is in user's native/preferred language -> Subtitles NOT needed unless FORCED

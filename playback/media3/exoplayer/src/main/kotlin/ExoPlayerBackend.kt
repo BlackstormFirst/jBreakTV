@@ -12,6 +12,7 @@ import org.jellyfin.playback.media3.exoplayer.mapping.getFfmpegSubtitleMimeType
 import androidx.annotation.OptIn
 import androidx.core.content.getSystemService
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -548,6 +549,92 @@ class ExoPlayerBackend(
 		}
 	}
 
+	private fun findBestEmbeddedTrackMatch(
+		format: Format,
+		candidates: List<Any>,
+		usedIndices: Set<Int>
+	): Any? {
+		val availableCandidates = candidates.filter { trk ->
+			val index = when (trk) {
+				is MediaStreamAudioTrack -> trk.index
+				is MediaStreamSubtitleTrack -> trk.index
+				is MediaStreamVideoTrack -> trk.index
+				else -> -1
+			}
+			index !in usedIndices
+		}
+
+		if (availableCandidates.isEmpty()) return null
+		if (availableCandidates.size == 1) return availableCandidates.first()
+
+		val formatLang = format.language?.lowercase(Locale.ROOT).orEmpty()
+		val isFormatForced = (format.selectionFlags and C.SELECTION_FLAG_FORCED) != 0 ||
+			format.label?.lowercase(Locale.ROOT)?.let { it.contains("forced") || it.contains("forcé") } == true
+		val isFormatDefault = (format.selectionFlags and C.SELECTION_FLAG_DEFAULT) != 0
+
+		var bestCandidate: Any? = null
+		var bestScore = -1000
+
+		for (cand in availableCandidates) {
+			var score = 0
+			when (cand) {
+				is MediaStreamSubtitleTrack -> {
+					val candLang = cand.language?.lowercase(Locale.ROOT).orEmpty()
+					if (cand.isForced == isFormatForced) {
+						score += 100
+					} else {
+						score -= 50
+					}
+					if (formatLang.isNotEmpty() && candLang.isNotEmpty()) {
+						if (normalizeLanguageCode(formatLang) == normalizeLanguageCode(candLang)) {
+							score += 50
+						}
+					} else if (formatLang.isEmpty() && candLang.isEmpty()) {
+						score += 20
+					}
+					if (cand.isDefault == isFormatDefault) {
+						score += 20
+					}
+					val label = format.label
+					if (!label.isNullOrBlank() && (cand.displayTitle == label || cand.title == label)) {
+						score += 30
+					}
+				}
+				is MediaStreamAudioTrack -> {
+					val candLang = cand.language?.lowercase(Locale.ROOT).orEmpty()
+					if (formatLang.isNotEmpty() && candLang.isNotEmpty()) {
+						if (normalizeLanguageCode(formatLang) == normalizeLanguageCode(candLang)) {
+							score += 50
+						}
+					} else if (formatLang.isEmpty() && candLang.isEmpty()) {
+						score += 20
+					}
+					if (format.channelCount != Format.NO_VALUE && format.channelCount == cand.channels) {
+						score += 30
+					}
+					if (cand.isDefault == isFormatDefault) {
+						score += 20
+					}
+				}
+				is MediaStreamVideoTrack -> {
+					if (format.width != Format.NO_VALUE && format.width == cand.width) {
+						score += 40
+					}
+					if (format.height != Format.NO_VALUE && format.height == cand.height) {
+						score += 40
+					}
+				}
+			}
+
+			if (score > bestScore) {
+				bestScore = score
+				bestCandidate = cand
+			}
+		}
+
+		return bestCandidate
+	}
+
 	override fun getTracks(trackType: Int): List<BackendTrack> {
 		val trackList = mutableListOf<BackendTrack>()
 		val currentTracks = exoPlayer.currentTracks
@@ -559,7 +646,10 @@ class ExoPlayerBackend(
 			else -> null
 		}
 
-		val usedTrackIndices = mutableSetOf<Int>()
+		val externalSubTracks = tracksForType?.filterIsInstance<MediaStreamSubtitleTrack>()?.filter { it.isExternal }.orEmpty()
+		val embeddedTracks = tracksForType?.filter { trk -> !(trk is MediaStreamSubtitleTrack && trk.isExternal) }.orEmpty()
+
+		val usedIndices = mutableSetOf<Int>()
 
 		for (groupInfo in currentTracks.groups) {
 			if (groupInfo.type != trackType) continue
@@ -569,64 +659,65 @@ class ExoPlayerBackend(
 				val isSelected = groupInfo.isTrackSelected(i)
 				val trackIndexInType = trackList.size
 
-				val lang = format.language?.lowercase(Locale.ROOT)
+				val formatId = format.id.orEmpty()
+				var matchedTrack: Any? = null
 
-				var matchedTitle: String? = null
-				var matchedIndex: Int? = null
+				if (trackType == C.TRACK_TYPE_TEXT) {
+					// 1. Check if this ExoPlayer track is an external subtitle track
+					val parsedExtIndex = if (formatId.startsWith("JF_EXTERNAL:")) {
+						formatId.substringAfter("JF_EXTERNAL:").toIntOrNull()
+					} else null
 
-				// 1. Check direct index match if language matches or is missing
-				val candidateAtIndex = tracksForType?.getOrNull(trackIndexInType)
-				if (candidateAtIndex != null && !usedTrackIndices.contains(trackIndexInType)) {
-					val candLang = when (candidateAtIndex) {
-						is MediaStreamAudioTrack -> candidateAtIndex.language
-						is MediaStreamSubtitleTrack -> candidateAtIndex.language
-						else -> null
-					}?.lowercase(Locale.ROOT)
-
-					if (lang.isNullOrBlank() || candLang.isNullOrBlank() || lang == candLang || normalizeLanguageCode(lang) == normalizeLanguageCode(candLang)) {
-						matchedTitle = when (candidateAtIndex) {
-							is MediaStreamAudioTrack -> candidateAtIndex.displayTitle ?: candidateAtIndex.title
-							is MediaStreamSubtitleTrack -> candidateAtIndex.displayTitle ?: candidateAtIndex.title
-							else -> null
-						}
-						matchedIndex = trackIndexInType
+					if (parsedExtIndex != null) {
+						matchedTrack = externalSubTracks.firstOrNull { it.index == parsedExtIndex && !usedIndices.contains(it.index) }
 					}
-				}
 
-				// 2. Search by language among unused tracks if index match failed
-				if (matchedTitle == null && tracksForType != null && !lang.isNullOrBlank()) {
-					tracksForType.forEachIndexed { idx, trk ->
-						if (matchedTitle == null && !usedTrackIndices.contains(idx)) {
-							val trkLang = when (trk) {
-								is MediaStreamAudioTrack -> trk.language
-								is MediaStreamSubtitleTrack -> trk.language
-								else -> null
-							}?.lowercase(Locale.ROOT)
-
-							if (trkLang != null && (lang == trkLang || normalizeLanguageCode(lang) == normalizeLanguageCode(trkLang))) {
-								matchedTitle = when (trk) {
-									is MediaStreamAudioTrack -> trk.displayTitle ?: trk.title
-									is MediaStreamSubtitleTrack -> trk.displayTitle ?: trk.title
-									else -> null
-								}
-								matchedIndex = idx
-							}
+					if (matchedTrack == null && externalSubTracks.isNotEmpty()) {
+						val lang = format.language?.lowercase(Locale.ROOT)
+						val label = format.label
+						matchedTrack = externalSubTracks.firstOrNull { trk ->
+							if (usedIndices.contains(trk.index)) return@firstOrNull false
+							val trkLang = trk.language?.lowercase(Locale.ROOT)
+							trk.displayTitle == label || trk.title == label ||
+								(!lang.isNullOrBlank() && !trkLang.isNullOrBlank() && normalizeLanguageCode(lang) == normalizeLanguageCode(trkLang))
 						}
 					}
 				}
 
-				if (matchedIndex != null) {
-					usedTrackIndices.add(matchedIndex)
+				// 2. If not matched as external subtitle, match against embedded tracks
+				if (matchedTrack == null && embeddedTracks.isNotEmpty()) {
+					matchedTrack = findBestEmbeddedTrackMatch(format, embeddedTracks, usedIndices)
 				}
 
-				val matchedMediaStreamIndex = if (matchedIndex != null) {
-					when (val trk = tracksForType?.getOrNull(matchedIndex)) {
-						is MediaStreamAudioTrack -> trk.index
-						is MediaStreamSubtitleTrack -> trk.index
-						is MediaStreamVideoTrack -> trk.index
-						else -> -1
+				// 3. Last fallback if still not matched
+				if (matchedTrack == null && tracksForType != null) {
+					matchedTrack = tracksForType.firstOrNull { trk ->
+						val idx = when (trk) {
+							is MediaStreamAudioTrack -> trk.index
+							is MediaStreamSubtitleTrack -> trk.index
+							is MediaStreamVideoTrack -> trk.index
+							else -> -1
+						}
+						!usedIndices.contains(idx)
 					}
-				} else -1
+				}
+
+				val matchedMediaStreamIndex = when (matchedTrack) {
+					is MediaStreamAudioTrack -> matchedTrack.index
+					is MediaStreamSubtitleTrack -> matchedTrack.index
+					is MediaStreamVideoTrack -> matchedTrack.index
+					else -> -1
+				}
+
+				if (matchedMediaStreamIndex != -1) {
+					usedIndices.add(matchedMediaStreamIndex)
+				}
+
+				val matchedTitle = when (matchedTrack) {
+					is MediaStreamAudioTrack -> matchedTrack.displayTitle ?: matchedTrack.title
+					is MediaStreamSubtitleTrack -> matchedTrack.displayTitle ?: matchedTrack.title
+					else -> null
+				}
 
 				val langDisplayName = format.language?.let { getDisplayNameForLanguage(it) }
 
