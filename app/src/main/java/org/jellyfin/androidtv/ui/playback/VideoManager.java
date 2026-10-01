@@ -11,7 +11,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.util.TypedValue;
-import android.view.Surface;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -120,7 +119,7 @@ public class VideoManager {
         if (nightModeEnabled) {
             mExoPlayer.addAnalyticsListener(new AnalyticsListener() {
                 @Override
-                public void onAudioSessionIdChanged(AnalyticsListener.EventTime eventTime, int audioSessionId) {
+                public void onAudioSessionIdChanged(EventTime eventTime, int audioSessionId) {
                     VideoManagerHelperKt.applyAudioNightmode(audioSessionId);
                 }
             });
@@ -213,6 +212,16 @@ public class VideoManager {
 
     public void subscribe(@NonNull PlaybackControllerNotifiable notifier) {
         mPlaybackControllerNotifiable = notifier;
+    }
+
+    public SurfaceView getSurfaceView() {
+        if (mExoPlayerView != null) {
+            View view = mExoPlayerView.getVideoSurfaceView();
+            if (view instanceof SurfaceView) {
+                return (SurfaceView) view;
+            }
+        }
+        return null;
     }
 
     private int determineExoPlayerExtensionRendererMode() {
@@ -467,30 +476,6 @@ public class VideoManager {
                     .setSubtitleConfigurations(subtitleConfigurations)
                     .build();
 
-            MediaStream videoStream = JavaCompat.getVideoStream(streamInfo.getMediaSource());
-            if (videoStream != null && videoStream.getRealFrameRate() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                float frameRate = videoStream.getRealFrameRate();
-                if (frameRate > 0) {
-                    try {
-                        View surfaceView = mExoPlayerView.getVideoSurfaceView();
-                        if (surfaceView instanceof SurfaceView) {
-                            Surface surface = ((SurfaceView) surfaceView).getHolder().getSurface();
-                            if (surface != null && surface.isValid()) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                    surface.setFrameRate(frameRate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE, Surface.CHANGE_FRAME_RATE_ALWAYS);
-                                    Timber.i("Successfully set surface frame rate to %f (CHANGE_FRAME_RATE_ALWAYS)", frameRate);
-                                } else {
-                                    surface.setFrameRate(frameRate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
-                                    Timber.i("Successfully set surface frame rate to %f (R-compatible)", frameRate);
-                                }
-                            }
-                        }
-                    } catch (Exception e) {
-                        Timber.w(e, "Could not set frame rate on surface view directly");
-                    }
-                }
-            }
-
             if (mAssHandler != null) {
                 AssFontManager.preloadFonts(mActivity, path, mAssHandler);
             }
@@ -502,7 +487,7 @@ public class VideoManager {
         }
     }
 
-    private int offsetStreamIndex(int index, boolean adjustByAdding, @Nullable List<org.jellyfin.sdk.model.api.MediaStream> allStreams) {
+    private int offsetStreamIndex(int index, boolean adjustByAdding, @Nullable List<MediaStream> allStreams) {
         if (index < 0 || allStreams == null)
             return -1;
 
@@ -514,7 +499,7 @@ public class VideoManager {
         // use indexStartsAtOne=true when the player's tracks list uses indexes/IDs starting at 1
         // MediaStream indexes/IDs start at 0
 
-        for (org.jellyfin.sdk.model.api.MediaStream stream : allStreams) {
+        for (MediaStream stream : allStreams) {
             if (!stream.isExternal())
                 break;
             index += adjustByAdding ? 1 : -1;
@@ -523,7 +508,7 @@ public class VideoManager {
         return index < 0 || index > allStreams.size() ? -1 : index;
     }
 
-    public int getExoPlayerTrack(@Nullable org.jellyfin.sdk.model.api.MediaStreamType streamType, @Nullable List<org.jellyfin.sdk.model.api.MediaStream> allStreams) {
+    public int getExoPlayerTrack(@Nullable MediaStreamType streamType, @Nullable List<MediaStream> allStreams) {
         if (!isInitialized() || streamType == null || allStreams == null)
             return -1;
         if (streamType != MediaStreamType.SUBTITLE && streamType != MediaStreamType.AUDIO && streamType != MediaStreamType.VIDEO)

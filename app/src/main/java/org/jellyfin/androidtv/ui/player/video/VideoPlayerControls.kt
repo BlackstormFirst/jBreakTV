@@ -59,6 +59,7 @@ import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import org.jellyfin.androidtv.util.apiclient.chapterImages
 import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.core.mediastream.mediaStream
@@ -632,7 +633,11 @@ private fun PlaybackSpeedButton(
 private fun MaxBitrateButton(
 	playbackManager: PlaybackManager,
 	visibilityState: PlayerOverlayVisibilityState,
-) = Box {
+) {
+	val entry by rememberQueueEntry(playbackManager)
+	val item = entry?.run { baseItemFlow.collectAsState(baseItem) }?.value ?: entry?.baseItem
+	if (item != null && LocalVideoManager.isLocalItem(item)) return
+
 	var expanded by remember { mutableStateOf(false) }
 
 	LaunchedEffect(expanded) {
@@ -646,50 +651,52 @@ private fun MaxBitrateButton(
 	val selectedFocusRequester = remember { FocusRequester() }
 	val coroutineScope = rememberCoroutineScope()
 
-	IconButton(
-		onClick = { expanded = true },
-	) {
-		Icon(
-			imageVector = ImageVector.vectorResource(R.drawable.ic_select_quality),
-			contentDescription = stringResource(R.string.lbl_quality_profile),
-		)
-	}
+	Box {
+		IconButton(
+			onClick = { expanded = true },
+		) {
+			Icon(
+				imageVector = ImageVector.vectorResource(R.drawable.ic_select_quality),
+				contentDescription = stringResource(R.string.lbl_quality_profile),
+			)
+		}
 
-	Popover(
-		expanded = expanded,
-		onDismissRequest = { expanded = false },
-		alignment = Alignment.TopCenter,
-		offset = DpOffset(0.dp, (-5).dp),
-		initialFocusRequester = selectedFocusRequester,
-	) {
-		PopoverMenu {
-			options.forEach { (value, label) ->
-				val isSelected = maxBitrate == value
-				PopoverMenuCheckboxItem(
-					selected = isSelected,
-					focusRequester = if (isSelected) selectedFocusRequester else null,
-					onClick = {
-						if (maxBitrate != value) {
-							maxBitrate = value
-							coroutineScope.launch {
-								val currentPositionMs = playbackManager.state.positionInfo.active.inWholeMilliseconds
-								val entry = playbackManager.queue.entry.value
-								if (entry != null) {
-									val updatedUserData = entry.baseItem?.userData?.copy(playbackPositionTicks = currentPositionMs * 10000L)
-									entry.baseItem = entry.baseItem?.copy(userData = updatedUserData)
-									entry.mediaStream = null
-									val currentIndex = playbackManager.queue.entryIndex.value
-									if (currentIndex != Queue.INDEX_NONE) {
-										playbackManager.queue.setIndex(Queue.INDEX_NONE)
-										playbackManager.queue.setIndex(currentIndex)
+		Popover(
+			expanded = expanded,
+			onDismissRequest = { expanded = false },
+			alignment = Alignment.TopCenter,
+			offset = DpOffset(0.dp, (-5).dp),
+			initialFocusRequester = selectedFocusRequester,
+		) {
+			PopoverMenu {
+				options.forEach { (value, label) ->
+					val isSelected = maxBitrate == value
+					PopoverMenuCheckboxItem(
+						selected = isSelected,
+						focusRequester = if (isSelected) selectedFocusRequester else null,
+						onClick = {
+							if (maxBitrate != value) {
+								maxBitrate = value
+								coroutineScope.launch {
+									val currentPositionMs = playbackManager.state.positionInfo.active.inWholeMilliseconds
+									val entry = playbackManager.queue.entry.value
+									if (entry != null) {
+										val updatedUserData = entry.baseItem?.userData?.copy(playbackPositionTicks = currentPositionMs * 10000L)
+										entry.baseItem = entry.baseItem?.copy(userData = updatedUserData)
+										entry.mediaStream = null
+										val currentIndex = playbackManager.queue.entryIndex.value
+										if (currentIndex != Queue.INDEX_NONE) {
+											playbackManager.queue.setIndex(Queue.INDEX_NONE)
+											playbackManager.queue.setIndex(currentIndex)
+										}
 									}
 								}
 							}
+							expanded = false
 						}
-						expanded = false
+					) {
+						Text(label)
 					}
-				) {
-					Text(label)
 				}
 			}
 		}

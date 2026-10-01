@@ -114,6 +114,13 @@ class VideoPlayerFragment : Fragment() {
 			}
 		}
 
+		lifecycleScope.launch {
+			playbackManager.queue.entry.collect {
+				val videoSize = playbackManager.state.videoSize.value
+				applyRefreshRate(videoSize)
+			}
+		}
+
 		// Observe play state to navigate back when playback is stopped after starting
 		lifecycleScope.launch {
 			var hasStarted = false
@@ -251,10 +258,13 @@ class VideoPlayerFragment : Fragment() {
 			else -> return
 		}
 
+		val surfaceView = playbackManager.backendService.surfaceView?.surface
+
 		refreshRateHelper?.updateRefreshRate(
 			frameRate = frameRate,
 			videoWidth = videoSize.width,
 			videoHeight = videoSize.height,
+			surfaceView = surfaceView,
 		)
 	}
 
@@ -266,6 +276,13 @@ class VideoPlayerFragment : Fragment() {
 		BaseScreen {
 			VideoPlayerScreen()
 		}
+	}
+
+	override fun onDestroyView() {
+		super.onDestroyView()
+
+		val surfaceView = playbackManager.backendService.surfaceView?.surface
+		refreshRateHelper?.resetRefreshRate(surfaceView)
 	}
 
 	override fun onPause() {
@@ -284,11 +301,11 @@ class VideoPlayerFragment : Fragment() {
 		}
 	}
 
-
 	override fun onStop() {
 		super.onStop()
 
-		refreshRateHelper?.resetRefreshRate()
+		val surfaceView = playbackManager.backendService.surfaceView?.surface
+		refreshRateHelper?.resetRefreshRate(surfaceView)
 		playbackManager.state.stop()
 	}
 

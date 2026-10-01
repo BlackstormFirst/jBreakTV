@@ -157,6 +157,17 @@ class MainActivity : FragmentActivity() {
 
 		workManager.enqueue(OneTimeWorkRequestBuilder<LeanbackChannelWorker>().build())
 		Timber.i("MainActivity stopped")
+
+		try {
+			val params = window.attributes
+			if (params.preferredDisplayModeId != 0) {
+				Timber.i("Resetting preferredDisplayModeId to default (0) on MainActivity stop")
+				params.preferredDisplayModeId = 0
+				window.attributes = params
+			}
+		} catch (e: Exception) {
+			Timber.w(e, "Error resetting preferredDisplayModeId on MainActivity stop")
+		}
 	}
 
 	@Suppress("RestrictedApi")

@@ -15,6 +15,7 @@ class BackendService {
 
 	private var listeners = mutableListOf<PlayerBackendEventListener>()
 	private var _surfaceView: PlayerSurfaceView? = null
+	val surfaceView get() = _surfaceView
 	private var _subtitleView: PlayerSubtitleView? = null
 
 	fun switchBackend(backend: PlayerBackend) {

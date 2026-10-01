@@ -46,6 +46,7 @@ import org.jellyfin.androidtv.ui.playback.overlay.action.SkipNextAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.SkipPreviousAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.ZoomAction;
 import org.jellyfin.androidtv.util.DateTimeExtensionsKt;
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager;
 import org.koin.java.KoinJavaComponent;
 
 import java.time.LocalDateTime;
@@ -289,7 +290,9 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
 
         if (!playerAdapter.isLiveTv()) {
             secondaryActionsAdapter.add(playbackSpeedAction);
-            secondaryActionsAdapter.add(selectQualityAction);
+            if (!LocalVideoManager.isLocalItem(playbackController.getCurrentlyPlayingItem())) {
+                secondaryActionsAdapter.add(selectQualityAction);
+            }
         }
 
         secondaryActionsAdapter.add(zoomAction);

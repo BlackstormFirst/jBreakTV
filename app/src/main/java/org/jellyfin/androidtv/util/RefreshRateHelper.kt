@@ -94,8 +94,20 @@ class RefreshRateHelper(
 		return false
 	}
 
-	fun resetRefreshRate() {
+	fun resetRefreshRate(surfaceView: SurfaceView? = null) {
 		try {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && surfaceView != null) {
+				try {
+					val surface = surfaceView.holder.surface
+					if (surface != null && surface.isValid) {
+						surface.setFrameRate(0f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+						Timber.i("Reset surface frame rate to default (0)")
+					}
+				} catch (e: Exception) {
+					Timber.w(e, "Failed to reset frame rate on Surface")
+				}
+			}
+
 			val window = activity.window ?: return
 			val params = window.attributes
 			if (params.preferredDisplayModeId != 0) {
@@ -118,7 +130,6 @@ class RefreshRateHelper(
 	): Display.Mode? {
 		var curWeight = 0
 		var bestMode: Display.Mode? = null
-		val sourceRate = (frameRate * 100).roundToInt()
 
 		for (mode in supportedModes) {
 			// Skip non-HD modes
@@ -128,10 +139,7 @@ class RefreshRateHelper(
 			if (videoWidth > 0 && mode.physicalWidth < videoWidth) continue
 			if (videoHeight > 0 && mode.physicalHeight < videoHeight) continue
 
-			val rate = (mode.refreshRate * 100).roundToInt()
-			// Check if mode refresh rate is a compatible multiple (1x, 2x, 2.5x)
-			val isCompatibleRate = rate == sourceRate || rate == sourceRate * 2 || rate == (sourceRate * 2.5).roundToInt()
-			if (!isCompatibleRate) continue
+			if (!isFrameRateCompatible(mode.refreshRate, frameRate)) continue
 
 			var resolutionDifference = -1
 			if (behavior == RefreshRateSwitchingBehavior.SCALE_ON_DEVICE) {
@@ -142,7 +150,7 @@ class RefreshRateHelper(
 				resolutionDifference = if (videoWidth > 0) abs(mode.physicalWidth - videoWidth) else 0
 			}
 
-			val refreshRateDifference = rate - sourceRate
+			val refreshRateDifference = (abs(mode.refreshRate - frameRate) * 100).roundToInt()
 			@Suppress("MagicNumber")
 			val weight = 100000 - refreshRateDifference + 100000 - resolutionDifference
 
@@ -153,5 +161,24 @@ class RefreshRateHelper(
 		}
 
 		return bestMode
+	}
+
+	private fun isFrameRateCompatible(modeRefreshRate: Float, videoFrameRate: Float): Boolean {
+		if (modeRefreshRate <= 0f || videoFrameRate <= 0f) return false
+
+		// Check direct match or multipliers (1x, 2x, 2.5x, 3x, 4x, 5x)
+		val multipliers = floatArrayOf(1f, 2f, 2.5f, 3f, 4f, 5f)
+		for (m in multipliers) {
+			val target = videoFrameRate * m
+			if (abs(modeRefreshRate - target) < 0.08f) {
+				return true
+			}
+		}
+
+		// Fractional cross-matching for common refresh rates (e.g., 23.976 <-> 24.0, 29.97 <-> 30.0, 59.94 <-> 60.0)
+		val isCloseTo24Group = (videoFrameRate in 23.9f..24.1f) && (modeRefreshRate in 23.9f..24.1f)
+		val isCloseTo30Group = (videoFrameRate in 29.9f..30.1f) && (modeRefreshRate in 29.9f..30.1f)
+		val isCloseTo60Group = (videoFrameRate in 59.9f..60.1f) && (modeRefreshRate in 59.9f..60.1f)
+		return isCloseTo24Group || isCloseTo30Group || isCloseTo60Group
 	}
 }
