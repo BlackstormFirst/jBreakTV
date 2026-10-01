@@ -2,6 +2,7 @@ package org.jellyfin.playback.media3.exoplayer.support
 
 import android.content.Context
 import io.github.peerless2012.ass.media.AssHandler
+import io.github.peerless2012.ass.media.AssHandlerConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -13,6 +14,20 @@ import java.io.File
 
 object AssFontManager {
 	private const val FONT_CACHE_DIR = "ass_fonts"
+
+	/**
+	 * Optimized configuration for libass rendering across all player backends:
+	 * - glyphSize: Expanded glyph outline cache (20,000) to avoid re-rasterizing characters.
+	 * - cacheSize: 128MB bitmap glyph cache.
+	 * - maxRenderPixels: Downscaling canvas limit for 4K displays (1080p canvas = 1920x1080 = 2,073,600 px).
+	 *   OpenGL then hardware-scales to native 4K, eliminating 4K rasterization CPU bottlenecks and 1-frame lags.
+	 */
+	@JvmStatic
+	val defaultAssHandlerConfig: AssHandlerConfig = AssHandlerConfig(
+		glyphSize = 20000,
+		cacheSize = 128,
+		maxRenderPixels = 1920 * 1080,
+	)
 
 	fun getFontCacheDir(context: Context): File {
 		val dir = File(context.cacheDir, FONT_CACHE_DIR)
@@ -41,28 +56,22 @@ object AssFontManager {
 	) = withContext(Dispatchers.IO) {
 		if (assHandler == null || url.isNullOrEmpty()) return@withContext
 
-		val isLocalFile = url.startsWith("file://") || url.startsWith("/")
-
 		runCatching {
 			val fontDir = getFontCacheDir(context)
-			if (isLocalFile) {
-				Timber.d("Preloading ASS fonts for local media: $url")
-				val filePath = url.removePrefix("file://")
-				val localFile = File(filePath)
-				if (localFile.exists()) {
-					val existingFonts = fontDir.listFiles()?.filter {
-						it.extension.lowercase() in listOf("ttf", "otf", "ttc")
-					}.orEmpty()
+			val fontFiles = fontDir.listFiles()?.filter {
+				it.extension.lowercase() in listOf("ttf", "otf", "ttc")
+			}.orEmpty()
 
-					Timber.d("Local font cache contains ${existingFonts.size} fonts")
+			if (fontFiles.isNotEmpty()) {
+				Timber.d("Preloading ${fontFiles.size} cached ASS fonts into libass for: $url")
+				for (fontFile in fontFiles) {
+					runCatching {
+						val fontBytes = fontFile.readBytes()
+						assHandler.addFont(fontFile.name, fontBytes)
+					}.onFailure { error ->
+						Timber.w(error, "Failed to load font ${fontFile.name} into libass")
+					}
 				}
-			} else {
-				Timber.d("Preloading ASS fonts for remote media: $url")
-				val existingFonts = fontDir.listFiles()?.filter {
-					it.extension.lowercase() in listOf("ttf", "otf", "ttc")
-				}.orEmpty()
-
-				Timber.d("Remote font cache contains ${existingFonts.size} fonts")
 			}
 		}.onFailure { error ->
 			Timber.w(error, "Failed to preload ASS fonts")

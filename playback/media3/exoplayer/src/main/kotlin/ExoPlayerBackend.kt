@@ -93,7 +93,10 @@ class ExoPlayerBackend(
 	private var lastKnownDuration: Duration? = null
 
 	private val assHandler by lazy {
-		AssHandler(AssRenderType.OVERLAY_OPEN_GL)
+		AssHandler(
+			renderType = AssRenderType.OVERLAY_OPEN_GL,
+			config = AssFontManager.defaultAssHandlerConfig,
+		)
 	}
 
 	private val exoPlayer by lazy {
