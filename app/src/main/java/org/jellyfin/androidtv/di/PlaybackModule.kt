@@ -99,6 +99,7 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 		enableLibass = userPreferences[UserPreferences.assDirectPlay],
 		enableDebugLogging = userPreferences[UserPreferences.debuggingEnabled],
 		enableTunneling = userPreferences[UserPreferences.codecTunneling],
+		enableAudioNightMode = userPreferences[UserPreferences.audioNightMode],
 		baseDataSourceFactory = get<HttpDataSource.Factory>(),
 		minBufferDuration = bufferLength.minBufferDuration,
 		maxBufferDuration = bufferLength.maxBufferDuration,

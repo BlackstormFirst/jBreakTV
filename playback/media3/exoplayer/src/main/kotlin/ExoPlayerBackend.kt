@@ -85,7 +85,9 @@ class ExoPlayerBackend(
 
 	private var currentStream: PlayableMediaStream? = null
 	private var subtitleView: SubtitleView? = null
-	private val audioPipeline = ExoPlayerAudioPipeline()
+	private val audioPipeline = ExoPlayerAudioPipeline().apply {
+		enableNightMode = exoPlayerOptions.enableAudioNightMode
+	}
 	private val audioAttributeState = AudioAttributeState()
 	private val timedEventState = TimedEventState()
 	private var lastKnownDuration: Duration? = null
@@ -445,6 +447,7 @@ class ExoPlayerBackend(
 
 	override fun stop() {
 		exoPlayer.stop()
+		audioPipeline.release()
 		currentStream = null
 	}
 
