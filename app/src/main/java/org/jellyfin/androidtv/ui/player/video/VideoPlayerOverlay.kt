@@ -44,7 +44,9 @@ import coil3.compose.rememberAsyncImagePainter
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
+import coil3.request.maxBitmapSize
 import coil3.request.transformations
+import coil3.size.Dimension
 import coil3.size.Size
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -266,12 +268,16 @@ private fun TrickplayFilmstripBar(
 	val item = entry?.baseItem ?: return
 	if (LocalVideoManager.isLocalItem(item)) return
 
-	val mediaSources = item.mediaSources.orEmpty()
-	val mediaSource = mediaSources.firstOrNull() ?: return
-	val mediaSourceId = mediaSource.id?.toUUIDOrNull() ?: return
+	val trickPlayResolutions = item.mediaSources?.firstOrNull()?.id?.let { item.trickplay?.get(it) }
+		?: item.trickplay?.get(item.id.toString())
+		?: item.trickplay?.values?.firstOrNull()
+		?: return
 
-	val trickPlayResolutions = item.trickplay?.get(mediaSource.id)
-	val trickPlayInfo = trickPlayResolutions?.values?.firstOrNull() ?: return
+	val trickPlayInfo = trickPlayResolutions.values.firstOrNull() ?: return
+
+	val mediaSourceId = item.mediaSources?.firstOrNull()?.id?.toUUIDOrNull()
+		?: item.trickplay?.keys?.firstOrNull()?.toUUIDOrNull()
+		?: item.id
 
 	val currentTimeMs = scrubbingProgress.inWholeMilliseconds
 	val centerTileIndex = currentTimeMs.floorDiv(trickPlayInfo.interval).toInt()
@@ -324,6 +330,7 @@ private fun TrickplayFilmstripBar(
 						ImageRequest.Builder(context)
 							.data(url)
 							.size(Size.ORIGINAL)
+							.maxBitmapSize(Size(Dimension.Undefined, Dimension.Undefined))
 							.httpHeaders(NetworkHeaders.Builder().apply {
 								set(
 									key = "Authorization",

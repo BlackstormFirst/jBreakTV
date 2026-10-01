@@ -29,7 +29,7 @@ class EpisodeQueueSupplier(
 			mediaTypes = listOf(MediaType.VIDEO),
 			includeItemTypes = listOf(BaseItemKind.EPISODE),
 			sortBy = listOf(ItemSortBy.PARENT_INDEX_NUMBER, ItemSortBy.INDEX_NUMBER, ItemSortBy.SORT_NAME),
-			fields = listOf(ItemFields.MEDIA_SOURCES),
+			fields = listOf(ItemFields.MEDIA_SOURCES, ItemFields.TRICKPLAY),
 			// Pagination
 			startIndex = offset,
 			limit = size,
