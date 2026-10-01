@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.getQualityProfiles
@@ -59,9 +61,6 @@ import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.backend.BackendTrack
-import org.jellyfin.playback.jellyfin.queue.baseItem
-import org.jellyfin.sdk.model.api.MediaStreamType
-import org.koin.compose.koinInject
 import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.queue.Queue
@@ -69,6 +68,7 @@ import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.baseItemFlow
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.MediaStreamType
 import org.koin.compose.koinInject
 import java.io.File
 import kotlin.time.Duration
@@ -88,6 +88,36 @@ fun VideoPlayerControls(
 	val playState by playbackManager.state.playState.collectAsState()
 	var scrubbingProgress by remember { mutableStateOf<Duration?>(null) }
 
+	val playPauseFocusRequester = remember { FocusRequester() }
+
+	val entryIndex by playbackManager.queue.entryIndex.collectAsState()
+	val entries by playbackManager.queue.entries.collectAsState()
+	val hasPrevious = entryIndex > 0 && entries.size > 1
+
+	val estimatedSize = remember(entries, entryIndex) { playbackManager.queue.estimatedSize }
+	val hasNext = remember(entryIndex, estimatedSize, entries) {
+		entryIndex in 0 until (maxOf(estimatedSize, entries.size) - 1)
+	}
+
+	var prevHasPrevious by remember { mutableStateOf(hasPrevious) }
+	var prevHasNext by remember { mutableStateOf(hasNext) }
+
+	LaunchedEffect(hasPrevious) {
+		if (prevHasPrevious && !hasPrevious) {
+			delay(50.milliseconds)
+			runCatching { playPauseFocusRequester.requestFocus() }
+		}
+		prevHasPrevious = hasPrevious
+	}
+
+	LaunchedEffect(hasNext) {
+		if (prevHasNext && !hasNext) {
+			delay(50.milliseconds)
+			runCatching { playPauseFocusRequester.requestFocus() }
+		}
+		prevHasNext = hasNext
+	}
+
 	Column(
 		verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.Bottom),
 	) {
@@ -97,7 +127,7 @@ fun VideoPlayerControls(
 				.focusRestorer()
 				.focusGroup()
 		) {
-			PlayPauseButton(playbackManager, playState)
+			PlayPauseButton(playbackManager, playState, playPauseFocusRequester)
 			PreviousEntryButton(playbackManager)
 			RewindButton(playbackManager)
 			FastForwardButton(playbackManager)
@@ -146,6 +176,7 @@ fun VideoPlayerControls(
 private fun PlayPauseButton(
 	playbackManager: PlaybackManager,
 	playState: PlayState,
+	focusRequester: FocusRequester = remember { FocusRequester() },
 ) {
 	IconButton(
 		onClick = {
@@ -157,6 +188,7 @@ private fun PlayPauseButton(
 				PlayState.PAUSED -> playbackManager.state.unpause()
 			}
 		},
+		modifier = Modifier.focusRequester(focusRequester),
 	) {
 		AnimatedContent(playState) { playState ->
 			when (playState) {
