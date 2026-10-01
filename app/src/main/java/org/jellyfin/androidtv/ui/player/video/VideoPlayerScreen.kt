@@ -117,17 +117,16 @@ fun VideoPlayerScreen() {
 			modifier = surfaceModifier,
 		)
 
+		PlayerSubtitles(
+			playbackManager = playbackManager,
+			modifier = surfaceModifier,
+		)
+
 		VideoPlayerOverlay(
 			playbackManager = playbackManager,
 			mediaToastRegistry = mediaToastRegistry,
 			zoomMode = zoomMode,
 			onZoomSelect = { zoomMode = it },
-		)
-
-
-		PlayerSubtitles(
-			playbackManager = playbackManager,
-			modifier = surfaceModifier,
 		)
 	}
 }
