@@ -210,10 +210,10 @@ fun CustomPlaybackOverlayFragment.onPlayStateChanged(isPlaying: Boolean) {
 	val isInitializedKey = R.id.toast_overlay + 1
 	val isInitialized = binding.toastOverlay.getTag(isInitializedKey) as? Boolean ?: false
 	if (!isInitialized) {
+		binding.toastOverlay.setTag(isInitializedKey, true)
 		if (isPlaying) {
-			binding.toastOverlay.setTag(isInitializedKey, true)
+			return
 		}
-		return
 	}
 	registry.emit(if (isPlaying) R.drawable.ic_play else R.drawable.ic_pause)
 }

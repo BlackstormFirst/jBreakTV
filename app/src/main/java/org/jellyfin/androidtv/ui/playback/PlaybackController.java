@@ -1377,6 +1377,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             if (mFragment != null) {
                 mFragment.setFadingEnabled(true);
                 mFragment.leanbackOverlayFragment.setShouldShowOverlay(false);
+                mFragment.setPlayPauseActionState(0);
             }
 
             mPlaybackState = PlaybackState.PLAYING;
@@ -1394,6 +1395,9 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
         if (mPlaybackState == PlaybackState.PAUSED) {
             mPlaybackState = PlaybackState.PLAYING;
+            if (mFragment != null) {
+                mFragment.setPlayPauseActionState(0);
+            }
         } else {
             if (!burningSubs) {
                 // Verify if ExoPlayer is ACTUALLY rendering the desired subtitle index
