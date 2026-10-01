@@ -1,6 +1,7 @@
 package org.jellyfin.androidtv.ui.playback;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -302,6 +303,7 @@ public class VideoManager {
             if (bufferLength == BufferLength.LARGE) {
                 loadControl = new DefaultLoadControl.Builder()
                         .setBufferDurationsMs(50_000, 120_000, 2_500, 5_000)
+                        .setBackBuffer(30_000, false)
                         .build();
             } else if (bufferLength == BufferLength.EXTRA_LARGE) {
                 loadControl = new DefaultLoadControl.Builder()
@@ -309,7 +311,17 @@ public class VideoManager {
                         .setBackBuffer(120_000, true)
                         .build();
             } else {
-                loadControl = new DefaultLoadControl();
+                ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+                boolean isLowRamDevice = am != null && am.isLowRamDevice();
+                loadControl = new DefaultLoadControl.Builder()
+                        .setBufferDurationsMs(
+                                isLowRamDevice ? 15_000 : DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                                isLowRamDevice ? 30_000 : DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+                                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+                        )
+                        .setBackBuffer(isLowRamDevice ? 10_000 : 30_000, false)
+                        .build();
             }
         }
         exoPlayerBuilder.setLoadControl(loadControl);

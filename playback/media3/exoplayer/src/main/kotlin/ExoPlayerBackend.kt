@@ -146,6 +146,13 @@ class ExoPlayerBackend(
 		val bufferForPlaybackAfterRebufferMs = exoPlayerOptions.bufferForPlaybackAfterRebufferDuration?.inWholeMilliseconds?.toInt()
 			?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
 
+		val backBufferMs = when {
+			isLowRamDevice -> 10_000
+			exoPlayerOptions.maxBufferDuration != null && exoPlayerOptions.maxBufferDuration.inWholeSeconds >= 200 -> 120_000
+			else -> 30_000
+		}
+		val retainBackBuffer = exoPlayerOptions.maxBufferDuration != null && exoPlayerOptions.maxBufferDuration.inWholeSeconds >= 200
+
 		val loadControl = DefaultLoadControl.Builder()
 			.setBufferDurationsMs(
 				minBufferMs,
@@ -154,7 +161,7 @@ class ExoPlayerBackend(
 				bufferForPlaybackAfterRebufferMs,
 			)
 			.setPrioritizeTimeOverSizeThresholds(true)
-			.setBackBuffer(if (isLowRamDevice) 10_000 else 30_000, false)
+			.setBackBuffer(backBufferMs, retainBackBuffer)
 			.build()
 
 		ExoPlayer.Builder(context)
