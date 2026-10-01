@@ -17,6 +17,7 @@ import kotlin.time.Duration
 interface PlayerState {
 	val volume: PlayerVolumeState
 	val playState: StateFlow<PlayState>
+	val isBuffering: StateFlow<Boolean>
 	val speed: StateFlow<Float>
 	val videoSize: StateFlow<VideoSize>
 	val playbackOrder: StateFlow<PlaybackOrder>
@@ -65,6 +66,9 @@ class MutablePlayerState(
 	private val _playState = MutableStateFlow(PlayState.STOPPED)
 	override val playState: StateFlow<PlayState> get() = _playState.asStateFlow()
 
+	private val _isBuffering = MutableStateFlow(false)
+	override val isBuffering: StateFlow<Boolean> get() = _isBuffering.asStateFlow()
+
 	private val _speed = MutableStateFlow(1f)
 	override val speed: StateFlow<Float> get() = _speed.asStateFlow()
 
@@ -87,6 +91,10 @@ class MutablePlayerState(
 		backendService.addListener(object : PlayerBackendEventListener() {
 			override fun onPlayStateChange(state: PlayState) {
 				_playState.value = state
+			}
+
+			override fun onBufferingStateChange(isBuffering: Boolean) {
+				_isBuffering.value = isBuffering
 			}
 
 			override fun onVideoSizeChange(width: Int, height: Int, frameRate: Float) {

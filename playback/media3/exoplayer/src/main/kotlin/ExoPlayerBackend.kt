@@ -43,8 +43,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jellyfin.playback.core.backend.BackendTrack
-import org.jellyfin.playback.media3.exoplayer.support.AssFontManager
 import org.jellyfin.playback.core.backend.BasePlayerBackend
+import org.jellyfin.playback.core.backend.PlayerBackendEventListener
+import org.jellyfin.playback.media3.exoplayer.support.AssFontManager
 import org.jellyfin.playback.core.mediastream.MediaStream
 import org.jellyfin.playback.core.mediastream.MediaStreamAudioTrack
 import org.jellyfin.playback.core.mediastream.MediaStreamVideoTrack
@@ -188,6 +189,23 @@ class ExoPlayerBackend(
 
 	private var pendingInitialSeekMs: Long? = null
 
+	private var isBufferingState = false
+
+	private fun updateBufferingState() {
+		val newBuffering = exoPlayer.playbackState == Player.STATE_BUFFERING
+		if (isBufferingState != newBuffering) {
+			isBufferingState = newBuffering
+			listener?.onBufferingStateChange(newBuffering)
+		}
+	}
+
+	override fun setListener(eventListener: PlayerBackendEventListener?) {
+		super.setListener(eventListener)
+		if (eventListener != null) {
+			listener?.onBufferingStateChange(exoPlayer.playbackState == Player.STATE_BUFFERING)
+		}
+	}
+
 	inner class PlayerListener : Player.Listener {
 		private fun checkPendingInitialSeek() {
 			val seekMs = pendingInitialSeekMs ?: return
@@ -211,6 +229,7 @@ class ExoPlayerBackend(
 		override fun onIsPlayingChanged(isPlaying: Boolean) {
 			checkPendingInitialSeek()
 			updatePlayState()
+			updateBufferingState()
 		}
 
 		override fun onPlayerError(error: PlaybackException) {
@@ -242,6 +261,7 @@ class ExoPlayerBackend(
 		override fun onPlaybackStateChanged(playbackState: Int) {
 			checkPendingInitialSeek()
 			updatePlayState()
+			updateBufferingState()
 		}
 
 		override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -249,6 +269,7 @@ class ExoPlayerBackend(
 				listener?.onMediaStreamEnd(requireNotNull(currentStream))
 			}
 			updatePlayState()
+			updateBufferingState()
 		}
 
 		override fun onAudioSessionIdChanged(audioSessionId: Int) {

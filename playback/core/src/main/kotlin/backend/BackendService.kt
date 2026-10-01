@@ -87,6 +87,10 @@ class BackendService {
 			callListeners { onPlayStateChange(state) }
 		}
 
+		override fun onBufferingStateChange(isBuffering: Boolean) {
+			callListeners { onBufferingStateChange(isBuffering) }
+		}
+
 		override fun onVideoSizeChange(width: Int, height: Int, frameRate: Float) {
 			callListeners { onVideoSizeChange(width, height, frameRate) }
 		}
