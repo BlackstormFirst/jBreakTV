@@ -31,6 +31,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.util.EventLogger
+import androidx.media3.exoplayer.video.VideoFrameMetadataListener
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.TsExtractor
 import androidx.media3.ui.SubtitleView
@@ -43,6 +44,7 @@ import io.github.peerless2012.ass.media.widget.AssSubtitleView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.jellyfin.playback.core.LibassRenderMode
 import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.core.backend.BasePlayerBackend
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
@@ -196,6 +198,11 @@ class ExoPlayerBackend(
 
 				if (exoPlayerOptions.enableLibass) {
 					assHandler.init(player)
+					if (exoPlayerOptions.libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
+						player.setVideoFrameMetadataListener { presentationTimeUs, _, _, _ ->
+							assHandler.videoTimeCallback?.invoke(presentationTimeUs)
+						}
+					}
 				}
 			}
 	}

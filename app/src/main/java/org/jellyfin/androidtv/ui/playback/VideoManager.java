@@ -65,6 +65,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import androidx.media3.exoplayer.video.VideoFrameMetadataListener;
+import org.jellyfin.playback.core.LibassRenderMode;
+import kotlin.jvm.functions.Function1;
+import kotlin.Unit;
+
 import io.github.peerless2012.ass.media.AssHandler;
 import io.github.peerless2012.ass.media.AssHandlerConfig;
 import io.github.peerless2012.ass.media.factory.AssRenderersFactory;
@@ -97,6 +102,7 @@ public class VideoManager {
 
     public boolean isContracted = false;
     public AssHandler mAssHandler;
+    private VideoFrameMetadataListener mVideoFrameMetadataListener = null;
 
     private final UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
     private final HttpDataSource.Factory exoPlayerHttpDataSourceFactory = KoinJavaComponent.get(HttpDataSource.Factory.class);
@@ -107,6 +113,7 @@ public class VideoManager {
         nightModeEnabled = userPreferences.get(UserPreferences.Companion.getAudioNightMode());
 
         boolean assDirectPlay = userPreferences.get(UserPreferences.Companion.getAssDirectPlay());
+        LibassRenderMode libassRenderMode = userPreferences.get(UserPreferences.Companion.getLibassRenderMode());
         AssHandler assHandler = assDirectPlay ? new AssHandler(AssRenderType.OVERLAY_OPEN_GL, AssFontManager.getDefaultAssHandlerConfig()) : null;
         mAssHandler = assHandler;
 
@@ -144,6 +151,15 @@ public class VideoManager {
 
         if (assHandler != null) {
             assHandler.init(mExoPlayer);
+            if (libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
+                mVideoFrameMetadataListener = (presentationTimeUs, releaseTimeNs, format, mediaFormat) -> {
+                    Function1<Long, Unit> callback = assHandler.getVideoTimeCallback();
+                    if (callback != null) {
+                        callback.invoke(presentationTimeUs);
+                    }
+                };
+                mExoPlayer.setVideoFrameMetadataListener(mVideoFrameMetadataListener);
+            }
             mExoPlayerView.getSubtitleView().addView(new AssSubtitleView(mActivity, assHandler));
         }
 

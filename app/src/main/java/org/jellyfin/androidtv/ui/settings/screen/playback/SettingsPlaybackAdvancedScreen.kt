@@ -22,6 +22,7 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.getQualityProfiles
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.UserSettingPreferences
+import org.jellyfin.androidtv.preference.constant.nameRes
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.form.Checkbox
 import org.jellyfin.androidtv.ui.base.form.RangeControl
@@ -237,6 +238,20 @@ fun SettingsPlaybackAdvancedScreen() {
 				onClick = { assDirectPlay = !assDirectPlay },
 				modifier = Modifier.focusKey("ass_direct_play")
 			)
+		}
+
+		item {
+			var assDirectPlay by rememberPreference(userPreferences, UserPreferences.assDirectPlay)
+			if (assDirectPlay) {
+				var libassRenderMode by rememberPreference(userPreferences, UserPreferences.libassRenderMode)
+
+				ListButton(
+					headingContent = { Text(stringResource(R.string.preference_libass_render_mode)) },
+					captionContent = { Text(stringResource(libassRenderMode.nameRes)) },
+					onClick = { router.push(Routes.PLAYBACK_LIBASS_RENDER_MODE) },
+					modifier = Modifier.focusKey(Routes.PLAYBACK_LIBASS_RENDER_MODE)
+				)
+			}
 		}
 
 		item {

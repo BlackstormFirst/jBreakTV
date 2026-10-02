@@ -19,6 +19,7 @@ import org.jellyfin.androidtv.preference.constant.RefreshRateSwitchingBehavior
 import org.jellyfin.androidtv.preference.constant.StillWatchingBehavior
 import org.jellyfin.androidtv.preference.constant.WatchedIndicatorBehavior
 import org.jellyfin.androidtv.preference.constant.ZoomMode
+import org.jellyfin.playback.core.LibassRenderMode
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentAction
 import org.jellyfin.androidtv.ui.playback.segment.toMediaSegmentActionsString
 import org.jellyfin.preference.booleanPreference
@@ -317,6 +318,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 * Enable libass.
 		 */
 		var assDirectPlay = booleanPreference("libass_enabled", true)
+
+		/**
+		 * Libass render mode (Standard / Time-based or Frame-accurate).
+		 */
+		var libassRenderMode = enumPreference("libass_render_mode", LibassRenderMode.STANDARD)
 
 		/**
 		 * Always burn in subtitles when transcoding.

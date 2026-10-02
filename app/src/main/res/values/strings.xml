@@ -640,6 +640,10 @@
     <string name="preference_enable_ass">Direct play ASS subtitles</string>
     <string name="preference_enable_pgs_description">Requires transcoding when disabled</string>
     <string name="preference_enable_ass_description">Experimental feature, may not work reliably</string>
+    <string name="preference_libass_render_mode">libass render mode</string>
+    <string name="preference_libass_render_mode_description">Select subtitle rendering timing mode for libass</string>
+    <string name="libass_render_mode_standard">Standard / Time-based</string>
+    <string name="libass_render_mode_frame_accurate">Frame-accurate</string>
     <string name="auto">Auto</string>
     <plurals name="seconds">
         <item quantity="one">%1$s second</item>

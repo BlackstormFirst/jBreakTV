@@ -5,6 +5,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.ui.SubtitleView
+import org.jellyfin.playback.core.LibassRenderMode
 import kotlin.time.Duration
 
 @OptIn(UnstableApi::class)
@@ -12,6 +13,7 @@ data class ExoPlayerOptions(
 	val preferFfmpeg: Boolean = false,
 	val enableDebugLogging: Boolean = false,
 	val enableLibass: Boolean = false,
+	val libassRenderMode: LibassRenderMode = LibassRenderMode.STANDARD,
 	val enableTunneling: Boolean = false,
 	val enableAudioNightMode: Boolean = false,
 	val baseDataSourceFactory: DataSource.Factory = DefaultHttpDataSource.Factory(),
@@ -21,5 +23,3 @@ data class ExoPlayerOptions(
 	val bufferForPlaybackAfterRebufferDuration: Duration? = null,
 	val configureSubtitleView: ((SubtitleView) -> Unit)? = null,
 )
-
-

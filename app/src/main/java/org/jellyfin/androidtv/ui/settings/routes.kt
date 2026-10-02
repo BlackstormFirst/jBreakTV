@@ -46,6 +46,7 @@ import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackHEVCLe
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackHdrOverrideScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackHdrOverridesScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackInactivityPromptScreen
+import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackLibassRenderModeScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackMaxBitrateScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackPhotoPlayerScreen
 import org.jellyfin.androidtv.ui.settings.screen.playback.SettingsPlaybackPlayerScreen
@@ -106,6 +107,7 @@ object Routes {
 	const val PLAYBACK_MEDIA_SEGMENTS = "/playback/media-segments"
 	const val PLAYBACK_MEDIA_SEGMENT = "/playback/media-segments/{segmentType}"
 	const val PLAYBACK_ADVANCED = "/playback/advanced"
+	const val PLAYBACK_LIBASS_RENDER_MODE = "/playback/libass-render-mode"
 	const val PLAYBACK_RESUME_SUBTRACT_DURATION = "/playback/resume-subtract-duration"
 	const val PLAYBACK_MAX_BITRATE = "/playback/max-bitrate"
 	const val PLAYBACK_REFRESH_RATE_SWITCHING_BEHAVIOR = "/playback/refresh-rate-switching-behavior"
@@ -263,6 +265,9 @@ val routes = mapOf<String, RouteComposable>(
 	},
 	Routes.PLAYBACK_ADVANCED to {
 		SettingsPlaybackAdvancedScreen()
+	},
+	Routes.PLAYBACK_LIBASS_RENDER_MODE to {
+		SettingsPlaybackLibassRenderModeScreen()
 	},
 	Routes.PLAYBACK_RESUME_SUBTRACT_DURATION to {
 		SettingsPlaybackResumeSubtractDurationScreen()

@@ -97,6 +97,7 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 	val exoPlayerOptions = ExoPlayerOptions(
 		preferFfmpeg = userPreferences[UserPreferences.preferExoPlayerFfmpeg],
 		enableLibass = userPreferences[UserPreferences.assDirectPlay],
+		libassRenderMode = userPreferences[UserPreferences.libassRenderMode],
 		enableDebugLogging = userPreferences[UserPreferences.debuggingEnabled],
 		enableTunneling = userPreferences[UserPreferences.codecTunneling],
 		enableAudioNightMode = userPreferences[UserPreferences.audioNightMode],

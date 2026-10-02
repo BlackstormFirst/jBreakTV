@@ -679,6 +679,10 @@
     <string name="preference_enable_ass">Sous-titres ASS en direct</string>
     <string name="preference_enable_pgs_description">Exige un transcodage désactivé</string>
     <string name="preference_enable_ass_description">Fonctionnalité expérimentale, peut ne pas fonctionner de manière fiable</string>
+    <string name="preference_libass_render_mode">Mode de rendu libass</string>
+    <string name="preference_libass_render_mode_description">Sélectionner le mode de rendu temporel des sous-titres pour libass</string>
+    <string name="libass_render_mode_standard">Standard / Basé sur le temps</string>
+    <string name="libass_render_mode_frame_accurate">Frame-accurate</string>
     <string name="lbl_date_show_added">Date d\'ajout de la série</string>
     <string name="lbl_date_episode_added">Date d\'ajout de l\'épisode</string>
     <string name="truehd">TrueHD</string>
