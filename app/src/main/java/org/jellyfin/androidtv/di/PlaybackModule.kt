@@ -146,12 +146,13 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 			mediaSegmentProvider = { item -> mediaSegmentRepository.getSegmentsForItem(item) },
 			localItemInspector = { file -> LocalVideoManager.inspectAndBuildBaseItemDto(androidContext(), file) },
 			streamIndexResolver = { item, mediaSource ->
+				val isLocal = LocalVideoManager.isLocalItem(item)
 				val sourceToUse = mediaSource ?: item.mediaSources?.firstOrNull() ?: MediaSourceInfo(
-					protocol = MediaProtocol.FILE,
+					protocol = if (isLocal) MediaProtocol.FILE else MediaProtocol.HTTP,
 					id = item.id.toString(),
 					path = item.path,
 					type = MediaSourceType.DEFAULT,
-					isRemote = false,
+					isRemote = !isLocal,
 					mediaStreams = item.mediaStreams,
 					supportsDirectPlay = true,
 					supportsDirectStream = true,
@@ -168,9 +169,32 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 					hasSegments = false,
 					transcodingSubProtocol = MediaStreamProtocol.HTTP,
 				)
+				val videoQueueManager = get<VideoQueueManager>()
+
 				val audioIndex = playbackIndexManager.getBestAudioIndex(sourceToUse)
 				val activeAudioLang = sourceToUse.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
 				val subIndex = playbackIndexManager.getBestSubtitleIndex(sourceToUse, androidContext(), activeAudioLang)
+
+				// Persist active audio/sub properties to VideoQueueManager for queue continuity
+				sourceToUse.mediaStreams?.firstOrNull { it.index == audioIndex }?.let { audioStream ->
+					audioStream.language?.let { videoQueueManager.setLastPlayedAudioLanguageIsoCode(it) }
+					audioStream.codec?.let { videoQueueManager.setLastPlayedAudioCodec(it) }
+					videoQueueManager.setLastPlayedAudioTitle(audioStream.title)
+					videoQueueManager.setLastPlayedAudioDefaultState(audioStream.isDefault)
+					videoQueueManager.setLastPlayedAudioHearingImpairedState(audioStream.isHearingImpaired)
+				}
+
+				if (subIndex != null && subIndex >= 0) {
+					sourceToUse.mediaStreams?.firstOrNull { it.index == subIndex }?.let { subStream ->
+						subStream.language?.let { videoQueueManager.setLastPlayedSubtitleLanguageIsoCode(it) }
+						subStream.codec?.let { videoQueueManager.setLastPlayedSubtitleCodec(it) }
+						videoQueueManager.setLastPlayedSubtitleTitle(subStream.title)
+						videoQueueManager.setLastPlayedSubtitleDefaultState(subStream.isDefault)
+						videoQueueManager.setLastPlayedSubtitleForcedState(subStream.isForced)
+						videoQueueManager.setLastPlayedSubtitleHearingImpairedState(subStream.isHearingImpaired)
+					}
+				}
+
 				Pair(audioIndex, subIndex)
 			},
 			maxBitrateProvider = {

@@ -15,6 +15,7 @@ import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
 import org.jellyfin.androidtv.util.RefreshRateHelper
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.core.model.PlayState
@@ -103,6 +104,23 @@ class VideoPlayerFragment : Fragment() {
 			playbackManager.queue.entryIndex.collect { index ->
 				if (index >= 0) {
 					videoQueueManager.setCurrentMediaPosition(index)
+
+					// Clear explicit stream index overrides from previous item so next item uses smart matching
+					videoQueueManager.setSelectedAudioStreamIndex(null)
+					videoQueueManager.setSelectedSubtitleStreamIndex(null)
+
+					// Reset playbackPositionTicks for all non-active items in the queue
+					// so returning to a previous episode starts from position 0 instead of resuming at the end
+					val entries = playbackManager.queue.entries.value
+					entries.forEachIndexed { i, entry ->
+						if (i != index) {
+							val item = entry.baseItem
+							if (item != null && (item.userData?.playbackPositionTicks ?: 0L) > 0L) {
+								val clearedUserData = item.userData?.copy(playbackPositionTicks = 0L)
+								entry.baseItem = item.copy(userData = clearedUserData)
+							}
+						}
+					}
 				}
 			}
 		}
@@ -170,12 +188,13 @@ class VideoPlayerFragment : Fragment() {
 						return
 					}
 
+					val isLocal = LocalVideoManager.isLocalItem(baseItem)
 					val mediaSource = baseItem.mediaSources?.firstOrNull() ?: MediaSourceInfo(
-						protocol = MediaProtocol.FILE,
+						protocol = if (isLocal) MediaProtocol.FILE else MediaProtocol.HTTP,
 						id = baseItem.id.toString(),
 						path = baseItem.path,
 						type = MediaSourceType.DEFAULT,
-						isRemote = false,
+						isRemote = !isLocal,
 						mediaStreams = baseItem.mediaStreams,
 						supportsDirectPlay = true,
 						supportsDirectStream = true,
@@ -229,6 +248,32 @@ class VideoPlayerFragment : Fragment() {
 						if (targetTrack != null && !targetTrack.isSelected) {
 							backend.selectTrack(3, targetTrack)
 						}
+					}
+
+					// Save active audio/subtitle properties to VideoQueueManager for queue persistence across episodes
+					val selectedAudioStream = baseItem.mediaStreams?.firstOrNull { it.index == audioIndex }
+					if (selectedAudioStream != null) {
+						selectedAudioStream.language?.let { videoQueueManager.setLastPlayedAudioLanguageIsoCode(it) }
+						selectedAudioStream.codec?.let { videoQueueManager.setLastPlayedAudioCodec(it) }
+						videoQueueManager.setLastPlayedAudioTitle(selectedAudioStream.title)
+						videoQueueManager.setLastPlayedAudioDefaultState(selectedAudioStream.isDefault)
+						videoQueueManager.setLastPlayedAudioHearingImpairedState(selectedAudioStream.isHearingImpaired)
+					}
+
+					val selectedSubStream = if (subIndex != null && subIndex >= 0) {
+						baseItem.mediaStreams?.firstOrNull { it.index == subIndex }
+					} else null
+					if (selectedSubStream != null) {
+						selectedSubStream.language?.let { videoQueueManager.setLastPlayedSubtitleLanguageIsoCode(it) }
+						selectedSubStream.codec?.let { videoQueueManager.setLastPlayedSubtitleCodec(it) }
+						videoQueueManager.setLastPlayedSubtitleTitle(selectedSubStream.title)
+						videoQueueManager.setLastPlayedSubtitleDefaultState(selectedSubStream.isDefault)
+						videoQueueManager.setLastPlayedSubtitleForcedState(selectedSubStream.isForced)
+						videoQueueManager.setLastPlayedSubtitleHearingImpairedState(selectedSubStream.isHearingImpaired)
+					} else if (subIndex == null || subIndex < 0) {
+						videoQueueManager.setLastPlayedSubtitleLanguageIsoCode("")
+						videoQueueManager.setLastPlayedSubtitleTitle(null)
+						videoQueueManager.setLastPlayedSubtitleCodec(null)
 					}
 
 					val hasSubtitleStreams = baseItem.mediaStreams?.any { it.type == MediaStreamType.SUBTITLE } == true

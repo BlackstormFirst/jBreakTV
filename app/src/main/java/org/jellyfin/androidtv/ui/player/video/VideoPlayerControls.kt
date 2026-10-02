@@ -58,19 +58,29 @@ import org.jellyfin.androidtv.ui.player.base.rememberPlayerOverlayVisibility
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import org.jellyfin.androidtv.util.apiclient.chapterImages
 import org.jellyfin.androidtv.util.apiclient.getUrl
+import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.backend.BackendTrack
+import org.jellyfin.playback.core.mediastream.MediaConversionMethod
+import org.jellyfin.playback.core.mediastream.MediaStreamService
 import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.queue.Queue
 import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.baseItemFlow
+import org.jellyfin.playback.core.queue.preferredAudioIndex
+import org.jellyfin.playback.core.queue.preferredSubtitleIndex
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.MediaProtocol
+import org.jellyfin.sdk.model.api.MediaSourceInfo
+import org.jellyfin.sdk.model.api.MediaSourceType
+import org.jellyfin.sdk.model.api.MediaStreamProtocol
 import org.jellyfin.sdk.model.api.MediaStreamType
 import org.koin.compose.koinInject
+import timber.log.Timber
 import java.io.File
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -382,12 +392,74 @@ private fun SubtitleButton(
 		if (expanded) visibilityState.pin() else visibilityState.unpin()
 	}
 
+	val coroutineScope = rememberCoroutineScope()
+	val context = LocalContext.current
 	val videoQueueManager = koinInject<VideoQueueManager>()
+	val playbackIndexManager = koinInject<PlaybackIndexManager>()
 	val entry by rememberQueueEntry(playbackManager)
 	val baseItem = entry?.baseItem
 	val backend = playbackManager.backend
+	val subStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.SUBTITLE }.orEmpty()
+
+	val isLocal = baseItem?.let { LocalVideoManager.isLocalItem(it) } == true
+	val mediaSource = baseItem?.mediaSources?.firstOrNull() ?: baseItem?.let { item ->
+		MediaSourceInfo(
+			protocol = if (isLocal) MediaProtocol.FILE else MediaProtocol.HTTP,
+			id = item.id.toString(),
+			path = item.path,
+			type = MediaSourceType.DEFAULT,
+			isRemote = !isLocal,
+			mediaStreams = item.mediaStreams,
+			supportsDirectPlay = true,
+			supportsDirectStream = true,
+			supportsTranscoding = false,
+			supportsProbing = false,
+			requiresOpening = false,
+			requiresClosing = false,
+			requiresLooping = false,
+			isInfiniteStream = false,
+			ignoreIndex = false,
+			ignoreDts = false,
+			genPtsInput = false,
+			readAtNativeFramerate = false,
+			hasSegments = false,
+			transcodingSubProtocol = MediaStreamProtocol.HTTP,
+		)
+	}
+
+	val currentPlayableStream = entry?.mediaStream
+	val isTranscodingOrRemux = currentPlayableStream?.conversionMethod != null && currentPlayableStream.conversionMethod != MediaConversionMethod.None
+
 	var cachedSubTracks by remember { mutableStateOf<List<BackendTrack>>(emptyList()) }
-	val subTracks = if (expanded) backend.getTracks(3).also { cachedSubTracks = it } else cachedSubTracks
+	val rawSubTracks = if (expanded) backend.getTracks(3).also { cachedSubTracks = it } else cachedSubTracks
+
+	val activeAudioIndex = entry?.preferredAudioIndex
+		?: videoQueueManager.getSelectedAudioStreamIndex()
+		?: mediaSource?.let { playbackIndexManager.getBestAudioIndex(it) }
+
+	val activeSubIndex = entry?.preferredSubtitleIndex
+		?: videoQueueManager.getSelectedSubtitleStreamIndex()
+		?: mediaSource?.let {
+			val activeAudioLang = mediaSource.mediaStreams?.firstOrNull { s -> s.index == activeAudioIndex }?.language
+			playbackIndexManager.getBestSubtitleIndex(it, context, activeAudioLang)
+		}
+
+	val subTracks = if (rawSubTracks.isNotEmpty() && !isTranscodingOrRemux) {
+		rawSubTracks
+	} else {
+		subStreams.mapIndexed { idx, stream ->
+			val isSelected = activeSubIndex != null && activeSubIndex >= 0 && stream.index == activeSubIndex
+			BackendTrack(
+				id = "JF_STREAM:${stream.index}",
+				type = 3,
+				label = stream.displayTitle ?: stream.title ?: stream.language ?: "Track ${idx + 1}",
+				language = stream.language,
+				isSelected = isSelected,
+				mediaStreamIndex = stream.index,
+			)
+		}
+	}
+	val isNoneSelected = activeSubIndex == null || activeSubIndex < 0 || subTracks.none { it.isSelected }
 	val selectedFocusRequester = remember { FocusRequester() }
 
 	IconButton(
@@ -407,15 +479,37 @@ private fun SubtitleButton(
 		initialFocusRequester = selectedFocusRequester,
 	) {
 		PopoverMenu {
-			val isNoneSelected = subTracks.none { it.isSelected }
 			PopoverMenuCheckboxItem(
 				selected = isNoneSelected,
 				focusRequester = if (isNoneSelected) selectedFocusRequester else null,
 				onClick = {
+					if (isNoneSelected) {
+						Timber.d("Subtitle track is already disabled (None), skipping reload")
+						expanded = false
+						return@PopoverMenuCheckboxItem
+					}
 					videoQueueManager.setLastPlayedSubtitleLanguageIsoCode("")
 					videoQueueManager.setLastPlayedSubtitleTitle(null)
 					videoQueueManager.setLastPlayedSubtitleCodec(null)
-					backend.selectTrack(3, null)
+					videoQueueManager.setSelectedSubtitleStreamIndex(-1)
+					entry?.preferredSubtitleIndex = -1
+
+					if (!isTranscodingOrRemux) {
+						backend.selectTrack(3, null)
+					} else {
+						val currentPos = backend.getPositionInfo().active
+						entry?.let { currentEntry ->
+							val baseItemObj = currentEntry.baseItem
+							if (baseItemObj != null) {
+								val newTicks = currentPos.inWholeMilliseconds * 10000L
+								val newUserData = baseItemObj.userData?.copy(playbackPositionTicks = newTicks)
+								currentEntry.baseItem = baseItemObj.copy(userData = newUserData)
+							}
+							coroutineScope.launch {
+								playbackManager.getService<MediaStreamService>()?.reloadStream(currentEntry)
+							}
+						}
+					}
 					expanded = false
 				}
 			) {
@@ -426,7 +520,11 @@ private fun SubtitleButton(
 					selected = track.isSelected,
 					focusRequester = if (track.isSelected) selectedFocusRequester else null,
 					onClick = {
-						val subStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.SUBTITLE }.orEmpty()
+						if (track.isSelected || (activeSubIndex != null && activeSubIndex >= 0 && track.mediaStreamIndex == activeSubIndex)) {
+							Timber.d("Subtitle track %s is already set and active, skipping reload", track.mediaStreamIndex)
+							expanded = false
+							return@PopoverMenuCheckboxItem
+						}
 						val mediaStream = subStreams.firstOrNull { it.index == track.mediaStreamIndex }
 							?: subStreams.firstOrNull { (it.language != null && it.language.equals(track.language, ignoreCase = true)) || it.displayTitle == track.label || it.title == track.label }
 							?: subStreams.getOrNull(trackIndexInList)
@@ -438,7 +536,28 @@ private fun SubtitleButton(
 						videoQueueManager.setLastPlayedSubtitleDefaultState(mediaStream?.isDefault ?: false)
 						videoQueueManager.setLastPlayedSubtitleForcedState(mediaStream?.isForced ?: false)
 						videoQueueManager.setLastPlayedSubtitleHearingImpairedState(mediaStream?.isHearingImpaired ?: false)
-						backend.selectTrack(3, track)
+						videoQueueManager.setSelectedSubtitleStreamIndex(track.mediaStreamIndex)
+						entry?.preferredSubtitleIndex = track.mediaStreamIndex
+
+						val isExternalSubtitle = mediaStream?.isExternal == true || track.id.startsWith("JF_EXTERNAL:")
+						val isTrackInExoPlayer = track.group != null
+
+						if (!isTranscodingOrRemux || isExternalSubtitle || isTrackInExoPlayer) {
+							backend.selectTrack(3, track)
+						} else {
+							val currentPos = backend.getPositionInfo().active
+							entry?.let { currentEntry ->
+								val baseItemObj = currentEntry.baseItem
+								if (baseItemObj != null) {
+									val newTicks = currentPos.inWholeMilliseconds * 10000L
+									val newUserData = baseItemObj.userData?.copy(playbackPositionTicks = newTicks)
+									currentEntry.baseItem = baseItemObj.copy(userData = newUserData)
+								}
+								coroutineScope.launch {
+									playbackManager.getService<MediaStreamService>()?.reloadStream(currentEntry)
+								}
+							}
+						}
 						expanded = false
 					}
 				) {
@@ -460,12 +579,65 @@ private fun AudioButton(
 		if (expanded) visibilityState.pin() else visibilityState.unpin()
 	}
 
+	val coroutineScope = rememberCoroutineScope()
 	val videoQueueManager = koinInject<VideoQueueManager>()
+	val playbackIndexManager = koinInject<PlaybackIndexManager>()
 	val entry by rememberQueueEntry(playbackManager)
 	val baseItem = entry?.baseItem
 	val backend = playbackManager.backend
+	val audioStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.AUDIO }.orEmpty()
+
+	val isLocal = baseItem?.let { LocalVideoManager.isLocalItem(it) } == true
+	val mediaSource = baseItem?.mediaSources?.firstOrNull() ?: baseItem?.let { item ->
+		MediaSourceInfo(
+			protocol = if (isLocal) MediaProtocol.FILE else MediaProtocol.HTTP,
+			id = item.id.toString(),
+			path = item.path,
+			type = MediaSourceType.DEFAULT,
+			isRemote = !isLocal,
+			mediaStreams = item.mediaStreams,
+			supportsDirectPlay = true,
+			supportsDirectStream = true,
+			supportsTranscoding = false,
+			supportsProbing = false,
+			requiresOpening = false,
+			requiresClosing = false,
+			requiresLooping = false,
+			isInfiniteStream = false,
+			ignoreIndex = false,
+			ignoreDts = false,
+			genPtsInput = false,
+			readAtNativeFramerate = false,
+			hasSegments = false,
+			transcodingSubProtocol = MediaStreamProtocol.HTTP,
+		)
+	}
+
+	val currentPlayableStream = entry?.mediaStream
+	val isTranscodingOrRemux = currentPlayableStream?.conversionMethod != null && currentPlayableStream.conversionMethod != MediaConversionMethod.None
+
 	var cachedAudioTracks by remember { mutableStateOf<List<BackendTrack>>(emptyList()) }
-	val audioTracks = if (expanded) backend.getTracks(1).also { cachedAudioTracks = it } else cachedAudioTracks
+	val rawAudioTracks = if (expanded) backend.getTracks(1).also { cachedAudioTracks = it } else cachedAudioTracks
+
+	val activeAudioIndex = entry?.preferredAudioIndex
+		?: videoQueueManager.getSelectedAudioStreamIndex()
+		?: mediaSource?.let { playbackIndexManager.getBestAudioIndex(it) }
+
+	val audioTracks = if (rawAudioTracks.isNotEmpty() && !isTranscodingOrRemux) {
+		rawAudioTracks
+	} else {
+		audioStreams.mapIndexed { idx, stream ->
+			val isSelected = activeAudioIndex != null && stream.index == activeAudioIndex
+			BackendTrack(
+				id = "JF_STREAM:${stream.index}",
+				type = 1,
+				label = stream.displayTitle ?: stream.title ?: stream.language ?: "Track ${idx + 1}",
+				language = stream.language,
+				isSelected = isSelected,
+				mediaStreamIndex = stream.index,
+			)
+		}
+	}
 	val selectedFocusRequester = remember { FocusRequester() }
 
 	IconButton(
@@ -490,7 +662,11 @@ private fun AudioButton(
 					selected = track.isSelected,
 					focusRequester = if (track.isSelected) selectedFocusRequester else null,
 					onClick = {
-						val audioStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.AUDIO }.orEmpty()
+						if (track.isSelected || (activeAudioIndex != null && activeAudioIndex >= 0 && track.mediaStreamIndex == activeAudioIndex)) {
+							Timber.d("Audio track %s is already set and active, skipping reload", track.mediaStreamIndex)
+							expanded = false
+							return@PopoverMenuCheckboxItem
+						}
 						val mediaStream = audioStreams.firstOrNull { it.index == track.mediaStreamIndex }
 							?: audioStreams.firstOrNull { (it.language != null && it.language.equals(track.language, ignoreCase = true)) || it.displayTitle == track.label || it.title == track.label }
 							?: audioStreams.getOrNull(trackIndexInList)
@@ -503,7 +679,29 @@ private fun AudioButton(
 						videoQueueManager.setLastPlayedAudioHearingImpairedState(mediaStream?.isHearingImpaired ?: false)
 						val audioTypeIndex = if (mediaStream != null) audioStreams.indexOf(mediaStream) else trackIndexInList
 						if (audioTypeIndex >= 0) videoQueueManager.setLastPlayedAudioIndexInType(audioTypeIndex)
-						backend.selectTrack(1, track)
+						videoQueueManager.setSelectedAudioStreamIndex(track.mediaStreamIndex)
+
+						val currentPlayableStream = entry?.mediaStream
+						val isTranscodingOrRemux = currentPlayableStream?.conversionMethod != null && currentPlayableStream.conversionMethod != MediaConversionMethod.None
+						val isTrackInExoPlayer = track.group != null
+
+						if (!isTranscodingOrRemux && isTrackInExoPlayer) {
+							backend.selectTrack(1, track)
+						} else {
+							val currentPos = backend.getPositionInfo().active
+							entry?.let { currentEntry ->
+								currentEntry.preferredAudioIndex = track.mediaStreamIndex
+								val baseItemObj = currentEntry.baseItem
+								if (baseItemObj != null) {
+									val newTicks = currentPos.inWholeMilliseconds * 10000L
+									val newUserData = baseItemObj.userData?.copy(playbackPositionTicks = newTicks)
+									currentEntry.baseItem = baseItemObj.copy(userData = newUserData)
+								}
+								coroutineScope.launch {
+									playbackManager.getService<MediaStreamService>()?.reloadStream(currentEntry)
+								}
+							}
+						}
 						expanded = false
 					}
 				) {
@@ -561,6 +759,11 @@ private fun VideoButton(
 						selected = isSelected,
 						focusRequester = if (isSelected) selectedFocusRequester else null,
 						onClick = {
+							if (isSelected) {
+								Timber.d("Video track %s is already set and active, skipping reload", track.mediaStreamIndex)
+								expanded = false
+								return@PopoverMenuCheckboxItem
+							}
 							val videoStreams = baseItem?.mediaStreams?.filter { it.type == MediaStreamType.VIDEO }.orEmpty()
 							val mediaStream = videoStreams.firstOrNull { it.index == track.mediaStreamIndex }
 								?: videoStreams.firstOrNull { it.displayTitle == track.label || it.title == track.label }

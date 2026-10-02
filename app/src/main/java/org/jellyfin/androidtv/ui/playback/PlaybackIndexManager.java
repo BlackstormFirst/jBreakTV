@@ -244,12 +244,13 @@ public class PlaybackIndexManager {
                 }
             }
 
-            // 3. targetLang + title
+            // 3. targetLang + title + forced
             for (MediaStream s : streams) {
                 if (areLanguagesEqual(targetLang, s.getLanguage())
                         && s.getTitle() != null
-                        && targetTitle.equalsIgnoreCase(s.getTitle())) {
-                    Timber.d("Best sub found ! (lang+title)");
+                        && targetTitle.equalsIgnoreCase(s.getTitle())
+                        && (targetForced == null || targetForced.equals(s.isForced()))) {
+                    Timber.d("Best sub found ! (lang+title+forced)");
                     return s.getIndex();
                 }
             }
@@ -319,32 +320,35 @@ public class PlaybackIndexManager {
             }
         }
 
-        // 9. targetLang + default
+        // 9. targetLang + default + forced
         if (targetDefault != null) {
             for (MediaStream s : streams) {
                 if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetDefault.equals(s.isDefault())) {
-                    Timber.d("Best sub found ! (lang+default)");
+                        && targetDefault.equals(s.isDefault())
+                        && (targetForced == null || targetForced.equals(s.isForced()))) {
+                    Timber.d("Best sub found ! (lang+default+forced)");
                     return s.getIndex();
                 }
             }
         }
 
-        // 10. targetLang + HI
+        // 10. targetLang + HI + forced
         if (targetHI != null) {
             for (MediaStream s : streams) {
                 if (areLanguagesEqual(targetLang, s.getLanguage())
-                        && targetHI.equals(s.isHearingImpaired())) {
-                    Timber.d("Best sub found ! (lang+HI)");
+                        && targetHI.equals(s.isHearingImpaired())
+                        && (targetForced == null || targetForced.equals(s.isForced()))) {
+                    Timber.d("Best sub found ! (lang+HI+forced)");
                     return s.getIndex();
                 }
             }
         }
 
-        // 11. targetLang only
+        // 11. targetLang + forced
         for (MediaStream s : streams) {
-            if (areLanguagesEqual(targetLang, s.getLanguage())) {
-                Timber.d("Best sub found ! (lang only)");
+            if (areLanguagesEqual(targetLang, s.getLanguage())
+                    && (targetForced == null || targetForced.equals(s.isForced()))) {
+                Timber.d("Best sub found ! (lang+forced)");
                 return s.getIndex();
             }
         }

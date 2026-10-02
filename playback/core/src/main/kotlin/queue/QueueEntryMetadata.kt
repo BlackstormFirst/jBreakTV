@@ -1,6 +1,7 @@
 package org.jellyfin.playback.core.queue
 
 import org.jellyfin.playback.core.element.ElementKey
+import org.jellyfin.playback.core.element.element
 import org.jellyfin.playback.core.element.elementFlow
 import org.jellyfin.playback.core.element.requiredElement
 import java.time.LocalDate
@@ -49,3 +50,16 @@ var QueueEntry.metadata by requiredElement(metadataKey) { QueueEntryMetadata.Emp
  * @see metadata
  */
 val QueueEntry.metadataFlow by elementFlow(metadataKey)
+
+private val preferredAudioIndexKey = ElementKey<Int>("PreferredAudioIndex")
+private val preferredSubtitleIndexKey = ElementKey<Int>("PreferredSubtitleIndex")
+
+/**
+ * Get or set the explicit audio stream index override for this [QueueEntry].
+ */
+var QueueEntry.preferredAudioIndex by element(preferredAudioIndexKey)
+
+/**
+ * Get or set the explicit subtitle stream index override for this [QueueEntry].
+ */
+var QueueEntry.preferredSubtitleIndex by element(preferredSubtitleIndexKey)

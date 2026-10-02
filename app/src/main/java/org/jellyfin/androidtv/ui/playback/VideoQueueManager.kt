@@ -5,6 +5,8 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 class VideoQueueManager {
 	private var _currentVideoQueue: List<BaseItemDto> = emptyList()
 	private var _currentMediaPosition = -1
+	private var _selectedAudioStreamIndex: Int? = null
+	private var _selectedSubtitleStreamIndex: Int? = null
 	private var _lastPlayedAudioDefaultState: Boolean = false
 	private var _lastPlayedAudioCodec: String? = null
 	private var _lastPlayedAudioHearingImpairedState: Boolean = false
@@ -172,9 +174,17 @@ class VideoQueueManager {
 		_lastPlayedSubtitleTitle = title
 	}
 
+	fun getSelectedAudioStreamIndex(): Int? = _selectedAudioStreamIndex
+	fun setSelectedAudioStreamIndex(index: Int?) { _selectedAudioStreamIndex = index }
+
+	fun getSelectedSubtitleStreamIndex(): Int? = _selectedSubtitleStreamIndex
+	fun setSelectedSubtitleStreamIndex(index: Int?) { _selectedSubtitleStreamIndex = index }
+
 	fun clearVideoQueue() {
 		_currentVideoQueue = emptyList()
 		_currentMediaPosition = -1
+		_selectedAudioStreamIndex = null
+		_selectedSubtitleStreamIndex = null
 		_lastPlayedAudioCodec = null
 		_lastPlayedAudioDefaultState = false
 		_lastPlayedAudioHearingImpairedState = false

@@ -15,12 +15,17 @@ import org.jellyfin.playback.core.timedevent.timedEvents
 import timber.log.Timber
 import kotlin.time.Duration
 
-internal class MediaStreamService(
+class MediaStreamService(
 	private val mediaStreamResolvers: Collection<MediaStreamResolver>,
 	private val preloadDuration: Duration,
 ) : PlayerService() {
 	private companion object {
 		private const val TIMED_EVENT_PRELOAD = "MediaStreamServicePreloadNext"
+	}
+
+	suspend fun reloadStream(entry: QueueEntry) {
+		entry.mediaStream = null
+		playEntry(entry)
 	}
 
 	override suspend fun onInitialize() {

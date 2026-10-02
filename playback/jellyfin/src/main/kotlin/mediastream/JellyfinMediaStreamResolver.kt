@@ -10,6 +10,8 @@ import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.util.isLocalPath
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.mediaSourceId
+import org.jellyfin.playback.core.queue.preferredAudioIndex
+import org.jellyfin.playback.core.queue.preferredSubtitleIndex
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.audioApi
 import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
@@ -22,6 +24,7 @@ import org.jellyfin.sdk.model.api.MediaSourceType
 import org.jellyfin.sdk.model.api.MediaStreamProtocol
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
+import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
 
 class JellyfinMediaStreamResolver(
 	private val api: ApiClient,
@@ -95,7 +98,7 @@ class JellyfinMediaStreamResolver(
 		}
 
 		val mediaInfo = runCatching {
-			getPlaybackInfo(baseItem, queueEntry.mediaSourceId)
+			getPlaybackInfo(queueEntry, queueEntry.mediaSourceId)
 		}.getOrNull() ?: return null
 
 		return when {
@@ -128,18 +131,34 @@ class JellyfinMediaStreamResolver(
 			)
 
 			// Remux (direct stream)
-			mediaInfo.mediaSource.supportsDirectStream && mediaInfo.mediaSource.transcodingUrl != null -> mediaInfo.toStream(
-				queueEntry = queueEntry,
-				conversionMethod = MediaConversionMethod.Remux,
-				url = api.createUrl(requireNotNull(mediaInfo.mediaSource.transcodingUrl), ignorePathParameters = true)
-			)
+			mediaInfo.mediaSource.supportsDirectStream && mediaInfo.mediaSource.transcodingUrl != null -> {
+				val rawUrl = api.createUrl(requireNotNull(mediaInfo.mediaSource.transcodingUrl), ignorePathParameters = true)
+				val (bestAudioIndex, bestSubIndex) = streamIndexResolver?.invoke(baseItem, mediaInfo.mediaSource) ?: Pair(null, null)
+				val audioIndexToUse = queueEntry.preferredAudioIndex ?: bestAudioIndex
+				val subIndexToUse = queueEntry.preferredSubtitleIndex ?: bestSubIndex
+				val finalUrl = rawUrl.withStreamIndexOverrides(audioIndexToUse, subIndexToUse)
+
+				mediaInfo.toStream(
+					queueEntry = queueEntry,
+					conversionMethod = MediaConversionMethod.Remux,
+					url = finalUrl
+				)
+			}
 
 			// Transcode
-			mediaInfo.mediaSource.supportsTranscoding && mediaInfo.mediaSource.transcodingUrl != null -> mediaInfo.toStream(
-				queueEntry = queueEntry,
-				conversionMethod = MediaConversionMethod.Transcode,
-				url = api.createUrl(requireNotNull(mediaInfo.mediaSource.transcodingUrl), ignorePathParameters = true)
-			)
+			mediaInfo.mediaSource.supportsTranscoding && mediaInfo.mediaSource.transcodingUrl != null -> {
+				val rawUrl = api.createUrl(requireNotNull(mediaInfo.mediaSource.transcodingUrl), ignorePathParameters = true)
+				val (bestAudioIndex, bestSubIndex) = streamIndexResolver?.invoke(baseItem, mediaInfo.mediaSource) ?: Pair(null, null)
+				val audioIndexToUse = queueEntry.preferredAudioIndex ?: bestAudioIndex
+				val subIndexToUse = queueEntry.preferredSubtitleIndex ?: bestSubIndex
+				val finalUrl = rawUrl.withStreamIndexOverrides(audioIndexToUse, subIndexToUse)
+
+				mediaInfo.toStream(
+					queueEntry = queueEntry,
+					conversionMethod = MediaConversionMethod.Transcode,
+					url = finalUrl
+				)
+			}
 
 			// No compatible stream found
 			else -> null
@@ -147,13 +166,29 @@ class JellyfinMediaStreamResolver(
 	}
 
 	private suspend fun getPlaybackInfo(
-		item: BaseItemDto,
+		queueEntry: QueueEntry,
 		mediaSourceId: String? = null,
 	): MediaInfo {
+		val item = requireNotNull(queueEntry.baseItem)
 		val initialSource = item.mediaSources?.firstOrNull { mediaSourceId == null || it.id == mediaSourceId }
 			?: item.mediaSources?.firstOrNull()
 
 		val (bestAudioIndex, bestSubIndex) = streamIndexResolver?.invoke(item, initialSource) ?: Pair(null, null)
+		if (queueEntry.preferredAudioIndex == null && bestAudioIndex != null) {
+			queueEntry.preferredAudioIndex = bestAudioIndex
+		}
+		if (queueEntry.preferredSubtitleIndex == null && bestSubIndex != null) {
+			queueEntry.preferredSubtitleIndex = bestSubIndex
+		}
+		val audioIndexToUse = queueEntry.preferredAudioIndex ?: bestAudioIndex
+		val subIndexToUse = queueEntry.preferredSubtitleIndex ?: bestSubIndex
+
+		val allStreams = initialSource?.mediaStreams.orEmpty().ifEmpty { item.mediaStreams.orEmpty() }
+		val requestedSubStream = allStreams.firstOrNull { it.index == subIndexToUse }
+		val subCodec = requestedSubStream?.codec?.lowercase(java.util.Locale.ROOT).orEmpty()
+		val isAssOrImageCodec = subCodec.contains("ass") || subCodec.contains("ssa") || subCodec.contains("pgs") || subCodec.contains("dvd") || subCodec.contains("sub")
+		val shouldBurnIn = requestedSubStream?.deliveryMethod == SubtitleDeliveryMethod.ENCODE || isAssOrImageCodec
+
 		val startTicks = item.userData?.playbackPositionTicks ?: 0L
 
 		val profile = deviceProfileBuilder()
@@ -171,8 +206,9 @@ class JellyfinMediaStreamResolver(
 				allowVideoStreamCopy = true,
 				allowAudioStreamCopy = true,
 				autoOpenLiveStream = false,
-				audioStreamIndex = bestAudioIndex,
-				subtitleStreamIndex = bestSubIndex,
+				audioStreamIndex = audioIndexToUse,
+				subtitleStreamIndex = subIndexToUse,
+				alwaysBurnInSubtitleWhenTranscoding = shouldBurnIn,
 			)
 		).content
 
@@ -224,5 +260,24 @@ class JellyfinMediaStreamResolver(
 		)
 	}
 
+}
+
+private fun String.withStreamIndexOverrides(audioIndex: Int?, subtitleIndex: Int?): String {
+	var result = this
+	if (audioIndex != null && audioIndex >= 0) {
+		result = if (result.contains("AudioStreamIndex=")) {
+			result.replace(Regex("AudioStreamIndex=\\d+"), "AudioStreamIndex=$audioIndex")
+		} else {
+			"$result&AudioStreamIndex=$audioIndex"
+		}
+	}
+	if (subtitleIndex != null) {
+		result = if (result.contains("SubtitleStreamIndex=")) {
+			result.replace(Regex("SubtitleStreamIndex=-?\\d+"), "SubtitleStreamIndex=$subtitleIndex")
+		} else {
+			"$result&SubtitleStreamIndex=$subtitleIndex"
+		}
+	}
+	return result
 }
 
