@@ -881,7 +881,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         int currVideoIndex = getVideoStreamIndex();
         Timber.i("trying to switch video stream from %s to %s", currVideoIndex, index);
         if (currVideoIndex == index) {
-            Timber.d("skipping setting video stream, already set to requested index %s", index);
+            Timber.d("PlaybackController: skipping video switch, already set to %s", index);
             if (mCurrentOptions.getVideoStreamIndex() == null || mCurrentOptions.getVideoStreamIndex() != index) {
                 Timber.i("setting mCurrentOptions video stream index from %s to %s", mCurrentOptions.getVideoStreamIndex(), index);
                 mCurrentOptions.setVideoStreamIndex(index);
@@ -942,7 +942,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         int currAudioIndex = getAudioStreamIndex();
         Timber.i("trying to switch audio stream from %s (ExoPlayer active: %s) to %s", currAudioIndex, activeExoAudioTrack, index);
         if (currAudioIndex == index && activeExoAudioTrack == index) {
-            Timber.d("skipping setting audio stream, already set and active at requested index %s", index);
+            Timber.d("PlaybackController: skipping audio switch, already set to %s", index);
             if (mCurrentOptions.getAudioStreamIndex() == null || mCurrentOptions.getAudioStreamIndex() != index) {
                 Timber.i("setting mCurrentOptions audio stream index from %s to %s", mCurrentOptions.getAudioStreamIndex(), index);
                 mCurrentOptions.setAudioStreamIndex(index);
@@ -1413,7 +1413,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                     Timber.i("onPrepared: Subtitle mismatch (ExoPlayer active: %d, Desired: %d) -> applying subtitle index", activeExoSubtitleTrack, currentSubtitleIndex);
                     PlaybackControllerHelperKt.setSubtitleIndex(this, currentSubtitleIndex, true);
                 } else {
-                    Timber.d("onPrepared: Subtitle index %d already correctly active in ExoPlayer, skipping", currentSubtitleIndex);
+                    Timber.d("PlaybackController: skipping subtitle switch, already set to %s", currentSubtitleIndex);
                 }
             } else {
                 PlaybackControllerHelperKt.disableDefaultSubtitles(this);

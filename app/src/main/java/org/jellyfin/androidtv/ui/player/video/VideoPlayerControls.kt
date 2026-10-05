@@ -484,7 +484,7 @@ private fun SubtitleButton(
 				focusRequester = if (isNoneSelected) selectedFocusRequester else null,
 				onClick = {
 					if (isNoneSelected) {
-						Timber.d("Subtitle track is already disabled (None), skipping reload")
+						Timber.d("VideoPlayerControls: skipping subtitle switch, already set to -1")
 						expanded = false
 						return@PopoverMenuCheckboxItem
 					}
@@ -521,7 +521,7 @@ private fun SubtitleButton(
 					focusRequester = if (track.isSelected) selectedFocusRequester else null,
 					onClick = {
 						if (track.isSelected || (activeSubIndex != null && activeSubIndex >= 0 && track.mediaStreamIndex == activeSubIndex)) {
-							Timber.d("Subtitle track %s is already set and active, skipping reload", track.mediaStreamIndex)
+							Timber.d("VideoPlayerControls: skipping subtitle switch, already set to ${track.mediaStreamIndex}")
 							expanded = false
 							return@PopoverMenuCheckboxItem
 						}
@@ -663,7 +663,7 @@ private fun AudioButton(
 					focusRequester = if (track.isSelected) selectedFocusRequester else null,
 					onClick = {
 						if (track.isSelected || (activeAudioIndex != null && activeAudioIndex >= 0 && track.mediaStreamIndex == activeAudioIndex)) {
-							Timber.d("Audio track %s is already set and active, skipping reload", track.mediaStreamIndex)
+							Timber.d("VideoPlayerControls: skipping audio switch, already set to ${track.mediaStreamIndex}")
 							expanded = false
 							return@PopoverMenuCheckboxItem
 						}
@@ -760,7 +760,7 @@ private fun VideoButton(
 						focusRequester = if (isSelected) selectedFocusRequester else null,
 						onClick = {
 							if (isSelected) {
-								Timber.d("Video track %s is already set and active, skipping reload", track.mediaStreamIndex)
+								Timber.d("VideoPlayerControls: skipping video switch, already set to ${track.mediaStreamIndex}")
 								expanded = false
 								return@PopoverMenuCheckboxItem
 							}
