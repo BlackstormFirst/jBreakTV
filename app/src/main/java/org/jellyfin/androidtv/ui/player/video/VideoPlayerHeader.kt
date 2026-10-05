@@ -40,25 +40,37 @@ fun VideoPlayerHeader(
 	}
 
 	val isLocal = item?.let { LocalVideoManager.isLocalItem(it) } == true
+	val isLiveTv = LiveTvPlayerHelper.isLiveTv(item)
 	val isEpisode = item?.type == BaseItemKind.EPISODE || item?.indexNumber != null
 
-	val titleText = remember(item, isLocal, isEpisode) {
-		val episodeName = item?.name.orEmpty()
-		if (!isLocal && isEpisode) {
-			val seasonNum = item.parentIndexNumber
-			val episodeNum = item.indexNumber
+	val titleText = remember(item, isLocal, isLiveTv, isEpisode) {
+		val name = item?.name.orEmpty()
+		if (isLiveTv) {
+			val channelNum = item?.channelNumber ?: item?.number
+			if (!channelNum.isNullOrEmpty()) "$channelNum $name" else name
+		} else if (!isLocal && isEpisode) {
+			val seasonNum = item?.parentIndexNumber
+			val episodeNum = item?.indexNumber
 			if (seasonNum != null && episodeNum != null) {
 				val sFormatted = "%02d".format(seasonNum)
 				val eFormatted = "%02d".format(episodeNum)
-				"S${sFormatted}E$eFormatted: $episodeName"
+				"S${sFormatted}E$eFormatted: $name"
 			} else if (episodeNum != null) {
 				val eFormatted = "%02d".format(episodeNum)
-				"E${eFormatted}: $episodeName"
+				"E${eFormatted}: $name"
 			} else {
-				episodeName
+				name
 			}
 		} else {
-			episodeName
+			name
+		}
+	}
+
+	val subtitleText = remember(item, isLiveTv) {
+		if (isLiveTv) {
+			item?.currentProgram?.name ?: item?.overview ?: item?.seriesName.orEmpty()
+		} else {
+			item?.seriesName.orEmpty()
 		}
 	}
 
@@ -74,9 +86,9 @@ fun VideoPlayerHeader(
 				)
 			)
 
-			if (!item.seriesName.isNullOrEmpty()) {
+			if (subtitleText.isNotEmpty()) {
 				Text(
-					text = item.seriesName.orEmpty(),
+					text = subtitleText,
 					overflow = TextOverflow.Ellipsis,
 					maxLines = 1,
 					style = LocalTextStyle.current.copy(
@@ -86,7 +98,20 @@ fun VideoPlayerHeader(
 				)
 			}
 
-			if (finishText != null) {
+			if (isLiveTv) {
+				val programEnd = item.currentProgram?.endDate ?: item.endDate
+				if (programEnd != null) {
+					val formatter = DateTimeFormatter.ofPattern("HH:mm")
+					val endTimeStr = programEnd.format(formatter)
+					Text(
+						text = stringResource(R.string.lbl_playback_control_ends, endTimeStr),
+						style = LocalTextStyle.current.copy(
+							color = Color.White.copy(alpha = 0.7f),
+							fontSize = 14.sp
+						)
+					)
+				}
+			} else if (finishText != null) {
 				Text(
 					text = stringResource(R.string.lbl_playback_control_ends, finishText),
 					style = LocalTextStyle.current.copy(
@@ -95,7 +120,6 @@ fun VideoPlayerHeader(
 					)
 				)
 			}
-
 		}
 	}
 }

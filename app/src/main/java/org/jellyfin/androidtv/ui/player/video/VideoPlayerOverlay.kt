@@ -58,6 +58,7 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.constant.ZoomMode
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.Text
+import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.composable.rememberPlayerPositionInfo
 import org.jellyfin.androidtv.ui.composable.rememberQueueEntry
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentAction
@@ -91,8 +92,13 @@ fun VideoPlayerOverlay(
 	zoomMode: ZoomMode = ZoomMode.FIT,
 	onZoomSelect: (ZoomMode) -> Unit = {},
 ) {
+	val api = koinInject<ApiClient>()
+	val videoQueueManager = koinInject<VideoQueueManager>()
+	val coroutineScope = rememberCoroutineScope()
+
 	val visibilityState = rememberPlayerOverlayVisibility()
 	var showPlaybackInfo by remember { mutableStateOf(false) }
+	var showGuideOverlay by remember { mutableStateOf(false) }
 	var scrubbingProgress by remember { mutableStateOf<Duration?>(null) }
 
 	val rootFocusRequester = remember { FocusRequester() }
@@ -134,6 +140,8 @@ fun VideoPlayerOverlay(
 		}
 	}
 
+	val isLiveTv = LiveTvPlayerHelper.isLiveTv(item)
+
 	Box(modifier = modifier) {
 		PlayerOverlayLayout(
 			visibilityState = visibilityState,
@@ -153,6 +161,7 @@ fun VideoPlayerOverlay(
 					playbackManager = playbackManager,
 					visibilityState = visibilityState,
 					onPlaybackInfoClick = { showPlaybackInfo = !showPlaybackInfo },
+					onToggleGuide = if (isLiveTv) { { showGuideOverlay = !showGuideOverlay } } else null,
 					zoomMode = zoomMode,
 					onZoomSelect = onZoomSelect,
 					onScrubbingProgressChange = { scrubbingProgress = it },
@@ -168,6 +177,31 @@ fun VideoPlayerOverlay(
 			onFastForward = {
 				playbackManager.state.fastForward()
 			},
+			onToggleGuide = if (isLiveTv) { { showGuideOverlay = !showGuideOverlay } } else null,
+			onChannelUp = if (isLiveTv) {
+				{
+					coroutineScope.launch {
+						LiveTvPlayerHelper.switchNextChannel(api, playbackManager, videoQueueManager, item?.id)
+					}
+				}
+			} else null,
+			onChannelDown = if (isLiveTv) {
+				{
+					coroutineScope.launch {
+						LiveTvPlayerHelper.switchPreviousChannel(api, playbackManager, videoQueueManager, item?.id)
+					}
+				}
+			} else null,
+		)
+
+		LiveTvGuideOverlay(
+			visible = showGuideOverlay,
+			onDismissRequest = { showGuideOverlay = false },
+			onChannelSelected = { channelId ->
+				coroutineScope.launch {
+					LiveTvPlayerHelper.switchChannel(api, playbackManager, videoQueueManager, channelId)
+				}
+			}
 		)
 
 		val activeScrubbing = scrubbingProgress

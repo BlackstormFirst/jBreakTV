@@ -129,6 +129,9 @@ fun PlayerOverlayLayout(
 	onTogglePlayPause: (() -> Unit)? = null,
 	onRewind: (() -> Unit)? = null,
 	onFastForward: (() -> Unit)? = null,
+	onToggleGuide: (() -> Unit)? = null,
+	onChannelUp: (() -> Unit)? = null,
+	onChannelDown: (() -> Unit)? = null,
 	isSkipButtonPresent: Boolean = false,
 	onFocusSkipButton: (() -> Unit)? = null,
 ) {
@@ -158,8 +161,20 @@ fun PlayerOverlayLayout(
 				val isRewindKey = keyEvent.key == Key.DirectionLeft || keyEvent.key == Key.MediaRewind || keyEvent.key == Key.MediaPrevious
 				val isFastForwardKey = keyEvent.key == Key.DirectionRight || keyEvent.key == Key.MediaFastForward || keyEvent.key == Key.MediaNext
 				val isOsdKey = keyEvent.key == Key.DirectionUp || keyEvent.key == Key.DirectionDown
+				val isGuideKey = keyEvent.key == Key.Guide || keyEvent.key == Key.Menu || keyEvent.key == Key.TvMediaContextMenu
+				val isChannelUpKey = keyEvent.key == Key.ChannelUp
+				val isChannelDownKey = keyEvent.key == Key.ChannelDown
 
-				if (keyEvent.key == Key.Back && visibilityState.visible) {
+				if (isGuideKey && onToggleGuide != null) {
+					onToggleGuide.invoke()
+					true
+				} else if (isChannelUpKey && onChannelUp != null) {
+					onChannelUp.invoke()
+					true
+				} else if (isChannelDownKey && onChannelDown != null) {
+					onChannelDown.invoke()
+					true
+				} else if (keyEvent.key == Key.Back && visibilityState.visible) {
 					visibilityState.hide()
 					true
 				} else if (!visibilityState.visible) {

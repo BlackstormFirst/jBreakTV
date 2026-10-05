@@ -10,6 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.base.BaseScreen
+import org.jellyfin.androidtv.ui.livetv.TvManager
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
@@ -133,7 +134,11 @@ class VideoPlayerFragment : Fragment() {
 		}
 
 		lifecycleScope.launch {
-			playbackManager.queue.entry.collect {
+			playbackManager.queue.entry.collect { entry ->
+				val item = entry?.baseItem
+				if (item != null && LiveTvPlayerHelper.isLiveTv(item)) {
+					TvManager.setLastLiveTvChannel(item.id)
+				}
 				val videoSize = playbackManager.state.videoSize.value
 				applyRefreshRate(videoSize)
 			}

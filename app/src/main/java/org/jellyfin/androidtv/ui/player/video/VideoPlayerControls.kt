@@ -92,10 +92,18 @@ fun VideoPlayerControls(
 	playbackManager: PlaybackManager = koinInject(),
 	visibilityState: PlayerOverlayVisibilityState = rememberPlayerOverlayVisibility(),
 	onPlaybackInfoClick: () -> Unit = {},
+	onToggleGuide: (() -> Unit)? = null,
 	zoomMode: ZoomMode = ZoomMode.FIT,
 	onZoomSelect: (ZoomMode) -> Unit = {},
 	onScrubbingProgressChange: ((Duration?) -> Unit)? = null,
 ) {
+	val api = koinInject<ApiClient>()
+	val videoQueueManager = koinInject<VideoQueueManager>()
+	val entry by rememberQueueEntry(playbackManager)
+	val baseItem = entry?.run { baseItemFlow.collectAsState(baseItem) }?.value ?: entry?.baseItem
+	val isLiveTv = LiveTvPlayerHelper.isLiveTv(baseItem)
+	val currentChannelId = baseItem?.id
+
 	val playState by playbackManager.state.playState.collectAsState()
 	var scrubbingProgress by remember { mutableStateOf<Duration?>(null) }
 
@@ -112,6 +120,8 @@ fun VideoPlayerControls(
 
 	var prevHasPrevious by remember { mutableStateOf(hasPrevious) }
 	var prevHasNext by remember { mutableStateOf(hasNext) }
+
+	val coroutineScope = rememberCoroutineScope()
 
 	LaunchedEffect(hasPrevious) {
 		if (prevHasPrevious && !hasPrevious) {
@@ -139,18 +149,61 @@ fun VideoPlayerControls(
 				.focusGroup()
 		) {
 			PlayPauseButton(playbackManager, playState, playPauseFocusRequester)
-			PreviousEntryButton(playbackManager)
+			if (isLiveTv) {
+				IconButton(
+					onClick = {
+						coroutineScope.launch {
+							LiveTvPlayerHelper.switchPreviousChannel(api, playbackManager, videoQueueManager, currentChannelId)
+						}
+					}
+				) {
+					Icon(
+						imageVector = ImageVector.vectorResource(R.drawable.ic_previous),
+						contentDescription = stringResource(R.string.lbl_prev_item),
+					)
+				}
+			} else {
+				PreviousEntryButton(playbackManager)
+			}
 			RewindButton(playbackManager)
 			FastForwardButton(playbackManager)
-			NextEntryButton(playbackManager)
-			ChapterButton(playbackManager, visibilityState)
+			if (isLiveTv) {
+				IconButton(
+					onClick = {
+						coroutineScope.launch {
+							LiveTvPlayerHelper.switchNextChannel(api, playbackManager, videoQueueManager, currentChannelId)
+						}
+					}
+				) {
+					Icon(
+						imageVector = ImageVector.vectorResource(R.drawable.ic_next),
+						contentDescription = stringResource(R.string.lbl_next_item),
+					)
+				}
+			} else {
+				NextEntryButton(playbackManager)
+				ChapterButton(playbackManager, visibilityState)
+			}
+
+			if (isLiveTv && onToggleGuide != null) {
+				IconButton(
+					onClick = { onToggleGuide.invoke() }
+				) {
+					Icon(
+						imageVector = ImageVector.vectorResource(R.drawable.ic_tv_play),
+						contentDescription = stringResource(R.string.lbl_live_tv_guide),
+					)
+				}
+			}
 
 			Spacer(Modifier.weight(1f))
 
 			SubtitleButton(playbackManager, visibilityState)
 			AudioButton(playbackManager, visibilityState)
 			VideoButton(playbackManager, visibilityState)
-			PlaybackSpeedButton(playbackManager, visibilityState)
+			if (!isLiveTv) {
+				PlaybackSpeedButton(playbackManager, visibilityState)
+			}
 			MaxBitrateButton(playbackManager, visibilityState)
 			ZoomButton(zoomMode, onZoomSelect, visibilityState)
 
