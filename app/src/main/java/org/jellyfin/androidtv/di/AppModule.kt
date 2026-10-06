@@ -57,6 +57,7 @@ import org.jellyfin.androidtv.ui.settings.screen.library.SettingsLibrariesScreen
 import org.jellyfin.androidtv.ui.startup.ServerAddViewModel
 import org.jellyfin.androidtv.ui.startup.StartupViewModel
 import org.jellyfin.androidtv.ui.startup.UserLoginViewModel
+import kotlinx.coroutines.Dispatchers
 import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.KeyProcessor
 import org.jellyfin.androidtv.util.MarkdownRenderer
@@ -127,18 +128,20 @@ val appModule = module {
 
 	single {
 		val userPreferences = get<UserPreferences>()
-		var diskMaxCacheSize = userPreferences[UserPreferences.diskMaxCacheSize]
-		var memoryMaxCachePercent = userPreferences[UserPreferences.memoryMaxCachePercent]
-		ImageLoader.Builder(androidContext()).apply {
+		val diskMaxCacheSize = userPreferences[UserPreferences.diskMaxCacheSize]
+		val memoryMaxCachePercent = userPreferences[UserPreferences.memoryMaxCachePercent]
+		val context = androidContext()
+		ImageLoader.Builder(context).apply {
+			coroutineContext(Dispatchers.IO)
 			diskCache {
 				DiskCache.Builder()
-					.directory(androidContext().cacheDir.resolve("image_cache").toOkioPath())
+					.directory(context.cacheDir.resolve("image_cache").toOkioPath())
 					.maxSizeBytes(diskMaxCacheSize * 1024 * 1024)
 					.build()
 			}
 			memoryCache {
 				MemoryCache.Builder()
-					.maxSizePercent(androidContext(), (memoryMaxCachePercent / 100.0))
+					.maxSizePercent(context, (memoryMaxCachePercent / 100.0))
 					.build()
 			}
 
