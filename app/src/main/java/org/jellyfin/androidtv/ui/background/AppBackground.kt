@@ -14,19 +14,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.service.BackgroundService
 import org.koin.compose.koinInject
@@ -34,18 +37,21 @@ import org.koin.compose.koinInject
 @Composable
 private fun AppThemeBackground() {
 	val context = LocalContext.current
-	val themeBackground = remember(context.theme) {
-		val attributes = context.theme.obtainStyledAttributes(intArrayOf(R.attr.defaultBackground))
-		val drawable = attributes.getDrawable(0)
-		attributes.recycle()
+	val themeBackground by produceState<ImageBitmap?>(initialValue = null, context.theme) {
+		value = withContext(Dispatchers.IO) {
+			val attributes = context.theme.obtainStyledAttributes(intArrayOf(R.attr.defaultBackground))
+			val drawable = attributes.getDrawable(0)
+			attributes.recycle()
 
-		if (drawable is ColorDrawable) drawable.toBitmap(1, 1).asImageBitmap()
-		else drawable?.toBitmap()?.asImageBitmap()
+			if (drawable is ColorDrawable) drawable.toBitmap(1, 1).asImageBitmap()
+			else drawable?.toBitmap()?.asImageBitmap()
+		}
 	}
 
-	if (themeBackground != null) {
+	val bitmap = themeBackground
+	if (bitmap != null) {
 		Image(
-			bitmap = themeBackground,
+			bitmap = bitmap,
 			contentDescription = null,
 			alignment = Alignment.Center,
 			contentScale = ContentScale.Crop,
