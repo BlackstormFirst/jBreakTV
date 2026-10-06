@@ -7,7 +7,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.compose.content
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.base.BaseScreen
 import org.jellyfin.androidtv.ui.livetv.TvManager
@@ -18,6 +20,7 @@ import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
 import org.jellyfin.androidtv.util.RefreshRateHelper
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.PlaybackManager
+import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.VideoSize
@@ -32,6 +35,15 @@ import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.koin.android.ext.android.inject
 import timber.log.Timber
+
+private data class TrackSelectionResult(
+	val audioIndex: Int?,
+	val subIndex: Int?,
+	val videoIndex: Int?,
+	val targetVideoTrack: BackendTrack?,
+	val targetAudioTrack: BackendTrack?,
+	val targetSubTrack: BackendTrack?,
+)
 
 class VideoPlayerFragment : Fragment() {
 	companion object {
@@ -180,113 +192,129 @@ class VideoPlayerFragment : Fragment() {
 				}
 
 				isApplyingAutoTracks = true
-				try {
-					val baseItem = entry.baseItem ?: return
-					val backend = playbackManager.backend
+				lifecycleScope.launch {
+					try {
+						val baseItem = entry.baseItem ?: return@launch
+						val backend = playbackManager.backend
 
-					val videoTracks = backend.getTracks(2)
-					val audioTracks = backend.getTracks(1)
-					val subTracks = backend.getTracks(3)
+						val videoTracks = backend.getTracks(2)
+						val audioTracks = backend.getTracks(1)
+						val subTracks = backend.getTracks(3)
 
-					if (videoTracks.isEmpty() && audioTracks.isEmpty() && subTracks.isEmpty()) {
-						// Tracks not loaded yet in ExoPlayer, retry on next onTracksChanged
-						return
-					}
-
-					val isLocal = LocalVideoManager.isLocalItem(baseItem)
-					val mediaSource = baseItem.mediaSources?.firstOrNull() ?: MediaSourceInfo(
-						protocol = if (isLocal) MediaProtocol.FILE else MediaProtocol.HTTP,
-						id = baseItem.id.toString(),
-						path = baseItem.path,
-						type = MediaSourceType.DEFAULT,
-						isRemote = !isLocal,
-						mediaStreams = baseItem.mediaStreams,
-						supportsDirectPlay = true,
-						supportsDirectStream = true,
-						supportsTranscoding = false,
-						supportsProbing = false,
-						requiresOpening = false,
-						requiresClosing = false,
-						requiresLooping = false,
-						isInfiniteStream = false,
-						ignoreIndex = false,
-						ignoreDts = false,
-						genPtsInput = false,
-						readAtNativeFramerate = false,
-						hasSegments = false,
-						transcodingSubProtocol = MediaStreamProtocol.HTTP,
-					)
-
-					val playbackIndexManager: PlaybackIndexManager by inject()
-					val audioIndex = playbackIndexManager.getBestAudioIndex(mediaSource)
-					val activeAudioLang = baseItem.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
-					val subIndex = playbackIndexManager.getBestSubtitleIndex(mediaSource, context, activeAudioLang)
-					val videoIndex = playbackIndexManager.getBestVideoIndex(mediaSource)
-
-					// Auto-select video track if needed
-					if (videoIndex != null) {
-						val targetTrack = videoTracks.firstOrNull { it.mediaStreamIndex == videoIndex }
-							?: videoTracks.firstOrNull()
-						if (targetTrack != null && !targetTrack.isSelected) {
-							backend.selectTrack(2, targetTrack)
+						if (videoTracks.isEmpty() && audioTracks.isEmpty() && subTracks.isEmpty()) {
+							// Tracks not loaded yet in ExoPlayer, retry on next onTracksChanged
+							return@launch
 						}
-					}
 
-					// Auto-select audio track if needed
-					if (audioIndex != null) {
-						val targetTrack = audioTracks.firstOrNull { it.mediaStreamIndex == audioIndex }
-							?: audioTracks.firstOrNull { it.language.equals(activeAudioLang, ignoreCase = true) }
-						if (targetTrack != null && !targetTrack.isSelected) {
-							backend.selectTrack(1, targetTrack)
+						val isLocal = LocalVideoManager.isLocalItem(baseItem)
+						val mediaSource = baseItem.mediaSources?.firstOrNull() ?: MediaSourceInfo(
+							protocol = if (isLocal) MediaProtocol.FILE else MediaProtocol.HTTP,
+							id = baseItem.id.toString(),
+							path = baseItem.path,
+							type = MediaSourceType.DEFAULT,
+							isRemote = !isLocal,
+							mediaStreams = baseItem.mediaStreams,
+							supportsDirectPlay = true,
+							supportsDirectStream = true,
+							supportsTranscoding = false,
+							supportsProbing = false,
+							requiresOpening = false,
+							requiresClosing = false,
+							requiresLooping = false,
+							isInfiniteStream = false,
+							ignoreIndex = false,
+							ignoreDts = false,
+							genPtsInput = false,
+							readAtNativeFramerate = false,
+							hasSegments = false,
+							transcodingSubProtocol = MediaStreamProtocol.HTTP,
+						)
+
+						val playbackIndexManager: PlaybackIndexManager by inject()
+						val ctx = context
+
+						// Perform track index calculation on Dispatchers.Default (background thread pool)
+						val trackSelection = withContext(Dispatchers.Default) {
+							val audioIndex = playbackIndexManager.getBestAudioIndex(mediaSource)
+							val activeAudioLang = baseItem.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
+							val subIndex = playbackIndexManager.getBestSubtitleIndex(mediaSource, ctx, activeAudioLang)
+							val videoIndex = playbackIndexManager.getBestVideoIndex(mediaSource)
+
+							val targetVideoTrack = if (videoIndex != null) {
+								videoTracks.firstOrNull { it.mediaStreamIndex == videoIndex } ?: videoTracks.firstOrNull()
+							} else null
+
+							val targetAudioTrack = if (audioIndex != null) {
+								audioTracks.firstOrNull { it.mediaStreamIndex == audioIndex }
+									?: audioTracks.firstOrNull { it.language.equals(activeAudioLang, ignoreCase = true) }
+							} else null
+
+							val targetSubTrack = if (subIndex != null && subIndex >= 0) {
+								val targetStream = baseItem.mediaStreams?.firstOrNull { it.index == subIndex }
+								subTracks.firstOrNull { it.mediaStreamIndex == subIndex }
+									?: subTracks.firstOrNull { it.language.equals(targetStream?.language, ignoreCase = true) }
+							} else null
+
+							TrackSelectionResult(
+								audioIndex = audioIndex,
+								subIndex = subIndex,
+								videoIndex = videoIndex,
+								targetVideoTrack = targetVideoTrack,
+								targetAudioTrack = targetAudioTrack,
+								targetSubTrack = targetSubTrack,
+							)
 						}
-					}
 
-					// Auto-select subtitle track if needed
-					if (subIndex == null || subIndex < 0) {
-						if (subTracks.any { it.isSelected }) {
-							backend.selectTrack(3, null)
+						// Apply track selection back on the main thread
+						if (trackSelection.videoIndex != null && trackSelection.targetVideoTrack != null && !trackSelection.targetVideoTrack.isSelected) {
+							backend.selectTrack(2, trackSelection.targetVideoTrack)
 						}
-					} else {
-						val targetStream = baseItem.mediaStreams?.firstOrNull { it.index == subIndex }
-						val targetTrack = subTracks.firstOrNull { it.mediaStreamIndex == subIndex }
-							?: subTracks.firstOrNull { it.language.equals(targetStream?.language, ignoreCase = true) }
-						if (targetTrack != null && !targetTrack.isSelected) {
-							backend.selectTrack(3, targetTrack)
+
+						if (trackSelection.audioIndex != null && trackSelection.targetAudioTrack != null && !trackSelection.targetAudioTrack.isSelected) {
+							backend.selectTrack(1, trackSelection.targetAudioTrack)
 						}
-					}
 
-					// Save active audio/subtitle properties to VideoQueueManager for queue persistence across episodes
-					val selectedAudioStream = baseItem.mediaStreams?.firstOrNull { it.index == audioIndex }
-					if (selectedAudioStream != null) {
-						selectedAudioStream.language?.let { videoQueueManager.setLastPlayedAudioLanguageIsoCode(it) }
-						selectedAudioStream.codec?.let { videoQueueManager.setLastPlayedAudioCodec(it) }
-						videoQueueManager.setLastPlayedAudioTitle(selectedAudioStream.title)
-						videoQueueManager.setLastPlayedAudioDefaultState(selectedAudioStream.isDefault)
-						videoQueueManager.setLastPlayedAudioHearingImpairedState(selectedAudioStream.isHearingImpaired)
-					}
+						if (trackSelection.subIndex == null || trackSelection.subIndex < 0) {
+							if (subTracks.any { it.isSelected }) {
+								backend.selectTrack(3, null)
+							}
+						} else if (trackSelection.targetSubTrack != null && !trackSelection.targetSubTrack.isSelected) {
+							backend.selectTrack(3, trackSelection.targetSubTrack)
+						}
 
-					val selectedSubStream = if (subIndex != null && subIndex >= 0) {
-						baseItem.mediaStreams?.firstOrNull { it.index == subIndex }
-					} else null
-					if (selectedSubStream != null) {
-						selectedSubStream.language?.let { videoQueueManager.setLastPlayedSubtitleLanguageIsoCode(it) }
-						selectedSubStream.codec?.let { videoQueueManager.setLastPlayedSubtitleCodec(it) }
-						videoQueueManager.setLastPlayedSubtitleTitle(selectedSubStream.title)
-						videoQueueManager.setLastPlayedSubtitleDefaultState(selectedSubStream.isDefault)
-						videoQueueManager.setLastPlayedSubtitleForcedState(selectedSubStream.isForced)
-						videoQueueManager.setLastPlayedSubtitleHearingImpairedState(selectedSubStream.isHearingImpaired)
-					} else if (subIndex == null || subIndex < 0) {
-						videoQueueManager.setLastPlayedSubtitleLanguageIsoCode("")
-						videoQueueManager.setLastPlayedSubtitleTitle(null)
-						videoQueueManager.setLastPlayedSubtitleCodec(null)
-					}
+						// Save active audio/subtitle properties to VideoQueueManager for queue persistence across episodes
+						val selectedAudioStream = baseItem.mediaStreams?.firstOrNull { it.index == trackSelection.audioIndex }
+						if (selectedAudioStream != null) {
+							selectedAudioStream.language?.let { videoQueueManager.setLastPlayedAudioLanguageIsoCode(it) }
+							selectedAudioStream.codec?.let { videoQueueManager.setLastPlayedAudioCodec(it) }
+							videoQueueManager.setLastPlayedAudioTitle(selectedAudioStream.title)
+							videoQueueManager.setLastPlayedAudioDefaultState(selectedAudioStream.isDefault)
+							videoQueueManager.setLastPlayedAudioHearingImpairedState(selectedAudioStream.isHearingImpaired)
+						}
 
-					val hasSubtitleStreams = baseItem.mediaStreams?.any { it.type == MediaStreamType.SUBTITLE } == true
-					if (!hasSubtitleStreams || subTracks.isNotEmpty()) {
-						lastAutoSelectedEntryId = entryId
+						val selectedSubStream = if (trackSelection.subIndex != null && trackSelection.subIndex >= 0) {
+							baseItem.mediaStreams?.firstOrNull { it.index == trackSelection.subIndex }
+						} else null
+						if (selectedSubStream != null) {
+							selectedSubStream.language?.let { videoQueueManager.setLastPlayedSubtitleLanguageIsoCode(it) }
+							selectedSubStream.codec?.let { videoQueueManager.setLastPlayedSubtitleCodec(it) }
+							videoQueueManager.setLastPlayedSubtitleTitle(selectedSubStream.title)
+							videoQueueManager.setLastPlayedSubtitleDefaultState(selectedSubStream.isDefault)
+							videoQueueManager.setLastPlayedSubtitleForcedState(selectedSubStream.isForced)
+							videoQueueManager.setLastPlayedSubtitleHearingImpairedState(selectedSubStream.isHearingImpaired)
+						} else if (trackSelection.subIndex == null || trackSelection.subIndex < 0) {
+							videoQueueManager.setLastPlayedSubtitleLanguageIsoCode("")
+							videoQueueManager.setLastPlayedSubtitleTitle(null)
+							videoQueueManager.setLastPlayedSubtitleCodec(null)
+						}
+
+						val hasSubtitleStreams = baseItem.mediaStreams?.any { it.type == MediaStreamType.SUBTITLE } == true
+						if (!hasSubtitleStreams || subTracks.isNotEmpty()) {
+							lastAutoSelectedEntryId = entryId
+						}
+					} finally {
+						isApplyingAutoTracks = false
 					}
-				} finally {
-					isApplyingAutoTracks = false
 				}
 			}
 		})
