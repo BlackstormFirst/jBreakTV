@@ -12,6 +12,7 @@ import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.mediaSourceId
 import org.jellyfin.playback.core.queue.preferredAudioIndex
 import org.jellyfin.playback.core.queue.preferredSubtitleIndex
+import org.jellyfin.playback.core.queue.preferredVideoIndex
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.audioApi
 import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
@@ -30,7 +31,7 @@ class JellyfinMediaStreamResolver(
 	private val api: ApiClient,
 	private val deviceProfileBuilder: () -> DeviceProfile,
 	private val localItemInspector: (suspend (File) -> BaseItemDto)? = null,
-	private val streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Pair<Int?, Int?>)? = null,
+	private val streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Triple<Int?, Int?, Int?>)? = null,
 	private val maxBitrateProvider: (() -> Int)? = null,
 ) : MediaStreamResolver {
 	companion object {
@@ -103,10 +104,13 @@ class JellyfinMediaStreamResolver(
 
 		return when {
 			// Direct play video
-			mediaInfo.mediaSource.supportsDirectPlay && baseItem.mediaType == MediaType.VIDEO -> mediaInfo.toStream(
-				queueEntry = queueEntry,
-				conversionMethod = MediaConversionMethod.None,
-				url = api.videosApi.getVideoStreamUrl(
+			mediaInfo.mediaSource.supportsDirectPlay && baseItem.mediaType == MediaType.VIDEO -> {
+				val (bestAudioIndex, bestSubIndex, bestVideoIndex) = streamIndexResolver?.invoke(baseItem, mediaInfo.mediaSource) ?: Triple(null, null, null)
+				val audioIndexToUse = queueEntry.preferredAudioIndex ?: bestAudioIndex
+				val subIndexToUse = queueEntry.preferredSubtitleIndex ?: bestSubIndex
+				val videoIndexToUse = queueEntry.preferredVideoIndex ?: bestVideoIndex
+
+				val rawUrl = api.videosApi.getVideoStreamUrl(
 					itemId = baseItem.id,
 					container = mediaInfo.mediaSource.container,
 					mediaSourceId = mediaInfo.mediaSource.id,
@@ -114,7 +118,14 @@ class JellyfinMediaStreamResolver(
 					tag = mediaInfo.mediaSource.eTag,
 					liveStreamId = mediaInfo.mediaSource.liveStreamId,
 				)
-			)
+				val finalUrl = rawUrl.withStreamIndexOverrides(audioIndexToUse, subIndexToUse, videoIndexToUse)
+
+				mediaInfo.toStream(
+					queueEntry = queueEntry,
+					conversionMethod = MediaConversionMethod.None,
+					url = finalUrl
+				)
+			}
 
 			// Direct play audio
 			mediaInfo.mediaSource.supportsDirectPlay && baseItem.mediaType == MediaType.AUDIO -> mediaInfo.toStream(
@@ -133,10 +144,11 @@ class JellyfinMediaStreamResolver(
 			// Remux (direct stream)
 			mediaInfo.mediaSource.supportsDirectStream && mediaInfo.mediaSource.transcodingUrl != null -> {
 				val rawUrl = api.createUrl(requireNotNull(mediaInfo.mediaSource.transcodingUrl), ignorePathParameters = true)
-				val (bestAudioIndex, bestSubIndex) = streamIndexResolver?.invoke(baseItem, mediaInfo.mediaSource) ?: Pair(null, null)
+				val (bestAudioIndex, bestSubIndex, bestVideoIndex) = streamIndexResolver?.invoke(baseItem, mediaInfo.mediaSource) ?: Triple(null, null, null)
 				val audioIndexToUse = queueEntry.preferredAudioIndex ?: bestAudioIndex
 				val subIndexToUse = queueEntry.preferredSubtitleIndex ?: bestSubIndex
-				val finalUrl = rawUrl.withStreamIndexOverrides(audioIndexToUse, subIndexToUse)
+				val videoIndexToUse = queueEntry.preferredVideoIndex ?: bestVideoIndex
+				val finalUrl = rawUrl.withStreamIndexOverrides(audioIndexToUse, subIndexToUse, videoIndexToUse)
 
 				mediaInfo.toStream(
 					queueEntry = queueEntry,
@@ -148,10 +160,11 @@ class JellyfinMediaStreamResolver(
 			// Transcode
 			mediaInfo.mediaSource.supportsTranscoding && mediaInfo.mediaSource.transcodingUrl != null -> {
 				val rawUrl = api.createUrl(requireNotNull(mediaInfo.mediaSource.transcodingUrl), ignorePathParameters = true)
-				val (bestAudioIndex, bestSubIndex) = streamIndexResolver?.invoke(baseItem, mediaInfo.mediaSource) ?: Pair(null, null)
+				val (bestAudioIndex, bestSubIndex, bestVideoIndex) = streamIndexResolver?.invoke(baseItem, mediaInfo.mediaSource) ?: Triple(null, null, null)
 				val audioIndexToUse = queueEntry.preferredAudioIndex ?: bestAudioIndex
 				val subIndexToUse = queueEntry.preferredSubtitleIndex ?: bestSubIndex
-				val finalUrl = rawUrl.withStreamIndexOverrides(audioIndexToUse, subIndexToUse)
+				val videoIndexToUse = queueEntry.preferredVideoIndex ?: bestVideoIndex
+				val finalUrl = rawUrl.withStreamIndexOverrides(audioIndexToUse, subIndexToUse, videoIndexToUse)
 
 				mediaInfo.toStream(
 					queueEntry = queueEntry,
@@ -173,26 +186,45 @@ class JellyfinMediaStreamResolver(
 		val initialSource = item.mediaSources?.firstOrNull { mediaSourceId == null || it.id == mediaSourceId }
 			?: item.mediaSources?.firstOrNull()
 
-		val (bestAudioIndex, bestSubIndex) = streamIndexResolver?.invoke(item, initialSource) ?: Pair(null, null)
+		val (bestAudioIndex, bestSubIndex, bestVideoIndex) = streamIndexResolver?.invoke(item, initialSource) ?: Triple(null, null, null)
 		if (queueEntry.preferredAudioIndex == null && bestAudioIndex != null) {
 			queueEntry.preferredAudioIndex = bestAudioIndex
 		}
 		if (queueEntry.preferredSubtitleIndex == null && bestSubIndex != null) {
 			queueEntry.preferredSubtitleIndex = bestSubIndex
 		}
+		if (queueEntry.preferredVideoIndex == null && bestVideoIndex != null) {
+			queueEntry.preferredVideoIndex = bestVideoIndex
+		}
 		val audioIndexToUse = queueEntry.preferredAudioIndex ?: bestAudioIndex
 		val subIndexToUse = queueEntry.preferredSubtitleIndex ?: bestSubIndex
+
+		val profile = deviceProfileBuilder()
+		val maxBitrate = maxBitrateProvider?.invoke() ?: 0
 
 		val allStreams = initialSource?.mediaStreams.orEmpty().ifEmpty { item.mediaStreams.orEmpty() }
 		val requestedSubStream = allStreams.firstOrNull { it.index == subIndexToUse }
 		val subCodec = requestedSubStream?.codec?.lowercase(java.util.Locale.ROOT).orEmpty()
-		val isAssOrImageCodec = subCodec.contains("ass") || subCodec.contains("ssa") || subCodec.contains("pgs") || subCodec.contains("dvd") || subCodec.contains("sub")
-		val shouldBurnIn = requestedSubStream?.deliveryMethod == SubtitleDeliveryMethod.ENCODE || isAssOrImageCodec
+
+		val isAssCodec = subCodec.contains("ass") || subCodec.contains("ssa")
+		val isPgsCodec = subCodec.contains("pgs")
+		val isAssSupportedDirect = isAssCodec && profile.subtitleProfiles.any {
+			(it.format.equals("ass", ignoreCase = true) || it.format.equals("ssa", ignoreCase = true)) &&
+				(it.method == SubtitleDeliveryMethod.EMBED || it.method == SubtitleDeliveryMethod.EXTERNAL)
+		}
+		val isPgsSupportedDirect = isPgsCodec && profile.subtitleProfiles.any {
+			it.format?.lowercase(java.util.Locale.ROOT)?.contains("pgs") == true &&
+				(it.method == SubtitleDeliveryMethod.EMBED || it.method == SubtitleDeliveryMethod.EXTERNAL)
+		}
+
+		val isUnsupportedSubCodec = (isAssCodec && !isAssSupportedDirect) ||
+			(isPgsCodec && !isPgsSupportedDirect) ||
+			subCodec.contains("dvd") || subCodec.contains("sub") || subCodec.contains("idx")
+
+		val shouldBurnIn = requestedSubStream?.deliveryMethod == SubtitleDeliveryMethod.ENCODE || isUnsupportedSubCodec
 
 		val startTicks = item.userData?.playbackPositionTicks ?: 0L
 
-		val profile = deviceProfileBuilder()
-		val maxBitrate = maxBitrateProvider?.invoke() ?: 0
 		val response = api.mediaInfoApi.getPostedPlaybackInfo(
 			itemId = item.id,
 			data = PlaybackInfoDto(
@@ -262,7 +294,7 @@ class JellyfinMediaStreamResolver(
 
 }
 
-private fun String.withStreamIndexOverrides(audioIndex: Int?, subtitleIndex: Int?): String {
+private fun String.withStreamIndexOverrides(audioIndex: Int?, subtitleIndex: Int?, videoIndex: Int? = null): String {
 	var result = this
 	if (audioIndex != null && audioIndex >= 0) {
 		result = if (result.contains("AudioStreamIndex=")) {
@@ -276,6 +308,13 @@ private fun String.withStreamIndexOverrides(audioIndex: Int?, subtitleIndex: Int
 			result.replace(Regex("SubtitleStreamIndex=-?\\d+"), "SubtitleStreamIndex=$subtitleIndex")
 		} else {
 			"$result&SubtitleStreamIndex=$subtitleIndex"
+		}
+	}
+	if (videoIndex != null && videoIndex >= 0) {
+		result = if (result.contains("VideoStreamIndex=")) {
+			result.replace(Regex("VideoStreamIndex=\\d+"), "VideoStreamIndex=$videoIndex")
+		} else {
+			"$result&VideoStreamIndex=$videoIndex"
 		}
 	}
 	return result

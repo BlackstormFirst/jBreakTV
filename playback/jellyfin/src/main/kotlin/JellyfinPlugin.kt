@@ -22,7 +22,7 @@ fun jellyfinPlugin(
 	lifecycle: Lifecycle? = null,
 	mediaSegmentProvider: (suspend (BaseItemDto) -> List<MediaSegmentDto>)? = null,
 	localItemInspector: (suspend (File) -> BaseItemDto)? = null,
-	streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Pair<Int?, Int?>)? = null,
+	streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Triple<Int?, Int?, Int?>)? = null,
 	maxBitrateProvider: (() -> Int)? = null,
 	onPlaybackStop: ((BaseItemDto) -> Unit)? = null,
 	segmentAutoSkipPredicate: ((MediaSegmentDto) -> Boolean)? = null,

@@ -67,6 +67,7 @@ import org.jellyfin.playback.core.model.PositionInfo
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.queue.preferredAudioIndex
 import org.jellyfin.playback.core.queue.preferredSubtitleIndex
+import org.jellyfin.playback.core.queue.preferredVideoIndex
 import org.jellyfin.playback.core.support.PlaySupportReport
 import org.jellyfin.playback.core.timedevent.TimedEvent
 import org.jellyfin.playback.core.ui.PlayerSubtitleView
@@ -682,6 +683,7 @@ class ExoPlayerBackend(
 
 		val prefAudio = stream?.queueEntry?.preferredAudioIndex
 		val prefSub = stream?.queueEntry?.preferredSubtitleIndex
+		val prefVideo = stream?.queueEntry?.preferredVideoIndex
 		val isTranscoded = stream != null && stream.conversionMethod != MediaConversionMethod.None
 		val activeGroups = currentTracks.groups.filter { it.type == trackType }
 
@@ -696,6 +698,23 @@ class ExoPlayerBackend(
 			val label = when (mediaTrack) {
 				is MediaStreamAudioTrack -> mediaTrack.displayTitle ?: mediaTrack.title ?: mediaTrack.language
 				is MediaStreamSubtitleTrack -> mediaTrack.displayTitle ?: mediaTrack.title ?: mediaTrack.language
+				is MediaStreamVideoTrack -> {
+					mediaTrack.displayTitle ?: mediaTrack.title ?: buildString {
+						if (mediaTrack.height > 0) {
+							append("${mediaTrack.height}p")
+						} else if (mediaTrack.width > 0) {
+							append("${mediaTrack.width}w")
+						}
+						if (mediaTrack.codec.isNotEmpty()) {
+							if (isNotEmpty()) append(" ")
+							append(mediaTrack.codec.uppercase())
+						}
+						if (!mediaTrack.videoRange.isNullOrEmpty() && mediaTrack.videoRange != "SDR" && mediaTrack.videoRange != "UNKNOWN") {
+							if (isNotEmpty()) append(" ")
+							append(mediaTrack.videoRange)
+						}
+					}.ifBlank { null }
+				}
 				else -> null
 			} ?: "Track ${indexInType + 1}"
 
@@ -717,6 +736,7 @@ class ExoPlayerBackend(
 				val isTargetTranscodedTrack = when (trackType) {
 					C.TRACK_TYPE_AUDIO -> index == (prefAudio ?: tracksForType.firstOrNull { (it as? MediaStreamAudioTrack)?.isDefault == true }?.let { (it as MediaStreamAudioTrack).index } ?: index)
 					C.TRACK_TYPE_TEXT -> index == prefSub
+					C.TRACK_TYPE_VIDEO -> index == (prefVideo ?: tracksForType.firstOrNull { (it as? MediaStreamVideoTrack)?.index == 0 }?.let { (it as MediaStreamVideoTrack).index } ?: index)
 					else -> false
 				}
 				if (isTargetTranscodedTrack) {
@@ -734,9 +754,11 @@ class ExoPlayerBackend(
 				trackType == C.TRACK_TYPE_AUDIO && prefAudio != null -> index == prefAudio
 				trackType == C.TRACK_TYPE_TEXT && prefSub == -1 -> false
 				trackType == C.TRACK_TYPE_TEXT && prefSub != null -> index == prefSub
+				trackType == C.TRACK_TYPE_VIDEO && prefVideo != null -> index == prefVideo
 				matchedGroupInfo != null -> matchedGroupInfo.isTrackSelected(matchedTrackIndex)
 				mediaTrack is MediaStreamAudioTrack -> mediaTrack.isDefault && trackList.none { it.isSelected }
 				mediaTrack is MediaStreamSubtitleTrack -> mediaTrack.isDefault && trackList.none { it.isSelected }
+				mediaTrack is MediaStreamVideoTrack -> index == 0 && trackList.none { it.isSelected }
 				else -> false
 			}
 
@@ -793,6 +815,19 @@ class ExoPlayerBackend(
 			}
 		}
 
+		val prefVideo = currentStream?.queueEntry?.preferredVideoIndex
+		if (prefVideo != null && prefVideo >= 0) {
+			val allVideoTracks = getTracks(C.TRACK_TYPE_VIDEO)
+			val targetTrack = allVideoTracks.firstOrNull { it.mediaStreamIndex == prefVideo }
+			val group = targetTrack?.group as? TrackGroup
+			if (group != null) {
+				builder.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+				builder.addOverride(TrackSelectionOverride(group, targetTrack.trackIndex))
+				builder.setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
+				changed = true
+			}
+		}
+
 		if (changed) {
 			val newParams = builder.build()
 			if (exoPlayer.trackSelectionParameters != newParams) {
@@ -807,6 +842,7 @@ class ExoPlayerBackend(
 			when (trackType) {
 				C.TRACK_TYPE_TEXT -> queueEntry.preferredSubtitleIndex = track?.mediaStreamIndex ?: -1
 				C.TRACK_TYPE_AUDIO -> if (track != null) queueEntry.preferredAudioIndex = track.mediaStreamIndex
+				C.TRACK_TYPE_VIDEO -> if (track != null) queueEntry.preferredVideoIndex = track.mediaStreamIndex
 			}
 		}
 

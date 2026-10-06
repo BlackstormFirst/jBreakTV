@@ -70,6 +70,8 @@ data class MediaStreamVideoTrack(
 	val width: Int,
 	val height: Int,
 	val videoRange: String?,
+	val title: String? = null,
+	val displayTitle: String? = null,
 ) : MediaStreamTrack
 
 data class MediaStreamSubtitleTrack(

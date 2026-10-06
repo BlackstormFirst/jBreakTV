@@ -180,11 +180,16 @@ class VideoQueueManager {
 	fun getSelectedSubtitleStreamIndex(): Int? = _selectedSubtitleStreamIndex
 	fun setSelectedSubtitleStreamIndex(index: Int?) { _selectedSubtitleStreamIndex = index }
 
+	private var _selectedVideoStreamIndex: Int? = null
+	fun getSelectedVideoStreamIndex(): Int? = _selectedVideoStreamIndex
+	fun setSelectedVideoStreamIndex(index: Int?) { _selectedVideoStreamIndex = index }
+
 	fun clearVideoQueue() {
 		_currentVideoQueue = emptyList()
 		_currentMediaPosition = -1
 		_selectedAudioStreamIndex = null
 		_selectedSubtitleStreamIndex = null
+		_selectedVideoStreamIndex = null
 		_lastPlayedAudioCodec = null
 		_lastPlayedAudioDefaultState = false
 		_lastPlayedAudioHearingImpairedState = false

@@ -20,8 +20,10 @@ import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
 import org.jellyfin.androidtv.util.RefreshRateHelper
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.PlaybackManager
+import org.jellyfin.playback.core.queue.preferredVideoIndex
 import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
+import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.VideoSize
 import org.jellyfin.playback.core.queue.queue
@@ -121,8 +123,9 @@ class VideoPlayerFragment : Fragment() {
 					// Clear explicit stream index overrides from previous item so next item uses smart matching
 					videoQueueManager.setSelectedAudioStreamIndex(null)
 					videoQueueManager.setSelectedSubtitleStreamIndex(null)
+					videoQueueManager.setSelectedVideoStreamIndex(null)
 
-					// Reset playbackPositionTicks for all non-active items in the queue
+					// Reset playbackPositionTicks and invalidate cached mediaStream for all non-active items in the queue
 					// so returning to a previous episode starts from position 0 instead of resuming at the end
 					val entries = playbackManager.queue.entries.value
 					entries.forEachIndexed { i, entry ->
@@ -132,6 +135,7 @@ class VideoPlayerFragment : Fragment() {
 								val clearedUserData = item.userData?.copy(playbackPositionTicks = 0L)
 								entry.baseItem = item.copy(userData = clearedUserData)
 							}
+							entry.mediaStream = null
 						}
 					}
 				}
@@ -282,7 +286,7 @@ class VideoPlayerFragment : Fragment() {
 							backend.selectTrack(3, trackSelection.targetSubTrack)
 						}
 
-						// Save active audio/subtitle properties to VideoQueueManager for queue persistence across episodes
+						// Save active audio/subtitle/video properties to VideoQueueManager for queue persistence across episodes
 						val selectedAudioStream = baseItem.mediaStreams?.firstOrNull { it.index == trackSelection.audioIndex }
 						if (selectedAudioStream != null) {
 							selectedAudioStream.language?.let { videoQueueManager.setLastPlayedAudioLanguageIsoCode(it) }
@@ -308,10 +312,19 @@ class VideoPlayerFragment : Fragment() {
 							videoQueueManager.setLastPlayedSubtitleCodec(null)
 						}
 
-						val hasSubtitleStreams = baseItem.mediaStreams?.any { it.type == MediaStreamType.SUBTITLE } == true
-						if (!hasSubtitleStreams || subTracks.isNotEmpty()) {
-							lastAutoSelectedEntryId = entryId
+						if (trackSelection.videoIndex != null) {
+							entry.preferredVideoIndex = trackSelection.videoIndex
+							val selectedVideoStream = baseItem.mediaStreams?.firstOrNull { it.index == trackSelection.videoIndex }
+							if (selectedVideoStream != null) {
+								selectedVideoStream.codec?.let { videoQueueManager.setLastPlayedVideoCodec(it) }
+								videoQueueManager.setLastPlayedVideoTitle(selectedVideoStream.title)
+								videoQueueManager.setLastPlayedVideoDefaultState(selectedVideoStream.isDefault)
+								val videoTypeIndex = baseItem.mediaStreams?.filter { it.type == MediaStreamType.VIDEO }?.indexOf(selectedVideoStream) ?: -1
+								if (videoTypeIndex >= 0) videoQueueManager.setLastPlayedVideoIndexInType(videoTypeIndex)
+							}
 						}
+
+						lastAutoSelectedEntryId = entryId
 					} finally {
 						isApplyingAutoTracks = false
 					}

@@ -49,6 +49,8 @@ private fun getVideoTrack(stream: MediaStream) = MediaStreamVideoTrack(
 	width = stream.width ?: 0,
 	height = stream.height ?: 0,
 	videoRange = stream.videoRangeType.name,
+	title = stream.title,
+	displayTitle = stream.displayTitle ?: stream.title,
 )
 
 private fun getSubtitleTrack(stream: MediaStream, api: ApiClient? = null) = MediaStreamSubtitleTrack(

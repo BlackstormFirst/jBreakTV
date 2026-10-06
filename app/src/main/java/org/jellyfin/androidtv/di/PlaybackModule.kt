@@ -23,6 +23,7 @@ import org.jellyfin.androidtv.preference.constant.BufferLength
 import org.jellyfin.androidtv.ui.browsing.MainActivity
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
+import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
@@ -174,8 +175,9 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 				val audioIndex = playbackIndexManager.getBestAudioIndex(sourceToUse)
 				val activeAudioLang = sourceToUse.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
 				val subIndex = playbackIndexManager.getBestSubtitleIndex(sourceToUse, androidContext(), activeAudioLang)
+				val videoIndex = playbackIndexManager.getBestVideoIndex(sourceToUse)
 
-				// Persist active audio/sub properties to VideoQueueManager for queue continuity
+				// Persist active audio/sub/video properties to VideoQueueManager for queue continuity
 				sourceToUse.mediaStreams?.firstOrNull { it.index == audioIndex }?.let { audioStream ->
 					audioStream.language?.let { videoQueueManager.setLastPlayedAudioLanguageIsoCode(it) }
 					audioStream.codec?.let { videoQueueManager.setLastPlayedAudioCodec(it) }
@@ -195,7 +197,17 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 					}
 				}
 
-				Pair(audioIndex, subIndex)
+				if (videoIndex != null && videoIndex >= 0) {
+					sourceToUse.mediaStreams?.firstOrNull { it.index == videoIndex }?.let { videoStream ->
+						videoStream.codec?.let { videoQueueManager.setLastPlayedVideoCodec(it) }
+						videoQueueManager.setLastPlayedVideoTitle(videoStream.title)
+						videoQueueManager.setLastPlayedVideoDefaultState(videoStream.isDefault)
+						val videoTypeIndex = sourceToUse.mediaStreams?.filter { it.type == MediaStreamType.VIDEO }?.indexOf(videoStream) ?: -1
+						if (videoTypeIndex >= 0) videoQueueManager.setLastPlayedVideoIndexInType(videoTypeIndex)
+					}
+				}
+
+				Triple(audioIndex, subIndex, videoIndex)
 			},
 			maxBitrateProvider = {
 				val mbps = userPreferences[UserPreferences.maxBitrate].toFloatOrNull() ?: 200f

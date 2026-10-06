@@ -53,6 +53,7 @@ val QueueEntry.metadataFlow by elementFlow(metadataKey)
 
 private val preferredAudioIndexKey = ElementKey<Int>("PreferredAudioIndex")
 private val preferredSubtitleIndexKey = ElementKey<Int>("PreferredSubtitleIndex")
+private val preferredVideoIndexKey = ElementKey<Int>("PreferredVideoIndex")
 
 /**
  * Get or set the explicit audio stream index override for this [QueueEntry].
@@ -63,3 +64,8 @@ var QueueEntry.preferredAudioIndex by element(preferredAudioIndexKey)
  * Get or set the explicit subtitle stream index override for this [QueueEntry].
  */
 var QueueEntry.preferredSubtitleIndex by element(preferredSubtitleIndexKey)
+
+/**
+ * Get or set the explicit video stream index override for this [QueueEntry].
+ */
+var QueueEntry.preferredVideoIndex by element(preferredVideoIndexKey)
