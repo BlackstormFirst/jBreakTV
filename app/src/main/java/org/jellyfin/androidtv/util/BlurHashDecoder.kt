@@ -11,6 +11,12 @@ import kotlin.math.withSign
 @Suppress("MagicNumber", "NestedBlockDepth")
 object BlurHashDecoder {
 	private const val CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~"
+	private val CHAR_MAP = IntArray(128) { -1 }.apply {
+		for (i in CHARS.indices) {
+			val c = CHARS[i].code
+			if (c in indices) this[c] = i
+		}
+	}
 	private val cache = LruCache<String, Bitmap>(60)
 
 	/**
@@ -20,10 +26,8 @@ object BlurHashDecoder {
 		if (blurHash == null || blurHash.length < 6 || width <= 0 || height <= 0) return null
 
 		val cacheKey = "$blurHash-$width-$height-$punch"
-		synchronized(cache) {
-			val cached = cache.get(cacheKey)
-			if (cached != null && !cached.isRecycled) return cached
-		}
+		val cached = cache[cacheKey]
+		if (cached != null && !cached.isRecycled) return cached
 
 		val numCompEnc = decode83(blurHash, 0, 1)
 		val numCompX = (numCompEnc % 9) + 1
@@ -44,9 +48,7 @@ object BlurHashDecoder {
 		}
 
 		val bitmap = composeBitmap(width, height, numCompX, numCompY, colors)
-		synchronized(cache) {
-			cache.put(cacheKey, bitmap)
-		}
+		cache.put(cacheKey, bitmap)
 		return bitmap
 	}
 
@@ -54,7 +56,8 @@ object BlurHashDecoder {
 		var result = 0
 
 		for (i in from until to) {
-			val index = CHARS.indexOf(str[i])
+			val c = str[i].code
+			val index = if (c in 0..127) CHAR_MAP[c] else -1
 			if (index != -1) result = result * 83 + index
 		}
 

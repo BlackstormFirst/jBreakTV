@@ -32,7 +32,7 @@ class ThemeViewModel : ViewModel() {
  * Do not call during resume if the activity may not be recreated (like in the video player).
  */
 fun FragmentActivity.applyTheme() {
-	val viewModel by viewModels<ThemeViewModel>()
+	val viewModel = viewModels<ThemeViewModel>().value
 	val userPreferences by inject<UserPreferences>()
 	val theme = userPreferences[UserPreferences.appTheme]
 
