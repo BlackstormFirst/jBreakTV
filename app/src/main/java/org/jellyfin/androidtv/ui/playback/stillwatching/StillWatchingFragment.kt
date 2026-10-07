@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.service.BackgroundService
+import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.background.AppBackground
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.LocalTextStyle
@@ -69,6 +70,7 @@ fun StillWatchingScreen(
 	val api = koinInject<ApiClient>()
 	val navigationRepository = koinInject<NavigationRepository>()
 	val backgroundService = koinInject<BackgroundService>()
+	val userPreferences = koinInject<UserPreferences>()
 	val viewModel = koinViewModel<StillWatchingViewModel>()
 
 	val state by viewModel.state.collectAsState()
@@ -87,7 +89,14 @@ fun StillWatchingScreen(
 	LaunchedEffect(state) {
 		when (state) {
 			// Open next item
-			StillWatchingState.STILL_WATCHING -> navigationRepository.navigate(Destinations.videoPlayer(0), true)
+			StillWatchingState.STILL_WATCHING -> {
+				val destination = if (userPreferences[UserPreferences.playbackRewriteVideoEnabled]) {
+					Destinations.videoPlayerNew(0)
+				} else {
+					Destinations.videoPlayer(0)
+				}
+				navigationRepository.navigate(destination, true)
+			}
 			// Close activity
 			StillWatchingState.CLOSE -> navigationRepository.goBack()
 			// Unknown state

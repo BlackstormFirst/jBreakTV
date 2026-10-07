@@ -11,8 +11,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.preference.UserPreferences
+import org.jellyfin.androidtv.preference.constant.NextUpBehavior
+import org.jellyfin.androidtv.preference.constant.StillWatchingBehavior
+import org.jellyfin.androidtv.ui.InteractionTrackerViewModel
 import org.jellyfin.androidtv.ui.base.BaseScreen
 import org.jellyfin.androidtv.ui.livetv.TvManager
+import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
@@ -20,15 +24,17 @@ import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
 import org.jellyfin.androidtv.util.RefreshRateHelper
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.PlaybackManager
-import org.jellyfin.playback.core.queue.preferredVideoIndex
 import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
+import org.jellyfin.playback.core.mediastream.PlayableMediaStream
 import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.VideoSize
+import org.jellyfin.playback.core.queue.preferredVideoIndex
 import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaProtocol
 import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.MediaSourceType
@@ -57,6 +63,7 @@ class VideoPlayerFragment : Fragment() {
 	private val userPreferences by inject<UserPreferences>()
 	private val api by inject<ApiClient>()
 	private val navigationRepository by inject<NavigationRepository>()
+	private val interactionTrackerViewModel by inject<InteractionTrackerViewModel>()
 
 	private var refreshRateHelper: RefreshRateHelper? = null
 	private var playerEventListener: PlayerBackendEventListener? = null
@@ -107,6 +114,12 @@ class VideoPlayerFragment : Fragment() {
 				}
 			}
 			videoQueueManager.setCurrentVideoQueue(items)
+		}
+
+		val currentItem = items.getOrNull(currentMediaPosition)
+		if (currentItem != null) {
+			interactionTrackerViewModel.notifyStartSession(currentItem, items)
+			interactionTrackerViewModel.notifyStart(currentItem)
 		}
 
 		// Create a queue from the items added to the legacy video queue
@@ -183,6 +196,34 @@ class VideoPlayerFragment : Fragment() {
 		playerEventListener = object : PlayerBackendEventListener() {
 			private var isApplyingAutoTracks = false
 			private var lastAutoSelectedEntryId: String? = null
+
+			override fun onMediaStreamEnd(mediaStream: PlayableMediaStream) {
+				lifecycleScope.launch {
+					val currentIndex = videoQueueManager.getCurrentMediaPosition()
+					val queueItems = videoQueueManager.getCurrentVideoQueue()
+					val currentItem = queueItems.getOrNull(currentIndex)
+					val nextIndex = currentIndex + 1
+					val nextItem = queueItems.getOrNull(nextIndex)
+
+					val stillWatchingBehavior = userPreferences[UserPreferences.stillWatchingBehavior]
+					val nextUpBehavior = userPreferences[UserPreferences.nextUpBehavior]
+
+					val stillWatchingEnabled = stillWatchingBehavior.enabled
+					val nextUpEnabled = nextUpBehavior != NextUpBehavior.DISABLED
+
+					if (nextItem != null && currentItem != null && currentItem.type != BaseItemKind.TRAILER && (stillWatchingEnabled || nextUpEnabled)) {
+						interactionTrackerViewModel.onEpisodeWatched()
+						videoQueueManager.setCurrentMediaPosition(nextIndex)
+						playbackManager.state.stop()
+
+						if (stillWatchingEnabled && interactionTrackerViewModel.getShowStillWatching()) {
+							navigationRepository.navigate(Destinations.stillWatching(nextItem.id), true)
+						} else if (nextUpEnabled) {
+							navigationRepository.navigate(Destinations.nextUp(nextItem.id), true)
+						}
+					}
+				}
+			}
 
 			override fun onTracksChanged() {
 				if (isApplyingAutoTracks) return
@@ -410,7 +451,5 @@ class VideoPlayerFragment : Fragment() {
 			playbackManager.removeListener(listener)
 		}
 		playerEventListener = null
-
-		videoQueueManager.clearVideoQueue()
 	}
 }
