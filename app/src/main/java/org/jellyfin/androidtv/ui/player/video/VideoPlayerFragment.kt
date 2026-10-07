@@ -211,14 +211,17 @@ class VideoPlayerFragment : Fragment() {
 					val stillWatchingEnabled = stillWatchingBehavior.enabled
 					val nextUpEnabled = nextUpBehavior != NextUpBehavior.DISABLED
 
-					if (nextItem != null && currentItem != null && currentItem.type != BaseItemKind.TRAILER && (stillWatchingEnabled || nextUpEnabled)) {
+					val showStillWatching = stillWatchingEnabled && interactionTrackerViewModel.getShowStillWatching()
+					val showNextUp = nextUpEnabled && !showStillWatching
+
+					if (nextItem != null && currentItem != null && currentItem.type != BaseItemKind.TRAILER && (showStillWatching || showNextUp)) {
 						interactionTrackerViewModel.onEpisodeWatched()
 						videoQueueManager.setCurrentMediaPosition(nextIndex)
 						playbackManager.state.stop()
 
-						if (stillWatchingEnabled && interactionTrackerViewModel.getShowStillWatching()) {
+						if (showStillWatching) {
 							navigationRepository.navigate(Destinations.stillWatching(nextItem.id), true)
-						} else if (nextUpEnabled) {
+						} else {
 							navigationRepository.navigate(Destinations.nextUp(nextItem.id), true)
 						}
 					}
