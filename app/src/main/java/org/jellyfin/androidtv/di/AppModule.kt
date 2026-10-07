@@ -132,7 +132,7 @@ val appModule = module {
 		val memoryMaxCachePercent = userPreferences[UserPreferences.memoryMaxCachePercent]
 		val context = androidContext()
 		ImageLoader.Builder(context).apply {
-			coroutineContext(Dispatchers.IO)
+			coroutineContext(Dispatchers.IO.limitedParallelism(3))
 			diskCache {
 				DiskCache.Builder()
 					.directory(context.cacheDir.resolve("image_cache").toOkioPath())

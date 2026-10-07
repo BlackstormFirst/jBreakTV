@@ -17,7 +17,7 @@ object BlurHashDecoder {
 			if (c in indices) this[c] = i
 		}
 	}
-	private val cache = LruCache<String, Bitmap>(60)
+	private val cache = LruCache<String, Bitmap>(80)
 
 	/**
 	 * Decode a blur hash into a new bitmap.

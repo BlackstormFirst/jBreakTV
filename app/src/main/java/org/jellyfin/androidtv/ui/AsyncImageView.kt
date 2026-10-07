@@ -23,13 +23,14 @@ import coil3.transform.CircleCropTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.util.BlurHashDecoder
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.math.round
 import kotlin.time.Duration.Companion.milliseconds
+
+private val imageDispatcher = Dispatchers.IO.limitedParallelism(2)
 
 /**
  * An extension to the [ImageView] that makes it easy to load images from the network.
@@ -79,7 +80,7 @@ class AsyncImageView @JvmOverloads constructor(
 		blurHash: String? = null,
 		placeholder: Drawable? = null,
 		aspectRatio: Double = 1.0,
-		blurHashResolution: Int = 32,
+		blurHashResolution: Int = 16,
 	) = doOnAttach {
 		// 1. Quick memory cache check to avoid BlurHash decoding and flickering
 		if (url != null) {
@@ -95,12 +96,12 @@ class AsyncImageView @JvmOverloads constructor(
 		// Cancel the previous load if still running
 		loadJob?.cancel()
 
-		loadJob = lifeCycleOwner?.lifecycleScope?.launch(Dispatchers.IO) {
+		loadJob = lifeCycleOwner?.lifecycleScope?.launch(imageDispatcher) {
 			var placeholderOrBlurHash = placeholder
 
 			// Only show blurhash if an image is going to be loaded from the network
 			val isLowRamDevice = context.getSystemService<ActivityManager>()?.isLowRamDevice == true
-			if (url != null && blurHash != null && !isLowRamDevice && aspectRatio > 0) withContext(Dispatchers.IO) {
+			if (url != null && blurHash != null && !isLowRamDevice && aspectRatio > 0) {
 				val blurHashBitmap = BlurHashDecoder.decode(
 					blurHash,
 					if (aspectRatio > 1) round(blurHashResolution * aspectRatio).toInt() else blurHashResolution,
@@ -124,6 +125,7 @@ class AsyncImageView @JvmOverloads constructor(
 
 					target(this@AsyncImageView)
 					data(url)
+					memoryCacheKey(url)
 					placeholder(placeholderOrBlurHash?.asImage())
 					if (circleCrop) transformations(CircleCropTransformation())
 					error(placeholder?.asImage())
