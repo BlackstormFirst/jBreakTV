@@ -24,18 +24,23 @@ class MediaSessionService(
 ) : PlayerService() {
 	private val notificationManager = NotificationManagerCompat.from(androidContext)
 	private var notifiedNotificationId: Int? = null
+	private var mediaSession: MediaSession? = null
+	private var sessionPlayer: MediaSessionPlayer? = null
 
 	override suspend fun onInitialize() {
+		releaseSession()
+
 		val player = MediaSessionPlayer(
 			looper = Looper.getMainLooper(),
 			scope = coroutineScope,
 			state = state,
 			manager = manager,
-		)
+		).also { sessionPlayer = it }
+
 		val session = MediaSession.Builder(androidContext, player).apply {
 			setId(options.notificationId.toString())
 			setSessionActivity(options.openIntent)
-		}.build()
+		}.build().also { mediaSession = it }
 
 		manager.queue.entry.onEach { item ->
 			if (item != null) updateNotification(session, item)
@@ -44,6 +49,20 @@ class MediaSessionService(
 				notifiedNotificationId = null
 			}
 		}.launchIn(coroutineScope)
+	}
+
+	@OptIn(UnstableApi::class)
+	fun releaseSession() {
+		runCatching {
+			mediaSession?.release()
+			sessionPlayer?.release()
+		}
+		mediaSession = null
+		sessionPlayer = null
+		if (notifiedNotificationId != null) {
+			notificationManager.cancel(notifiedNotificationId!!)
+			notifiedNotificationId = null
+		}
 	}
 
 	@OptIn(UnstableApi::class)

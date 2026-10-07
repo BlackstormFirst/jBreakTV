@@ -59,6 +59,7 @@ class VideoPlayerFragment : Fragment() {
 	private val navigationRepository by inject<NavigationRepository>()
 
 	private var refreshRateHelper: RefreshRateHelper? = null
+	private var playerEventListener: PlayerBackendEventListener? = null
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -179,7 +180,7 @@ class VideoPlayerFragment : Fragment() {
 		}
 
 		// Listen for track changes to apply best video/audio/subtitle selections
-		playbackManager.addListener(object : PlayerBackendEventListener() {
+		playerEventListener = object : PlayerBackendEventListener() {
 			private var isApplyingAutoTracks = false
 			private var lastAutoSelectedEntryId: String? = null
 
@@ -330,7 +331,9 @@ class VideoPlayerFragment : Fragment() {
 					}
 				}
 			}
-		})
+		}.also { listener ->
+			playbackManager.addListener(listener)
+		}
 
 		// Pause player until the initial resume
 		playbackManager.state.pause()
@@ -402,6 +405,11 @@ class VideoPlayerFragment : Fragment() {
 
 	override fun onDestroy() {
 		super.onDestroy()
+
+		playerEventListener?.let { listener ->
+			playbackManager.removeListener(listener)
+		}
+		playerEventListener = null
 
 		videoQueueManager.clearVideoQueue()
 	}

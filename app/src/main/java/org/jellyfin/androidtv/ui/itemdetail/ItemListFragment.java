@@ -4,6 +4,7 @@ import static org.koin.java.KoinJavaComponent.inject;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
@@ -85,6 +86,7 @@ public class ItemListFragment extends Fragment implements View.OnKeyListener {
 
     private boolean firstTime = true;
     private Instant lastUpdated = Instant.now();
+    private final Handler mHandler = new Handler(Looper.getMainLooper());
 
     private final Lazy<DataRefreshService> dataRefreshService = inject(DataRefreshService.class);
     private final Lazy<BackgroundService> backgroundService = inject(BackgroundService.class);
@@ -193,7 +195,7 @@ public class ItemListFragment extends Fragment implements View.OnKeyListener {
 
         if (!firstTime && dataRefreshService.getValue().getLastPlayback() != null && dataRefreshService.getValue().getLastPlayback().isAfter(lastUpdated)) {
             if (MediaType.VIDEO.equals(mBaseItem.getMediaType())) {
-                new Handler().postDelayed(new Runnable() {
+                mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED))
@@ -213,6 +215,7 @@ public class ItemListFragment extends Fragment implements View.OnKeyListener {
     @Override
     public void onPause() {
         super.onPause();
+        mHandler.removeCallbacksAndMessages(null);
         mediaManager.getValue().removeAudioEventListener(mAudioEventListener);
     }
 

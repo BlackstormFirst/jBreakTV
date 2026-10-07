@@ -1373,6 +1373,8 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     public void onDestroy() {
         super.onDestroy();
 
+        mHandler.removeCallbacksAndMessages(null);
+
         // end playback from here if this fragment belongs to the current session.
         if (playbackControllerContainer.getValue().getPlaybackController() != null && playbackControllerContainer.getValue().getPlaybackController().getFragment() == this) {
             Timber.i("Destroying fragment: ending playback session");
