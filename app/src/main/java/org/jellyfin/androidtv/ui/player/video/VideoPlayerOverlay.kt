@@ -117,17 +117,37 @@ fun VideoPlayerOverlay(
 	val currentPositionMs = positionInfo.active.inWholeMilliseconds
 
 	val mediaSegmentRepository = koinInject<MediaSegmentRepository>()
-	val activeSegment = remember(entry, currentPositionMs, mediaSegmentRepository) {
-		val autoHideMs = MediaSegmentRepository.AskToSkipAutoHideDuration.inWholeMilliseconds
+	val skippableSegment = remember(entry, currentPositionMs, mediaSegmentRepository) {
 		val segments = entry?.mediaSegments.orEmpty()
 		segments.firstOrNull { segment ->
 			val startMs = segment.startTicks / 10000
 			val endMs = segment.endTicks / 10000
-			val hideMs = minOf(endMs, startMs + autoHideMs)
-			currentPositionMs in startMs until hideMs &&
+			currentPositionMs in startMs until endMs &&
 				mediaSegmentRepository.getMediaSegmentAction(segment) == MediaSegmentAction.ASK_TO_SKIP
 		}
 	}
+
+	var isSkipButtonAutoHidden by remember { mutableStateOf(false) }
+
+	LaunchedEffect(skippableSegment, visibilityState.visible) {
+		if (skippableSegment == null) {
+			isSkipButtonAutoHidden = false
+		} else if (visibilityState.visible) {
+			// When OSD is shown while inside a skippable segment:
+			// Reset auto-hidden status so the skip button re-appears (or stays present)
+			// and keep the auto-hide timer paused/held as long as OSD is visible.
+			isSkipButtonAutoHidden = false
+		} else {
+			// When OSD is closed and we are inside a skippable segment:
+			// Start/restart auto-hide timer if not already auto-hidden
+			if (!isSkipButtonAutoHidden) {
+				delay(MediaSegmentRepository.AskToSkipAutoHideDuration)
+				isSkipButtonAutoHidden = true
+			}
+		}
+	}
+
+	val activeSegment = if (skippableSegment != null && !isSkipButtonAutoHidden) skippableSegment else null
 
 	LaunchedEffect(activeSegment, visibilityState.visible) {
 		if (!visibilityState.visible) {
