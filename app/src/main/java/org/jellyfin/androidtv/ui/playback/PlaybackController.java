@@ -661,8 +661,9 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         var bSubIndex = playbackIndexManager.getValue().getBestSubtitleIndex(response.getMediaSource(), mFragment.getContext(), currentAudioLang);
-        var mSubIndex = mCurrentOptions.getSubtitleStreamIndex();
-        PlaybackControllerHelperKt.setSubtitleIndex(this, bSubIndex, (mSubIndex == null || !Objects.equals(mSubIndex, bSubIndex)));
+        var mSubIndex = mCurrentOptions != null ? mCurrentOptions.getSubtitleStreamIndex() : null;
+        Integer subIndexToApply = (mSubIndex != null) ? mSubIndex : bSubIndex;
+        PlaybackControllerHelperKt.setSubtitleIndex(this, subIndexToApply, !Objects.equals(getSubtitleStreamIndex(), subIndexToApply));
         Timber.i("default audio index set to %s remote default %s", mDefaultAudioIndex, response.getMediaSource().getDefaultAudioStreamIndex());
         Timber.i("default sub index set to %s remote default %s", mSubIndex, response.getMediaSource().getDefaultSubtitleStreamIndex());
 
