@@ -158,6 +158,9 @@ class AuthenticationRepositoryImpl(
 		} catch (err: ApiClientException) {
 			Timber.e(err, "Unable to get current user data")
 			emit(ApiClientErrorLoginState(err))
+		} catch (err: Exception) {
+			Timber.e(err, "Unexpected error during token authentication")
+			emit(ServerUnavailableState)
 		}
 	}.flowOn(Dispatchers.IO)
 

@@ -8,6 +8,7 @@ import androidx.lifecycle.coroutineScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -60,7 +61,11 @@ class SocketHandler(
 	init {
 		lifecycle.coroutineScope.launch(Dispatchers.IO) {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-				subscribe(this)
+				try {
+					subscribe(this)
+				} catch (err: Exception) {
+					Timber.e(err, "Error initializing WebSocket subscriptions")
+				}
 			}
 		}
 	}
@@ -94,73 +99,88 @@ class SocketHandler(
 			}
 		} catch (err: ApiClientException) {
 			Timber.e(err, "Unable to update capabilities")
+		} catch (err: Exception) {
+			Timber.e(err, "Unexpected error updating capabilities")
 		}
 	}
 
-	private fun subscribe(coroutineScope: CoroutineScope) = api.webSocket.apply {
-		// Library
-		subscribe<LibraryChangedMessage>()
-			.onEach { message ->
-				message.data?.let(::onLibraryChanged)
-				//preferencesRepository.refreshServerUserSettings()
-			}
-			.launchIn(coroutineScope)
-
-		// Media playback
-		subscribe<PlayMessage>()
-			.onEach { message -> onPlayMessage(message) }
-			.launchIn(coroutineScope)
-
-		subscribe<PlaystateMessage>()
-			.onEach { message -> onPlayStateMessage(message) }
-			.launchIn(coroutineScope)
-
-		subscribeGeneralCommand(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)
-			.onEach { message ->
-				val index = message["index"]?.toIntOrNull() ?: return@onEach
-
-				withContext(Dispatchers.Main) {
-					playbackControllerContainer.playbackController?.setSubtitleIndex(index)
-				}
-			}
-			.launchIn(coroutineScope)
-
-		subscribeGeneralCommand(GeneralCommandType.SET_AUDIO_STREAM_INDEX)
-			.onEach { message ->
-				val index = message["index"]?.toIntOrNull() ?: return@onEach
-
-				withContext(Dispatchers.Main) {
-					playbackControllerContainer.playbackController?.switchAudioStream(index)
-				}
-			}
-			.launchIn(coroutineScope)
-
-		// General commands
-		subscribeGeneralCommand(GeneralCommandType.DISPLAY_CONTENT)
-			.onEach { message ->
-				val itemId by message
-				val itemType by message
-
-				val itemUuid = itemId?.toUUIDOrNull()
-				val itemKind = itemType?.let { type ->
-					BaseItemKind.entries.find { value ->
-						value.serialName.equals(type, true)
+	private fun subscribe(coroutineScope: CoroutineScope) {
+		try {
+			api.webSocket.apply {
+				// Library
+				subscribe<LibraryChangedMessage>()
+					.onEach { message ->
+						message.data?.let(::onLibraryChanged)
+						//preferencesRepository.refreshServerUserSettings()
 					}
-				}
+					.catch { err -> Timber.w(err, "LibraryChangedMessage WebSocket error") }
+					.launchIn(coroutineScope)
 
-				if (itemUuid != null && itemKind != null) onDisplayContent(itemUuid, itemKind)
+				// Media playback
+				subscribe<PlayMessage>()
+					.onEach { message -> onPlayMessage(message) }
+					.catch { err -> Timber.w(err, "PlayMessage WebSocket error") }
+					.launchIn(coroutineScope)
+
+				subscribe<PlaystateMessage>()
+					.onEach { message -> onPlayStateMessage(message) }
+					.catch { err -> Timber.w(err, "PlaystateMessage WebSocket error") }
+					.launchIn(coroutineScope)
+
+				subscribeGeneralCommand(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)
+					.onEach { message ->
+						val index = message["index"]?.toIntOrNull() ?: return@onEach
+
+						withContext(Dispatchers.Main) {
+							playbackControllerContainer.playbackController?.setSubtitleIndex(index)
+						}
+					}
+					.catch { err -> Timber.w(err, "SET_SUBTITLE_STREAM_INDEX WebSocket error") }
+					.launchIn(coroutineScope)
+
+				subscribeGeneralCommand(GeneralCommandType.SET_AUDIO_STREAM_INDEX)
+					.onEach { message ->
+						val index = message["index"]?.toIntOrNull() ?: return@onEach
+
+						withContext(Dispatchers.Main) {
+							playbackControllerContainer.playbackController?.switchAudioStream(index)
+						}
+					}
+					.catch { err -> Timber.w(err, "SET_AUDIO_STREAM_INDEX WebSocket error") }
+					.launchIn(coroutineScope)
+
+				// General commands
+				subscribeGeneralCommand(GeneralCommandType.DISPLAY_CONTENT)
+					.onEach { message ->
+						val itemId by message
+						val itemType by message
+
+						val itemUuid = itemId?.toUUIDOrNull()
+						val itemKind = itemType?.let { type ->
+							BaseItemKind.entries.find { value ->
+								value.serialName.equals(type, true)
+							}
+						}
+
+						if (itemUuid != null && itemKind != null) onDisplayContent(itemUuid, itemKind)
+					}
+					.catch { err -> Timber.w(err, "DISPLAY_CONTENT WebSocket error") }
+					.launchIn(coroutineScope)
+
+				subscribeGeneralCommands(setOf(GeneralCommandType.DISPLAY_MESSAGE, GeneralCommandType.SEND_STRING))
+					.onEach { message ->
+						val header by message
+						val text by message
+						val string by message
+
+						onDisplayMessage(header, text ?: string)
+					}
+					.catch { err -> Timber.w(err, "DISPLAY_MESSAGE WebSocket error") }
+					.launchIn(coroutineScope)
 			}
-			.launchIn(coroutineScope)
-
-		subscribeGeneralCommands(setOf(GeneralCommandType.DISPLAY_MESSAGE, GeneralCommandType.SEND_STRING))
-			.onEach { message ->
-				val header by message
-				val text by message
-				val string by message
-
-				onDisplayMessage(header, text ?: string)
-			}
-			.launchIn(coroutineScope)
+		} catch (err: Exception) {
+			Timber.e(err, "Failed to subscribe to WebSocket")
+		}
 	}
 
 	private fun onLibraryChanged(info: LibraryUpdateInfo) {

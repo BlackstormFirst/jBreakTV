@@ -92,11 +92,15 @@ class BackgroundService(
 		// Disable blur on splashscreen
 		_blurBackground.value = false
 
-		// Manually grab the backdrop URL
-		val api = jellyfin.createApi(baseUrl = server.address)
-		val splashscreenUrl = api.imageApi.getSplashscreenUrl()
+		try {
+			// Manually grab the backdrop URL
+			val api = jellyfin.createApi(baseUrl = server.address)
+			val splashscreenUrl = api.imageApi.getSplashscreenUrl()
 
-		loadBackgrounds(setOf(splashscreenUrl))
+			loadBackgrounds(setOf(splashscreenUrl))
+		} catch (err: Exception) {
+			clearBackgrounds()
+		}
 	}
 
 	private fun loadBackgrounds(backdropUrls: Set<String>, debounceMs: Long = 250L) {
@@ -108,28 +112,36 @@ class BackgroundService(
 		// Cancel current loading job
 		loadBackgroundsJob?.cancel()
 		loadBackgroundsJob = scope.launch(Dispatchers.IO) {
-			if (debounceMs > 0) {
-				delay(debounceMs.milliseconds)
-			}
-			_backgrounds = backdropUrls.mapNotNull { url ->
-				val request = ImageRequest.Builder(context)
-					.data(url)
-					.apply {
-						// On Android versions older than 12 (API 31), Modifier.blur() is not supported in Compose.
-						// As a workaround, we downscale the image significantly during loading.
-						// When scaled back up to fill the screen, the bilinear filtering creates a natural blur effect.
-						if (android.os.Build.VERSION.SDK_INT < 31 && _blurBackground.value) {
-							size(240, 135)
-						}
+			try {
+				if (debounceMs > 0) {
+					delay(debounceMs.milliseconds)
+				}
+				_backgrounds = backdropUrls.mapNotNull { url ->
+					try {
+						val request = ImageRequest.Builder(context)
+							.data(url)
+							.apply {
+								// On Android versions older than 12 (API 31), Modifier.blur() is not supported in Compose.
+								// As a workaround, we downscale the image significantly during loading.
+								// When scaled back up to fill the screen, the bilinear filtering creates a natural blur effect.
+								if (android.os.Build.VERSION.SDK_INT < 31 && _blurBackground.value) {
+									size(240, 135)
+								}
+							}
+							.build()
+
+						imageLoader.execute(request).image?.toBitmap()?.asImageBitmap()
+					} catch (err: Exception) {
+						null
 					}
-					.build()
+				}
 
-				imageLoader.execute(request).image?.toBitmap()?.asImageBitmap()
+				// Go to first background
+				_currentIndex = 0
+				update()
+			} catch (_: Exception) {
+				clearBackgrounds()
 			}
-
-			// Go to first background
-			_currentIndex = 0
-			update()
 		}
 	}
 

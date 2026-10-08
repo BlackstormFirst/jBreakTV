@@ -68,7 +68,7 @@ abstract class DisplayPreferencesStore(
 			cachedPreferences = result.customPrefs.toMutableMap()
 
 			return true
-		} catch (err: ApiClientException) {
+		} catch (err: Exception) {
 			Timber.e(err, "Unable to retrieve displaypreferences. (displayPreferencesId=$displayPreferencesId, app=$app)")
 
 			if (displayPreferencesDto == null) {

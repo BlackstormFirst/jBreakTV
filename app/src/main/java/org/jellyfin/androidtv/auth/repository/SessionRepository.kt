@@ -18,7 +18,6 @@ import org.jellyfin.androidtv.preference.constant.UserSelectBehavior.LAST_USER
 import org.jellyfin.androidtv.preference.constant.UserSelectBehavior.SPECIFIC_USER
 import org.jellyfin.androidtv.util.sdk.forUser
 import org.jellyfin.sdk.api.client.ApiClient
-import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.extensions.clientLogApi
 import org.jellyfin.sdk.api.client.extensions.userApi
 import org.jellyfin.sdk.model.DeviceInfo
@@ -69,21 +68,26 @@ class SessionRepositoryImpl(
 
 			_state.value = SessionRepositoryState.RESTORING_SESSION
 
-			val alwaysAuthenticate = authenticationPreferences[AuthenticationPreferences.alwaysAuthenticate]
-			val autoLoginBehavior = authenticationPreferences[AuthenticationPreferences.autoLoginUserBehavior]
+			try {
+				val alwaysAuthenticate = authenticationPreferences[AuthenticationPreferences.alwaysAuthenticate]
+				val autoLoginBehavior = authenticationPreferences[AuthenticationPreferences.autoLoginUserBehavior]
 
-			when {
-				alwaysAuthenticate -> destroyCurrentSession()
-				autoLoginBehavior == DISABLED -> destroyCurrentSession()
-				autoLoginBehavior == LAST_USER && !destroyOnly -> setCurrentSession(createLastUserSession())
-				autoLoginBehavior == SPECIFIC_USER && !destroyOnly -> {
-					val serverId = authenticationPreferences[AuthenticationPreferences.autoLoginServerId].toUUIDOrNull()
-					val userId = authenticationPreferences[AuthenticationPreferences.autoLoginUserId].toUUIDOrNull()
-					if (serverId != null && userId != null) setCurrentSession(createUserSession(serverId, userId))
+				when {
+					alwaysAuthenticate -> destroyCurrentSession()
+					autoLoginBehavior == DISABLED -> destroyCurrentSession()
+					autoLoginBehavior == LAST_USER && !destroyOnly -> setCurrentSession(createLastUserSession())
+					autoLoginBehavior == SPECIFIC_USER && !destroyOnly -> {
+						val serverId = authenticationPreferences[AuthenticationPreferences.autoLoginServerId].toUUIDOrNull()
+						val userId = authenticationPreferences[AuthenticationPreferences.autoLoginUserId].toUUIDOrNull()
+						if (serverId != null && userId != null) setCurrentSession(createUserSession(serverId, userId))
+					}
 				}
+			} catch (err: Exception) {
+				Timber.e(err, "Unable to restore session")
+				destroyCurrentSession()
+			} finally {
+				_state.value = SessionRepositoryState.READY
 			}
-
-			_state.value = SessionRepositoryState.READY
 		}
 	}
 
@@ -146,21 +150,31 @@ class SessionRepositoryImpl(
 				}
 				userRepository.setCurrentUser(user)
 				serverRepository.setCurrentServer(server)
-			} catch (err: ApiClientException) {
-				Timber.e(err, "Unable to authenticate: bad response when getting user info")
+			} catch (err: Exception) {
+				Timber.e(err, "Unable to authenticate: bad response or connection failure when getting user info")
 				destroyCurrentSession()
 				return false
 			}
 
 			// Update crash reporting URL
-			val crashReportUrl = userApiClient.clientLogApi.logFileUrl()
-			telemetryPreferences[TelemetryPreferences.crashReportUrl] = crashReportUrl
-			telemetryPreferences[TelemetryPreferences.crashReportToken] = session.accessToken
+			try {
+				val crashReportUrl = userApiClient.clientLogApi.logFileUrl()
+				telemetryPreferences[TelemetryPreferences.crashReportUrl] = crashReportUrl
+				telemetryPreferences[TelemetryPreferences.crashReportToken] = session.accessToken
+			} catch (err: Exception) {
+				Timber.w(err, "Unable to update crash report URL")
+			}
 		} else {
 			userRepository.setCurrentUser(null)
 			serverRepository.setCurrentServer(null)
 		}
-		preferencesRepository.onSessionChanged()
+
+		try {
+			preferencesRepository.onSessionChanged()
+		} catch (err: Exception) {
+			Timber.e(err, "Error updating preferences on session change")
+		}
+
 		_currentSession.value = session
 
 		return true

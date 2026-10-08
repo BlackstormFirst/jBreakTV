@@ -19,7 +19,6 @@ import org.jellyfin.androidtv.auth.store.AuthenticationStore
 import org.jellyfin.androidtv.util.sdk.toServer
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.api.client.ApiClient
-import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.exception.InvalidContentException
 import org.jellyfin.sdk.api.client.extensions.brandingApi
 import org.jellyfin.sdk.api.client.extensions.systemApi
@@ -84,13 +83,17 @@ class ServerRepositoryImpl(
 	override suspend fun loadDiscoveryServers() {
 		val servers = mutableListOf<Server>()
 
-		jellyfin.discovery
-			.discoverLocalServers()
-			.map(ServerDiscoveryInfo::toServer)
-			.collect { server ->
-				servers += server
-				_discoveredServers.emit(servers.toList())
-			}
+		try {
+			jellyfin.discovery
+				.discoverLocalServers()
+				.map(ServerDiscoveryInfo::toServer)
+				.collect { server ->
+					servers += server
+					_discoveredServers.emit(servers.toList())
+				}
+		} catch (err: Exception) {
+			Timber.e(err, "Error during local server discovery")
+		}
 	}
 
 	override fun setCurrentServer(server: Server?) {
@@ -184,7 +187,7 @@ class ServerRepositoryImpl(
 				?.let { version -> version < ServerRepository.minimumServerVersion } == true
 
 			updateServerInternal(id, server, forceUpdate)
-		} catch (err: ApiClientException) {
+		} catch (err: Exception) {
 			Timber.e(err, "Unable to update server")
 			null
 		}
@@ -198,7 +201,7 @@ class ServerRepositoryImpl(
 
 		return try {
 			updateServerInternal(server.id, serverInfo, force) != null
-		} catch (err: ApiClientException) {
+		} catch (err: Exception) {
 			Timber.e(err, "Unable to update server")
 
 			false
@@ -216,21 +219,27 @@ class ServerRepositoryImpl(
 		if (now - server.lastRefreshed < 600000 && server.version != null && !forceUpdate) return null
 
 		val newServer = withContext(Dispatchers.IO) {
-			val api = jellyfin.createApi(server.address)
+			try {
+				val api = jellyfin.createApi(server.address)
 
-			// Get login disclaimer
-			val branding = api.getBrandingOptionsOrDefault()
-			val systemInfo by api.systemApi.getPublicSystemInfo()
+				// Get login disclaimer
+				val branding = api.getBrandingOptionsOrDefault()
+				val systemInfo by api.systemApi.getPublicSystemInfo()
 
-			server.copy(
-				name = systemInfo.serverName ?: server.name,
-				version = systemInfo.version ?: server.version,
-				loginDisclaimer = branding.loginDisclaimer ?: server.loginDisclaimer,
-				splashscreenEnabled = branding.splashscreenEnabled,
-				setupCompleted = systemInfo.startupWizardCompleted ?: server.setupCompleted,
-				lastRefreshed = now
-			)
-		}
+				server.copy(
+					name = systemInfo.serverName ?: server.name,
+					version = systemInfo.version ?: server.version,
+					loginDisclaimer = branding.loginDisclaimer ?: server.loginDisclaimer,
+					splashscreenEnabled = branding.splashscreenEnabled,
+					setupCompleted = systemInfo.startupWizardCompleted ?: server.setupCompleted,
+					lastRefreshed = now
+				)
+			} catch (err: Exception) {
+				Timber.e(err, "Failed to update server info")
+				null
+			}
+		} ?: return null
+
 		authenticationStore.putServer(id, newServer)
 
 		return newServer

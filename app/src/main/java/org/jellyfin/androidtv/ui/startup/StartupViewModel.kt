@@ -19,6 +19,7 @@ import org.jellyfin.androidtv.auth.repository.AuthenticationRepository
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.ServerUserRepository
 import org.jellyfin.androidtv.auth.store.AuthenticationPreferences
+import timber.log.Timber
 import java.util.UUID
 
 class StartupViewModel(
@@ -48,13 +49,17 @@ class StartupViewModel(
 
 	fun loadUsers(server: Server) {
 		viewModelScope.launch {
-			val storedUsers = serverUserRepository.getStoredServerUsers(server)
-			_users.value = storedUsers.sortedWith(userComparator)
+			try {
+				val storedUsers = serverUserRepository.getStoredServerUsers(server)
+				_users.value = storedUsers.sortedWith(userComparator)
 
-			val storedUserIds = storedUsers.map { it.id }
-			val publicUsers = serverUserRepository.getPublicServerUsers(server)
-				.filterNot { it.id in storedUserIds }
-			_users.value = (storedUsers + publicUsers).sortedWith(userComparator)
+				val storedUserIds = storedUsers.map { it.id }
+				val publicUsers = serverUserRepository.getPublicServerUsers(server)
+					.filterNot { it.id in storedUserIds }
+				_users.value = (storedUsers + publicUsers).sortedWith(userComparator)
+			} catch (err: Exception) {
+				Timber.e(err, "Error loading users for server ${server.id}")
+			}
 		}
 	}
 
@@ -76,13 +81,23 @@ class StartupViewModel(
 
 		viewModelScope.launch(Dispatchers.IO) {
 			discoveryMutex.withLock {
-				serverRepository.loadDiscoveryServers()
+				try {
+					serverRepository.loadDiscoveryServers()
+				} catch (err: Exception) {
+					Timber.e(err, "Error loading discovery servers")
+				}
 			}
 		}
 	}
 
 	fun reloadStoredServers() {
-		viewModelScope.launch { serverRepository.loadStoredServers() }
+		viewModelScope.launch {
+			try {
+				serverRepository.loadStoredServers()
+			} catch (err: Exception) {
+				Timber.e(err, "Error reloading stored servers")
+			}
+		}
 	}
 
 	suspend fun getLastServer(): Server? {
