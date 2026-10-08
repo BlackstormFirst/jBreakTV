@@ -15,16 +15,9 @@ import java.io.File
 object AssFontManager {
 	private const val FONT_CACHE_DIR = "ass_fonts"
 
-	/**
-	 * Optimized configuration for libass rendering across all player backends:
-	 * - glyphSize: Expanded glyph outline cache (20,000) to avoid re-rasterizing characters.
-	 * - cacheSize: 128MB bitmap glyph cache.
-	 * - maxRenderPixels: Downscaling canvas limit for 4K displays (1080p canvas = 1920x1080 = 2,073,600 px).
-	 *   OpenGL then hardware-scales to native 4K, eliminating 4K rasterization CPU bottlenecks and 1-frame lags.
-	 */
 	@JvmStatic
 	val defaultAssHandlerConfig: AssHandlerConfig = AssHandlerConfig(
-		glyphSize = 20000,
+		glyphSize = 10000,
 		cacheSize = 128,
 		maxRenderPixels = 1920 * 1080,
 	)
