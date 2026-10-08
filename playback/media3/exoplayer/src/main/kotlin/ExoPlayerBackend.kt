@@ -384,22 +384,11 @@ class ExoPlayerBackend(
 	}
 
 	override fun prepareItem(item: QueueEntry) {
-		val mediaItem = buildMediaItem(item)
-
 		if (exoPlayerOptions.enableLibass) {
 			CoroutineScope(Dispatchers.IO).launch {
 				AssFontManager.preloadFontsForEntry(context, item, assHandler)
 			}
 		}
-
-		// Remove any excessive items from the start
-		while (exoPlayer.mediaItemCount > MEDIA_ITEM_COUNT_MAX - 1) exoPlayer.removeMediaItem(0)
-
-		// Add new item to the end of the media item list
-		exoPlayer.addMediaItem(mediaItem)
-
-		// Instruct exoplayer to prepare
-		exoPlayer.prepare()
 	}
 
 
@@ -425,19 +414,7 @@ class ExoPlayerBackend(
 			}
 		}
 
-		var preparedItemIndex = (0 until exoPlayer.mediaItemCount).firstOrNull { index ->
-			val tag = exoPlayer.getMediaItemAt(index).localConfiguration?.tag as? QueueEntry
-			tag == item || exoPlayer.getMediaItemAt(index).mediaId == stream.hashCode().toString()
-		}
-
-		if (preparedItemIndex != null) {
-			exoPlayer.replaceMediaItem(preparedItemIndex, mediaItem)
-		} else {
-			while (exoPlayer.mediaItemCount > MEDIA_ITEM_COUNT_MAX - 1) exoPlayer.removeMediaItem(0)
-			exoPlayer.addMediaItem(mediaItem)
-			preparedItemIndex = exoPlayer.mediaItemCount - 1
-		}
-
+		exoPlayer.setMediaItem(mediaItem)
 		exoPlayer.prepare()
 
 		val startTicks = stream.startPositionTicks
@@ -445,16 +422,10 @@ class ExoPlayerBackend(
 
 		if (startPositionMs > 0) {
 			pendingInitialSeekMs = startPositionMs
-			exoPlayer.seekTo(preparedItemIndex, startPositionMs)
+			exoPlayer.seekTo(startPositionMs)
 		} else {
 			pendingInitialSeekMs = null
-			// Seek to prepared media item
-			when (preparedItemIndex) {
-				exoPlayer.currentMediaItemIndex - 1 -> exoPlayer.seekToPreviousMediaItem()
-				exoPlayer.currentMediaItemIndex + 1 -> exoPlayer.seekToNextMediaItem()
-				exoPlayer.currentMediaItemIndex -> Unit
-				else -> exoPlayer.seekTo(preparedItemIndex, 0)
-			}
+			exoPlayer.seekTo(0)
 		}
 
 

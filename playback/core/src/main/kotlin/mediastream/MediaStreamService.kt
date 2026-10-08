@@ -94,13 +94,7 @@ class MediaStreamService(
 		// Peek into the next item to preload
 		val nextItem = manager.queue.peekNext() ?: return@launch
 
-		// Preload media stream information
-		val hasMediaStream = nextItem.ensureMediaStream()
-
-		if (hasMediaStream) {
-			// Preload media in backend
-			val backend = requireNotNull(manager.backend)
-			backend.prepareItem(nextItem)
-		}
+		// Preload media stream information in background without polluting ExoPlayer playlist
+		nextItem.ensureMediaStream()
 	}
 }

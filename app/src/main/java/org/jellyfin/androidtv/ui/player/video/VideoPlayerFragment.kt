@@ -67,6 +67,7 @@ class VideoPlayerFragment : Fragment() {
 
 	private var refreshRateHelper: RefreshRateHelper? = null
 	private var playerEventListener: PlayerBackendEventListener? = null
+	private var lastAutoSelectedEntryId: String? = null
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -133,6 +134,7 @@ class VideoPlayerFragment : Fragment() {
 			playbackManager.queue.entryIndex.collect { index ->
 				if (index >= 0) {
 					videoQueueManager.setCurrentMediaPosition(index)
+					lastAutoSelectedEntryId = null
 
 					// Clear explicit stream index overrides from previous item so next item uses smart matching
 					videoQueueManager.setSelectedAudioStreamIndex(null)
@@ -195,7 +197,6 @@ class VideoPlayerFragment : Fragment() {
 		// Listen for track changes to apply best video/audio/subtitle selections
 		playerEventListener = object : PlayerBackendEventListener() {
 			private var isApplyingAutoTracks = false
-			private var lastAutoSelectedEntryId: String? = null
 
 			override fun onMediaStreamEnd(mediaStream: PlayableMediaStream) {
 				lifecycleScope.launch {
