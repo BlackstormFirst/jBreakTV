@@ -3,6 +3,7 @@ package org.jellyfin.androidtv.ui.player.video
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.compose.content
 import androidx.lifecycle.Lifecycle
@@ -10,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.constant.NextUpBehavior
 import org.jellyfin.androidtv.preference.constant.StillWatchingBehavior
@@ -43,6 +45,7 @@ import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.koin.android.ext.android.inject
 import timber.log.Timber
+import java.io.File
 
 private data class TrackSelectionResult(
 	val audioIndex: Int?,
@@ -68,6 +71,11 @@ class VideoPlayerFragment : Fragment() {
 	private var refreshRateHelper: RefreshRateHelper? = null
 	private var playerEventListener: PlayerBackendEventListener? = null
 	private var lastAutoSelectedEntryId: String? = null
+
+	private var playbackRetries = 0
+	private var lastPlaybackErrorTime = 0L
+	private var isRetrying = false
+	private var isNavigatingToNextUp = false
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -135,6 +143,7 @@ class VideoPlayerFragment : Fragment() {
 				if (index >= 0) {
 					videoQueueManager.setCurrentMediaPosition(index)
 					lastAutoSelectedEntryId = null
+					isNavigatingToNextUp = false
 
 					// Clear explicit stream index overrides from previous item so next item uses smart matching
 					videoQueueManager.setSelectedAudioStreamIndex(null)
@@ -183,9 +192,11 @@ class VideoPlayerFragment : Fragment() {
 				when (playState) {
 					PlayState.PLAYING, PlayState.PAUSED -> {
 						hasStarted = true
+						isRetrying = false
 					}
 					PlayState.STOPPED -> {
-						if (hasStarted && isAdded && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+						val hasNextItem = videoQueueManager.getCurrentMediaPosition() < videoQueueManager.getCurrentVideoQueue().size - 1
+						if (hasStarted && !isRetrying && !isNavigatingToNextUp && !hasNextItem && isAdded && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
 							navigationRepository.goBack()
 						}
 					}
@@ -216,6 +227,7 @@ class VideoPlayerFragment : Fragment() {
 					val showNextUp = nextUpEnabled && !showStillWatching
 
 					if (nextItem != null && currentItem != null && currentItem.type != BaseItemKind.TRAILER && (showStillWatching || showNextUp)) {
+						isNavigatingToNextUp = true
 						interactionTrackerViewModel.onEpisodeWatched()
 						videoQueueManager.setCurrentMediaPosition(nextIndex)
 						playbackManager.state.stop()
@@ -374,12 +386,67 @@ class VideoPlayerFragment : Fragment() {
 					}
 				}
 			}
+
+			override fun onError(error: Throwable) {
+				lifecycleScope.launch {
+					handlePlayerError(error)
+				}
+			}
 		}.also { listener ->
 			playbackManager.addListener(listener)
 		}
 
 		// Pause player until the initial resume
 		playbackManager.state.pause()
+	}
+
+	private fun handlePlayerError(error: Throwable?) {
+		if (!isAdded || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+
+		val entry = playbackManager.queue.entry.value
+		val currentItem = entry?.baseItem
+
+		// USB Protection: If current item is a disconnected local file, close player cleanly
+		if (currentItem != null && LocalVideoManager.isLocalItem(currentItem)) {
+			val path = currentItem.path
+			if (path != null) {
+				val file = File(path)
+				if (!file.exists() || !file.canRead()) {
+					Timber.w("UsbDebug: Local file inaccessible on error (%s). Closing player.", path)
+					Toast.makeText(requireContext(), "Périphérique USB déconnecté", Toast.LENGTH_SHORT).show()
+					playbackManager.state.stop()
+					navigationRepository.goBack()
+					return
+				}
+			}
+		}
+
+		// Reset retry count if it's been more than 30s since previous error
+		val now = System.currentTimeMillis()
+		if (playbackRetries > 0 && now - lastPlaybackErrorTime > 30000) {
+			Timber.i("Playback error: playback stabilized - retry count reset to 0 from $playbackRetries")
+			playbackRetries = 0
+		}
+
+		playbackRetries++
+		lastPlaybackErrorTime = now
+
+		if (playbackRetries < 3) {
+			val isLiveTv = currentItem != null && LiveTvPlayerHelper.isLiveTv(currentItem)
+			val msgRes = if (isLiveTv) R.string.msg_error_live_stream else R.string.player_error
+			Toast.makeText(requireContext(), getString(msgRes), Toast.LENGTH_SHORT).show()
+			Timber.i("Player error encountered (attempt $playbackRetries/3) - retrying")
+
+			isRetrying = true
+			playbackManager.state.stop()
+			playbackManager.state.play()
+		} else {
+			isRetrying = false
+			Toast.makeText(requireContext(), getString(R.string.too_many_errors), Toast.LENGTH_LONG).show()
+			Timber.e(error, "Too many playback errors ($playbackRetries retries), closing player")
+			playbackManager.state.stop()
+			navigationRepository.goBack()
+		}
 	}
 
 	private fun applyRefreshRate(videoSize: VideoSize) {

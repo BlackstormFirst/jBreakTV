@@ -9,4 +9,5 @@ abstract class PlayerBackendEventListener {
 	open fun onVideoSizeChange(width: Int, height: Int, frameRate: Float = 0f) = Unit
 	open fun onMediaStreamEnd(mediaStream: PlayableMediaStream) = Unit
 	open fun onTracksChanged() = Unit
+	open fun onError(error: Throwable) = Unit
 }

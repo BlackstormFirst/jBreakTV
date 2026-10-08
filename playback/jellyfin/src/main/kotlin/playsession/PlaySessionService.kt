@@ -58,9 +58,9 @@ class PlaySessionService(
 		state.playState.onEach { playState ->
 			when (playState) {
 				PlayState.PLAYING -> sendStreamStart()
-				PlayState.STOPPED -> sendStreamStop()
+				PlayState.STOPPED -> sendStreamStop(failed = false)
 				PlayState.PAUSED -> sendStreamUpdate()
-				PlayState.ERROR -> sendStreamStop()
+				PlayState.ERROR -> sendStreamStop(failed = true)
 			}
 		}.launchIn(coroutineScope)
 
@@ -213,7 +213,7 @@ class PlaySessionService(
 		}
 	}
 
-	private suspend fun sendStreamStop() {
+	private suspend fun sendStreamStop(failed: Boolean = false) {
 		val entry = manager.queue.entry.value ?: activeEntry
 		val item = entry?.baseItem ?: activeItem
 		if (item != null) {
@@ -245,7 +245,7 @@ class PlaySessionService(
 							playSessionId = stream.identifier,
 							playlistItemId = item.playlistItemId,
 							positionTicks = reportMs * 10000L,
-							failed = false,
+							failed = failed,
 							nowPlayingQueue = getQueue(),
 						)
 					)

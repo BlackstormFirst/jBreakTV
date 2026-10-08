@@ -260,6 +260,8 @@ class ExoPlayerBackend(
 		}
 
 		override fun onPlayerError(error: PlaybackException) {
+			Timber.e(error, "***** Got error from player")
+			listener?.onError(error)
 			listener?.onPlayStateChange(PlayState.ERROR)
 		}
 

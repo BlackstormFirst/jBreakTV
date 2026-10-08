@@ -80,8 +80,8 @@ class MediaStreamService(
 			backend.playItem(entry)
 		} else {
 			Timber.e("Unable to resolve stream for entry $entry")
+			manager.backendService.BackendEventListener().onError(IllegalStateException("Unable to resolve stream for entry $entry"))
 
-			// TODO: Somehow notify the user that we skipped an unplayable entry
 			if (manager.queue.peekNext() != null) {
 				manager.queue.next(usePlaybackOrder = true, useRepeatMode = false)
 			} else {

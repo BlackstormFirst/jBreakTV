@@ -103,5 +103,9 @@ class BackendService {
 		override fun onTracksChanged() {
 			callListeners { onTracksChanged() }
 		}
+
+		override fun onError(error: Throwable) {
+			callListeners { onError(error) }
+		}
 	}
 }
