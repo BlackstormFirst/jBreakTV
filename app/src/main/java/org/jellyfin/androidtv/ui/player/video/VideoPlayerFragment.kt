@@ -315,19 +315,17 @@ class VideoPlayerFragment : Fragment() {
 						}
 
 						// Apply track selection back on the main thread
-						if (trackSelection.videoIndex != null && trackSelection.targetVideoTrack != null && !trackSelection.targetVideoTrack.isSelected) {
+						if (trackSelection.videoIndex != null && trackSelection.targetVideoTrack != null) {
 							backend.selectTrack(2, trackSelection.targetVideoTrack)
 						}
 
-						if (trackSelection.audioIndex != null && trackSelection.targetAudioTrack != null && !trackSelection.targetAudioTrack.isSelected) {
+						if (trackSelection.audioIndex != null && trackSelection.targetAudioTrack != null) {
 							backend.selectTrack(1, trackSelection.targetAudioTrack)
 						}
 
 						if (trackSelection.subIndex == null || trackSelection.subIndex < 0) {
-							if (subTracks.any { it.isSelected }) {
-								backend.selectTrack(3, null)
-							}
-						} else if (trackSelection.targetSubTrack != null && !trackSelection.targetSubTrack.isSelected) {
+							backend.selectTrack(3, null)
+						} else if (trackSelection.targetSubTrack != null) {
 							backend.selectTrack(3, trackSelection.targetSubTrack)
 						}
 
