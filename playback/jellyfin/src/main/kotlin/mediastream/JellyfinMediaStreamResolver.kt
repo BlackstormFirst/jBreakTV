@@ -33,6 +33,7 @@ class JellyfinMediaStreamResolver(
 	private val localItemInspector: (suspend (File) -> BaseItemDto)? = null,
 	private val streamIndexResolver: ((BaseItemDto, MediaSourceInfo?) -> Triple<Int?, Int?, Int?>)? = null,
 	private val maxBitrateProvider: (() -> Int)? = null,
+	private val subtitlesBurnDuringTranscodeProvider: (() -> Boolean)? = null,
 ) : MediaStreamResolver {
 	companion object {
 		private val supportedMediaTypes = arrayOf(MediaType.VIDEO, MediaType.AUDIO)
@@ -221,7 +222,9 @@ class JellyfinMediaStreamResolver(
 			(isPgsCodec && !isPgsSupportedDirect) ||
 			subCodec.contains("dvd") || subCodec.contains("sub") || subCodec.contains("idx")
 
-		val shouldBurnIn = requestedSubStream?.deliveryMethod == SubtitleDeliveryMethod.ENCODE || isUnsupportedSubCodec
+		val isEmbeddedSub = requestedSubStream != null && !requestedSubStream.isExternal && subIndexToUse != null && subIndexToUse >= 0
+		val burnInPreference = subtitlesBurnDuringTranscodeProvider?.invoke() == true
+		val shouldBurnIn = requestedSubStream?.deliveryMethod == SubtitleDeliveryMethod.ENCODE || isUnsupportedSubCodec || burnInPreference || isEmbeddedSub
 
 		val startTicks = item.userData?.playbackPositionTicks ?: 0L
 

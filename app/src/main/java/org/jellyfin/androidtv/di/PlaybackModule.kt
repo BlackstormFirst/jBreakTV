@@ -213,6 +213,9 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 				val mbps = userPreferences[UserPreferences.maxBitrate].toFloatOrNull() ?: 200f
 				(mbps * 1_000_000f).toInt()
 			},
+			subtitlesBurnDuringTranscodeProvider = {
+				userPreferences[UserPreferences.subtitlesBurnDuringTranscode]
+			},
 			onPlaybackStop = { item ->
 				dataRefreshService.lastPlayback = Instant.now()
 				dataRefreshService.lastPlayedItem = item

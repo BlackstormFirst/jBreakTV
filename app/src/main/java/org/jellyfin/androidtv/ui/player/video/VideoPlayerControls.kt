@@ -454,6 +454,7 @@ private fun SubtitleButton(
 	val context = LocalContext.current
 	val videoQueueManager = koinInject<VideoQueueManager>()
 	val playbackIndexManager = koinInject<PlaybackIndexManager>()
+	val userPreferences = koinInject<UserPreferences>()
 	val entry by rememberQueueEntry(playbackManager)
 	val baseItem = entry?.baseItem
 	val backend = playbackManager.backend
@@ -552,7 +553,11 @@ private fun SubtitleButton(
 					videoQueueManager.setSelectedSubtitleStreamIndex(-1)
 					entry?.preferredSubtitleIndex = -1
 
-					if (!isTranscodingOrRemux) {
+					val subtitlesBurnDuringTranscode = userPreferences[UserPreferences.subtitlesBurnDuringTranscode]
+					val currentPlayableStream = entry?.mediaStream
+					val isTranscodingVideo = currentPlayableStream?.conversionMethod == MediaConversionMethod.Transcode
+
+					if (!isTranscodingOrRemux || (!subtitlesBurnDuringTranscode && !isTranscodingVideo)) {
 						backend.selectTrack(3, null)
 					} else {
 						val currentPos = backend.getPositionInfo().active
@@ -597,10 +602,14 @@ private fun SubtitleButton(
 						videoQueueManager.setSelectedSubtitleStreamIndex(track.mediaStreamIndex)
 						entry?.preferredSubtitleIndex = track.mediaStreamIndex
 
+						val subtitlesBurnDuringTranscode = userPreferences[UserPreferences.subtitlesBurnDuringTranscode]
+						val currentPlayableStream = entry?.mediaStream
+						val isTranscodingVideo = currentPlayableStream?.conversionMethod == MediaConversionMethod.Transcode
+
 						val isExternalSubtitle = mediaStream?.isExternal == true || track.id.startsWith("JF_EXTERNAL:")
 						val isTrackInExoPlayer = track.group != null
 
-						if (!isTranscodingOrRemux || isExternalSubtitle || isTrackInExoPlayer) {
+						if (!isTranscodingOrRemux || (isExternalSubtitle && !subtitlesBurnDuringTranscode) || (isTrackInExoPlayer && !isTranscodingVideo)) {
 							backend.selectTrack(3, track)
 						} else {
 							val currentPos = backend.getPositionInfo().active
