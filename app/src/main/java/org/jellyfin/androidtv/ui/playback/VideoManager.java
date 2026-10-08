@@ -155,7 +155,23 @@ public class VideoManager {
                 mVideoFrameMetadataListener = (presentationTimeUs, releaseTimeNs, format, mediaFormat) -> {
                     Function1<Long, Unit> callback = assHandler.getVideoTimeCallback();
                     if (callback != null) {
-                        callback.invoke(presentationTimeUs);
+                        long delayMs = 0;
+                        if (releaseTimeNs != C.TIME_UNSET) {
+                            long nowNs = System.nanoTime();
+                            if (releaseTimeNs > nowNs) {
+                                delayMs = (releaseTimeNs - nowNs) / 1_000_000L;
+                            }
+                        }
+                        if (delayMs > 0 && delayMs < 200) {
+                            mHandler.postDelayed(() -> {
+                                Function1<Long, Unit> cb = assHandler.getVideoTimeCallback();
+                                if (cb != null) {
+                                    cb.invoke(presentationTimeUs);
+                                }
+                            }, delayMs);
+                        } else {
+                            callback.invoke(presentationTimeUs);
+                        }
                     }
                 };
                 mExoPlayer.setVideoFrameMetadataListener(mVideoFrameMetadataListener);
