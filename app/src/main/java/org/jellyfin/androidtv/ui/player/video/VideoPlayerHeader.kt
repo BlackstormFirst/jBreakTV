@@ -45,12 +45,12 @@ fun VideoPlayerHeader(
 
 	val titleText = remember(item, isLocal, isLiveTv, isEpisode) {
 		val name = item?.name.orEmpty()
-		if (isLiveTv) {
-			val channelNum = item?.channelNumber ?: item?.number
+		if (item != null && isLiveTv) {
+			val channelNum = item.channelNumber ?: item.number
 			if (!channelNum.isNullOrEmpty()) "$channelNum $name" else name
-		} else if (!isLocal && isEpisode) {
-			val seasonNum = item?.parentIndexNumber
-			val episodeNum = item?.indexNumber
+		} else if (item != null && !isLocal && isEpisode) {
+			val seasonNum = item.parentIndexNumber
+			val episodeNum = item.indexNumber
 			if (seasonNum != null && episodeNum != null) {
 				val sFormatted = "%02d".format(seasonNum)
 				val eFormatted = "%02d".format(episodeNum)
@@ -67,8 +67,8 @@ fun VideoPlayerHeader(
 	}
 
 	val subtitleText = remember(item, isLiveTv) {
-		if (isLiveTv) {
-			item?.currentProgram?.name ?: item?.overview ?: item?.seriesName.orEmpty()
+		if (item != null && isLiveTv) {
+			item.currentProgram?.name ?: item.overview ?: item.seriesName.orEmpty()
 		} else {
 			item?.seriesName.orEmpty()
 		}

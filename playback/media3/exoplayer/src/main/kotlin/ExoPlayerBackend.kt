@@ -673,7 +673,6 @@ class ExoPlayerBackend(
 				is MediaStreamAudioTrack -> mediaTrack.index
 				is MediaStreamSubtitleTrack -> mediaTrack.index
 				is MediaStreamVideoTrack -> mediaTrack.index
-				else -> -1
 			}
 
 			val label = when (mediaTrack) {
@@ -696,13 +695,12 @@ class ExoPlayerBackend(
 						}
 					}.ifBlank { null }
 				}
-				else -> null
 			} ?: "Track ${indexInType + 1}"
 
 			val language = when (mediaTrack) {
 				is MediaStreamAudioTrack -> mediaTrack.language
 				is MediaStreamSubtitleTrack -> mediaTrack.language
-				else -> null
+				is MediaStreamVideoTrack -> null
 			}
 
 			// Find matching ExoPlayer group info for this media track
