@@ -142,6 +142,19 @@ class VideoPlayerFragment : Fragment() {
 			playbackManager.queue.entryIndex.collect { index ->
 				if (index >= 0) {
 					videoQueueManager.setCurrentMediaPosition(index)
+					val fullSeriesQueue = videoQueueManager.getFullSeriesQueue()
+					if (fullSeriesQueue != null) {
+						val updatedQueue = videoQueueManager.getCurrentVideoQueue()
+						val updatedPos = videoQueueManager.getCurrentMediaPosition()
+						val currentEntries = playbackManager.queue.entries.value
+						val currentIds = currentEntries.mapNotNull { it.baseItem?.id }
+						val updatedIds = updatedQueue.map { it.id }
+						if (currentIds != updatedIds) {
+							val queueSupplier = RewriteMediaManager.BaseItemQueueSupplier(api, updatedQueue, false)
+							playbackManager.queue.clear()
+							playbackManager.queue.addSupplier(queueSupplier, updatedPos)
+						}
+					}
 					lastAutoSelectedEntryId = null
 					isNavigatingToNextUp = false
 

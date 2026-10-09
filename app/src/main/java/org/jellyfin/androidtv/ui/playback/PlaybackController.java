@@ -1075,6 +1075,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             resetPlayerErrors();
             mCurrentIndex++;
             videoQueueManager.getValue().setCurrentMediaPosition(mCurrentIndex);
+            if (videoQueueManager.getValue().getFullSeriesQueue() != null) {
+                mItems = videoQueueManager.getValue().getCurrentVideoQueue();
+                mCurrentIndex = videoQueueManager.getValue().getCurrentMediaPosition();
+            }
             Timber.i("Moving to index: %d out of %d total items.", mCurrentIndex, mItems.size());
             spinnerOff = false;
             play(0);
@@ -1088,6 +1092,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             resetPlayerErrors();
             mCurrentIndex--;
             videoQueueManager.getValue().setCurrentMediaPosition(mCurrentIndex);
+            if (videoQueueManager.getValue().getFullSeriesQueue() != null) {
+                mItems = videoQueueManager.getValue().getCurrentVideoQueue();
+                mCurrentIndex = videoQueueManager.getValue().getCurrentMediaPosition();
+            }
             Timber.i("Moving to index: %d out of %d total items.", mCurrentIndex, mItems.size());
             spinnerOff = false;
             play(0);

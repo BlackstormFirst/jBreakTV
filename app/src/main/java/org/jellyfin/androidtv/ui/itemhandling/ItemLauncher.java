@@ -170,18 +170,24 @@ public class ItemLauncher {
                                 @Override
                                 public void onResponse(List<BaseItemDto> response) {
                                     if (!isActive()) return;
-                                    int itemsPosition = 0;
+                                    int itemsPosition = -1;
                                     for (int i = 0; i < response.size(); i++) {
                                         if (response.get(i).getId().equals(targetItem.getId())) {
                                             itemsPosition = i;
                                             break;
                                         }
                                     }
+                                    List<BaseItemDto> finalItems = response;
+                                    if (itemsPosition == -1) {
+                                        finalItems = new ArrayList<>(response);
+                                        finalItems.add(0, targetItem);
+                                        itemsPosition = 0;
+                                    }
                                     int pos = 0;
                                     if (targetItem.getUserData() != null && targetItem.getUserData().getPlaybackPositionTicks() > 0) {
                                         pos = Math.toIntExact(targetItem.getUserData().getPlaybackPositionTicks() / 10000);
                                     }
-                                    playbackLauncher.getValue().launch(context, response, pos, false, itemsPosition, false);
+                                    playbackLauncher.getValue().launch(context, finalItems, pos, false, itemsPosition, false);
                                 }
                             });
                             break;

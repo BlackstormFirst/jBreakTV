@@ -15,6 +15,7 @@ import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.playback.PlaybackControllerContainer
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
+import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.sdk.api.client.ApiClient
@@ -39,6 +40,7 @@ class SdkPlaybackHelper(
 	private val userPreferences: UserPreferences,
 	private val playbackLauncher: PlaybackLauncher,
 	private val playbackControllerContainer: PlaybackControllerContainer,
+	private val videoQueueManager: VideoQueueManager,
 ) : PlaybackHelper {
 	companion object {
 		const val ITEM_QUERY_LIMIT = 150
@@ -80,22 +82,34 @@ class SdkPlaybackHelper(
 					val response by api.tvShowsApi.getEpisodes(
 						seriesId = seriesId,
 						isMissing = false,
-						sortBy = ItemSortBy.SORT_NAME,
-						limit = ITEM_QUERY_LIMIT,
+						sortBy = if (shuffle) ItemSortBy.RANDOM else null,
 						fields = ItemRepository.itemFields
 					)
 
-					response.items.filter { it.canPlay() }
+					val allEpisodes = response.items.filter { it.canPlay() }
+					val currentIndex = allEpisodes.indexOfFirst { it.id == mainItem.id }
+
+					if (currentIndex != -1) {
+						videoQueueManager.setFullSeriesQueue(allEpisodes)
+						val start = (currentIndex - 1).coerceAtLeast(0)
+						val end = (currentIndex + 2).coerceAtMost(allEpisodes.size)
+						allEpisodes.subList(start, end)
+					} else {
+						videoQueueManager.setFullSeriesQueue(null)
+						if (mainItem.canPlay()) listOf(mainItem) else emptyList()
+					}
 				} else {
+					videoQueueManager.setFullSeriesQueue(null)
 					if (mainItem.canPlay()) listOf(mainItem) else emptyList()
 				}
 			}
 
 			BaseItemKind.SERIES -> {
+				videoQueueManager.setFullSeriesQueue(null)
 				val response by api.tvShowsApi.getEpisodes(
 					seriesId = mainItem.id,
 					isMissing = false,
-					sortBy = if (shuffle) ItemSortBy.RANDOM else ItemSortBy.SORT_NAME,
+					sortBy = if (shuffle) ItemSortBy.RANDOM else null,
 					limit = ITEM_QUERY_LIMIT,
 					fields = ItemRepository.itemFields,
 				)
@@ -103,11 +117,12 @@ class SdkPlaybackHelper(
 			}
 
 			BaseItemKind.SEASON -> {
+				videoQueueManager.setFullSeriesQueue(null)
 				val response by api.tvShowsApi.getEpisodes(
 					seriesId = requireNotNull(mainItem.seriesId),
 					seasonId = mainItem.id,
 					isMissing = false,
-					sortBy = if (shuffle) ItemSortBy.RANDOM else ItemSortBy.SORT_NAME,
+					sortBy = if (shuffle) ItemSortBy.RANDOM else null,
 					limit = ITEM_QUERY_LIMIT,
 					fields = ItemRepository.itemFields,
 				)
@@ -115,6 +130,7 @@ class SdkPlaybackHelper(
 			}
 
 			BaseItemKind.FOLDER -> {
+				videoQueueManager.setFullSeriesQueue(null)
 				val response by api.itemsApi.getItems(
 					parentId = mainItem.id,
 					isMissing = false,
@@ -123,7 +139,11 @@ class SdkPlaybackHelper(
 						BaseItemKind.MOVIE,
 						BaseItemKind.VIDEO
 					),
-					sortBy = if (shuffle) listOf(ItemSortBy.RANDOM) else listOf(ItemSortBy.SORT_NAME),
+					sortBy = if (shuffle) listOf(ItemSortBy.RANDOM) else listOf(
+						ItemSortBy.PARENT_INDEX_NUMBER,
+						ItemSortBy.INDEX_NUMBER,
+						ItemSortBy.SORT_NAME
+					),
 					recursive = true,
 					limit = ITEM_QUERY_LIMIT,
 					fields = ItemRepository.itemFields
@@ -133,6 +153,7 @@ class SdkPlaybackHelper(
 			}
 
 			BaseItemKind.BOX_SET -> {
+				videoQueueManager.setFullSeriesQueue(null)
 				val response by api.itemsApi.getItems(
 					parentId = mainItem.id,
 					isMissing = false,
@@ -151,6 +172,7 @@ class SdkPlaybackHelper(
 			}
 
 			BaseItemKind.MUSIC_ALBUM -> {
+				videoQueueManager.setFullSeriesQueue(null)
 				val response by api.itemsApi.getItems(
 					isMissing = false,
 					mediaTypes = listOf(MediaType.AUDIO),
@@ -171,6 +193,7 @@ class SdkPlaybackHelper(
 			}
 
 			BaseItemKind.MUSIC_ARTIST -> {
+				videoQueueManager.setFullSeriesQueue(null)
 				val response by api.itemsApi.getItems(
 					isMissing = false,
 					mediaTypes = listOf(MediaType.AUDIO),
@@ -191,6 +214,7 @@ class SdkPlaybackHelper(
 			}
 
 			BaseItemKind.PLAYLIST -> {
+				videoQueueManager.setFullSeriesQueue(null)
 				val response by api.itemsApi.getItems(
 					parentId = mainItem.id,
 					isMissing = false,
@@ -274,8 +298,12 @@ class SdkPlaybackHelper(
 			val pos = item.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration) ?: Duration.ZERO
 
 			val allowIntros = pos == Duration.ZERO && item.type == BaseItemKind.MOVIE
-			val items = getItems(item, allowIntros, shuffle)
-			val targetIndex = items.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
+			var items = getItems(item, allowIntros, shuffle)
+			var targetIndex = items.indexOfFirst { it.id == item.id }
+			if (targetIndex == -1) {
+				items = if (item.canPlay()) listOf(item) + items else items
+				targetIndex = items.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
+			}
 
 			playbackLauncher.launch(
 				context,

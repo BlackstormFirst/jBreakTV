@@ -1228,14 +1228,20 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 }
 
                 interactionTracker.getValue().notifyStartSession(item, response);
-                int itemsPosition = 0;
+                int itemsPosition = -1;
                 for (int i = 0; i < response.size(); i++) {
                     if (response.get(i).getId().equals(item.getId())) {
                         itemsPosition = i;
                         break;
                     }
                 }
-                KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).launch(getContext(), response, pos, false, itemsPosition, shuffle);
+                List<BaseItemDto> finalItems = response;
+                if (itemsPosition == -1) {
+                    finalItems = new ArrayList<>(response);
+                    finalItems.add(0, item);
+                    itemsPosition = 0;
+                }
+                KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).launch(getContext(), finalItems, pos, false, itemsPosition, shuffle);
             }
         });
     }

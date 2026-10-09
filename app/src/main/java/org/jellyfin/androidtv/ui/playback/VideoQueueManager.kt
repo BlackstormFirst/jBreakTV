@@ -5,6 +5,8 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 class VideoQueueManager {
 	private var _currentVideoQueue: List<BaseItemDto> = emptyList()
 	private var _currentMediaPosition = -1
+	private var _fullSeriesQueue: List<BaseItemDto>? = null
+	private var _currentSeriesEpisodeId: String? = null
 	private var _selectedAudioStreamIndex: Int? = null
 	private var _selectedSubtitleStreamIndex: Int? = null
 	private var _lastPlayedAudioDefaultState: Boolean = false
@@ -24,10 +26,34 @@ class VideoQueueManager {
 	private var _lastPlayedVideoCodec: String? = null
 	private var _lastPlayedVideoTitle: String? = null
 
+	fun setFullSeriesQueue(allEpisodes: List<BaseItemDto>?) {
+		_fullSeriesQueue = allEpisodes?.toList()
+		_currentSeriesEpisodeId = null
+	}
+
+	fun getFullSeriesQueue(): List<BaseItemDto>? = _fullSeriesQueue
+
+	fun updateWindowForEpisode(currentEpisode: BaseItemDto) {
+		val fullList = _fullSeriesQueue ?: return
+		val fullIndex = fullList.indexOfFirst { it.id == currentEpisode.id }
+		if (fullIndex == -1) return
+
+		val start = (fullIndex - 1).coerceAtLeast(0)
+		val end = (fullIndex + 2).coerceAtMost(fullList.size)
+		val window = fullList.subList(start, end)
+		val newPosition = fullIndex - start
+
+		_currentVideoQueue = window.toMutableList()
+		_currentMediaPosition = newPosition
+		_currentSeriesEpisodeId = currentEpisode.id.toString()
+	}
+
 	fun setCurrentVideoQueue(items: List<BaseItemDto>?) {
 		if (items.isNullOrEmpty()) {
 			_currentVideoQueue = emptyList()
 			_currentMediaPosition = -1
+			_fullSeriesQueue = null
+			_currentSeriesEpisodeId = null
 			return
 		}
 
@@ -43,6 +69,10 @@ class VideoQueueManager {
 		if (currentMediaPosition !in 0.._currentVideoQueue.size) return
 
 		_currentMediaPosition = currentMediaPosition
+		val currentItem = _currentVideoQueue.getOrNull(currentMediaPosition)
+		if (currentItem != null && !_fullSeriesQueue.isNullOrEmpty()) {
+			updateWindowForEpisode(currentItem)
+		}
 	}
 
 	fun getCurrentMediaPosition() = _currentMediaPosition
@@ -187,6 +217,8 @@ class VideoQueueManager {
 	fun clearVideoQueue() {
 		_currentVideoQueue = emptyList()
 		_currentMediaPosition = -1
+		_fullSeriesQueue = null
+		_currentSeriesEpisodeId = null
 		_selectedAudioStreamIndex = null
 		_selectedSubtitleStreamIndex = null
 		_selectedVideoStreamIndex = null
