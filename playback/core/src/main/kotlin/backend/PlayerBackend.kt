@@ -34,6 +34,7 @@ interface PlayerBackend {
 	fun play()
 	fun pause()
 	fun stop()
+	fun release() {}
 
 	fun seekTo(position: Duration)
 	fun setScrubbing(scrubbing: Boolean)

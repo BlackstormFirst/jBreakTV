@@ -20,6 +20,7 @@ class BackendService {
 
 	fun switchBackend(backend: PlayerBackend) {
 		_backend?.stop()
+		_backend?.release()
 		_backend?.setListener(null)
 		_backend?.setSurfaceView(null)
 		_backend?.setSubtitleView(null)
@@ -29,6 +30,18 @@ class BackendService {
 			_subtitleView?.let(::setSubtitleView)
 			setListener(BackendEventListener())
 		}
+	}
+
+	fun release() {
+		_backend?.stop()
+		_backend?.release()
+		_backend?.setListener(null)
+		_backend?.setSurfaceView(null)
+		_backend?.setSubtitleView(null)
+		_backend = null
+		_surfaceView = null
+		_subtitleView = null
+		listeners.clear()
 	}
 
 	fun attachSurfaceView(surfaceView: PlayerSurfaceView) {

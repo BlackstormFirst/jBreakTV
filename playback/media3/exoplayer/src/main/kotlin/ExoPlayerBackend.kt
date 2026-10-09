@@ -43,9 +43,7 @@ import io.github.peerless2012.ass.media.kt.withAssMkvSupport
 import io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory
 import io.github.peerless2012.ass.media.type.AssRenderType
 import io.github.peerless2012.ass.media.widget.AssSubtitleView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+
 import org.jellyfin.playback.core.LibassRenderMode
 import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.core.backend.BasePlayerBackend
@@ -102,14 +100,15 @@ class ExoPlayerBackend(
 	private val timedEventState = TimedEventState()
 	private var lastKnownDuration: Duration? = null
 
-	private val assHandler by lazy {
+	private val assHandlerDelegate = lazy {
 		AssHandler(
 			renderType = AssRenderType.OVERLAY_OPEN_GL,
 			config = AssFontManager.getAssHandlerConfig(context),
 		)
 	}
+	private val assHandler by assHandlerDelegate
 
-	private val exoPlayer by lazy {
+	private val exoPlayerDelegate = lazy {
 		val dataSourceFactory = DefaultDataSource.Factory(
 			context,
 			exoPlayerOptions.baseDataSourceFactory,
@@ -208,7 +207,7 @@ class ExoPlayerBackend(
 					assHandler.init(player)
 					if (exoPlayerOptions.libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
 						val mainHandler = Handler(Looper.getMainLooper())
-						player.setVideoFrameMetadataListener { presentationTimeUs, releaseTimeNs, _, _ ->
+						val metadataListener = VideoFrameMetadataListener { presentationTimeUs, releaseTimeNs, _, _ ->
 							val callback = assHandler.videoTimeCallback
 							if (callback != null) {
 								var delayMs = 0L
@@ -220,17 +219,23 @@ class ExoPlayerBackend(
 								}
 								if (delayMs in 1..200) {
 									mainHandler.postDelayed({
-										assHandler.videoTimeCallback?.invoke(presentationTimeUs)
+										if (player.playbackState != Player.STATE_BUFFERING) {
+											assHandler.videoTimeCallback?.invoke(presentationTimeUs)
+										}
 									}, delayMs)
 								} else {
 									callback.invoke(presentationTimeUs)
 								}
 							}
 						}
+						videoFrameMetadataListener = metadataListener
+						player.setVideoFrameMetadataListener(metadataListener)
 					}
 				}
 			}
 	}
+	private var videoFrameMetadataListener: VideoFrameMetadataListener? = null
+	private val exoPlayer by exoPlayerDelegate
 
 	private var pendingInitialSeekMs: Long? = null
 
@@ -406,9 +411,7 @@ class ExoPlayerBackend(
 
 	override fun prepareItem(item: QueueEntry) {
 		if (exoPlayerOptions.enableLibass) {
-			CoroutineScope(Dispatchers.IO).launch {
-				AssFontManager.preloadFontsForEntry(context, item, assHandler)
-			}
+			AssFontManager.preloadFonts(context, item.mediaStream?.url, assHandler)
 		}
 	}
 
@@ -422,9 +425,7 @@ class ExoPlayerBackend(
 		val mediaItem = buildMediaItem(item)
 
 		if (exoPlayerOptions.enableLibass) {
-			CoroutineScope(Dispatchers.IO).launch {
-				AssFontManager.preloadFontsForEntry(context, item, assHandler)
-			}
+			AssFontManager.preloadFonts(context, item.mediaStream?.url, assHandler)
 		}
 
 		exoPlayer.setMediaItem(mediaItem)
@@ -482,9 +483,28 @@ class ExoPlayerBackend(
 
 	override fun stop() {
 		currentStream = null
-		exoPlayer.stop()
-		exoPlayer.clearMediaItems()
+		if (exoPlayerOptions.enableLibass) {
+			AssFontManager.cancelPreload()
+		}
+		if (exoPlayerDelegate.isInitialized()) {
+			exoPlayer.stop()
+			exoPlayer.clearMediaItems()
+		}
 		audioPipeline.release()
+	}
+
+	override fun release() {
+		stop()
+		if (exoPlayerOptions.enableLibass && assHandlerDelegate.isInitialized()) {
+			runCatching { assHandler.release() }
+		}
+		if (exoPlayerDelegate.isInitialized()) {
+			runCatching {
+				videoFrameMetadataListener?.let { exoPlayer.clearVideoFrameMetadataListener(it) }
+				videoFrameMetadataListener = null
+				exoPlayer.release()
+			}
+		}
 	}
 
 	override fun seekTo(position: Duration) {

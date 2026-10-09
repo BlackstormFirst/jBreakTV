@@ -153,6 +153,7 @@ public class VideoManager {
             assHandler.init(mExoPlayer);
             if (libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
                 mVideoFrameMetadataListener = (presentationTimeUs, releaseTimeNs, format, mediaFormat) -> {
+                    if (mAssHandler == null || mExoPlayer == null) return;
                     Function1<Long, Unit> callback = assHandler.getVideoTimeCallback();
                     if (callback != null) {
                         long delayMs = 0;
@@ -164,6 +165,8 @@ public class VideoManager {
                         }
                         if (delayMs > 0 && delayMs < 200) {
                             mHandler.postDelayed(() -> {
+                                if (mAssHandler == null || mExoPlayer == null) return;
+                                if (mExoPlayer.getPlaybackState() == Player.STATE_BUFFERING) return;
                                 Function1<Long, Unit> cb = assHandler.getVideoTimeCallback();
                                 if (cb != null) {
                                     cb.invoke(presentationTimeUs);
@@ -176,7 +179,10 @@ public class VideoManager {
                 };
                 mExoPlayer.setVideoFrameMetadataListener(mVideoFrameMetadataListener);
             }
-            mExoPlayerView.getSubtitleView().addView(new AssSubtitleView(mActivity, assHandler));
+            if (mExoPlayerView.getSubtitleView() != null) {
+                mExoPlayerView.getSubtitleView().removeAllViews();
+                mExoPlayerView.getSubtitleView().addView(new AssSubtitleView(mActivity, assHandler));
+            }
         }
 
         mExoPlayer.addListener(new Player.Listener() {
@@ -729,8 +735,29 @@ public class VideoManager {
 
     private void releasePlayer() {
         _helper.setScreensaverLock(false);
+        AssFontManager.cancelPreload();
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
+        }
+        if (mAssHandler != null) {
+            try {
+                mAssHandler.release();
+            } catch (Exception e) {
+                Timber.w(e, "Error releasing AssHandler");
+            }
+            mAssHandler = null;
+        }
+        if (mExoPlayerView != null && mExoPlayerView.getSubtitleView() != null) {
+            mExoPlayerView.getSubtitleView().removeAllViews();
+        }
         if (mExoPlayer != null) {
-            mExoPlayerView.setPlayer(null);
+            if (mVideoFrameMetadataListener != null) {
+                mExoPlayer.clearVideoFrameMetadataListener(mVideoFrameMetadataListener);
+                mVideoFrameMetadataListener = null;
+            }
+            if (mExoPlayerView != null) {
+                mExoPlayerView.setPlayer(null);
+            }
             mExoPlayer.release();
             mExoPlayer = null;
         }
