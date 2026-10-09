@@ -1,6 +1,8 @@
 package org.jellyfin.playback.media3.exoplayer.support
 
+import android.app.ActivityManager
 import android.content.Context
+import android.os.Build
 import io.github.peerless2012.ass.media.AssHandler
 import io.github.peerless2012.ass.media.AssHandlerConfig
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +23,31 @@ object AssFontManager {
 		cacheSize = 128,
 		maxRenderPixels = 1920 * 1080,
 	)
+
+	@JvmStatic
+	fun getAssHandlerConfig(context: Context): AssHandlerConfig {
+		val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+		val isLowRam = am?.isLowRamDevice == true
+		val isApi30Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
+		val glyphSize = when {
+			isLowRam -> 8000
+			isApi30Plus -> 25000
+			else -> 10000
+		}
+		val cacheSize = when {
+			isLowRam -> 64
+			isApi30Plus -> 256
+			else -> 256
+		}
+		val maxRenderPixels =  1920 * 1080
+
+		return AssHandlerConfig(
+			glyphSize = glyphSize,
+			cacheSize = cacheSize,
+			maxRenderPixels = maxRenderPixels,
+		)
+	}
 
 	fun getFontCacheDir(context: Context): File {
 		val dir = File(context.cacheDir, FONT_CACHE_DIR)
@@ -60,7 +87,9 @@ object AssFontManager {
 				for (fontFile in fontFiles) {
 					runCatching {
 						val fontBytes = fontFile.readBytes()
-						assHandler.addFont(fontFile.name, fontBytes)
+						synchronized(assHandler) {
+							assHandler.addFont(fontFile.name, fontBytes)
+						}
 					}.onFailure { error ->
 						Timber.w(error, "Failed to load font ${fontFile.name} into libass")
 					}

@@ -105,7 +105,7 @@ class ExoPlayerBackend(
 	private val assHandler by lazy {
 		AssHandler(
 			renderType = AssRenderType.OVERLAY_OPEN_GL,
-			config = AssFontManager.defaultAssHandlerConfig,
+			config = AssFontManager.getAssHandlerConfig(context),
 		)
 	}
 

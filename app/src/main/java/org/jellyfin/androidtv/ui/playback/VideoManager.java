@@ -114,7 +114,7 @@ public class VideoManager {
 
         boolean assDirectPlay = userPreferences.get(UserPreferences.Companion.getAssDirectPlay());
         LibassRenderMode libassRenderMode = userPreferences.get(UserPreferences.Companion.getLibassRenderMode());
-        AssHandler assHandler = assDirectPlay ? new AssHandler(AssRenderType.OVERLAY_OPEN_GL, AssFontManager.getDefaultAssHandlerConfig()) : null;
+        AssHandler assHandler = assDirectPlay ? new AssHandler(AssRenderType.OVERLAY_OPEN_GL, AssFontManager.getAssHandlerConfig(activity)) : null;
         mAssHandler = assHandler;
 
         mExoPlayer = configureExoplayerBuilder(activity, assHandler).build();
