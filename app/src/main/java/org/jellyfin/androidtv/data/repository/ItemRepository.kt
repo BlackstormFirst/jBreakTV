@@ -35,6 +35,16 @@ object ItemRepository {
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
 	)
 
+	// Light field set for playback queues and playlists retrieval.
+	// Includes media source info and image aspect ratio required for queue playback,
+	// while excluding heavy fields like Chapters, Trickplay, Overview, Taglines, Genres, etc.
+	// to drastically speed up query response times and lower server load.
+	val playbackFields = setOf(
+		ItemFields.CAN_DELETE,
+		ItemFields.MEDIA_SOURCES,
+		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
+	)
+
 	// Even lighter field set for Next Up - excludes ChildCount as it's not needed for episodes.
 	val nextUpFields = setOf(
 		ItemFields.CAN_DELETE,

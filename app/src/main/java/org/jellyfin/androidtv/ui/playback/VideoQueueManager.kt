@@ -38,13 +38,8 @@ class VideoQueueManager {
 		val fullIndex = fullList.indexOfFirst { it.id == currentEpisode.id }
 		if (fullIndex == -1) return
 
-		val start = (fullIndex - 1).coerceAtLeast(0)
-		val end = (fullIndex + 2).coerceAtMost(fullList.size)
-		val window = fullList.subList(start, end)
-		val newPosition = fullIndex - start
-
-		_currentVideoQueue = window.toMutableList()
-		_currentMediaPosition = newPosition
+		_currentVideoQueue = fullList.toMutableList()
+		_currentMediaPosition = fullIndex
 		_currentSeriesEpisodeId = currentEpisode.id.toString()
 	}
 

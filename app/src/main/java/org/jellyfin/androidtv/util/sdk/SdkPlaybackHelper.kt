@@ -83,7 +83,7 @@ class SdkPlaybackHelper(
 						seriesId = seriesId,
 						isMissing = false,
 						sortBy = if (shuffle) ItemSortBy.RANDOM else null,
-						fields = ItemRepository.itemFields
+						fields = ItemRepository.playbackFields
 					)
 
 					val allEpisodes = response.items.filter { it.canPlay() }
@@ -91,9 +91,7 @@ class SdkPlaybackHelper(
 
 					if (currentIndex != -1) {
 						videoQueueManager.setFullSeriesQueue(allEpisodes)
-						val start = (currentIndex - 1).coerceAtLeast(0)
-						val end = (currentIndex + 2).coerceAtMost(allEpisodes.size)
-						allEpisodes.subList(start, end)
+						allEpisodes
 					} else {
 						videoQueueManager.setFullSeriesQueue(null)
 						if (mainItem.canPlay()) listOf(mainItem) else emptyList()
@@ -110,8 +108,7 @@ class SdkPlaybackHelper(
 					seriesId = mainItem.id,
 					isMissing = false,
 					sortBy = if (shuffle) ItemSortBy.RANDOM else null,
-					limit = ITEM_QUERY_LIMIT,
-					fields = ItemRepository.itemFields,
+					fields = ItemRepository.playbackFields,
 				)
 				response.items.filter { it.canPlay() }
 			}
@@ -123,8 +120,7 @@ class SdkPlaybackHelper(
 					seasonId = mainItem.id,
 					isMissing = false,
 					sortBy = if (shuffle) ItemSortBy.RANDOM else null,
-					limit = ITEM_QUERY_LIMIT,
-					fields = ItemRepository.itemFields,
+					fields = ItemRepository.playbackFields,
 				)
 				response.items.filter { it.canPlay() }
 			}
