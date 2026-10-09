@@ -452,11 +452,6 @@ public class VideoManager {
         hasNotifiedPrepared = false;
         if (mExoPlayer != null) {
             mExoPlayer.stop();
-
-            mExoPlayer.setTrackSelectionParameters(mExoPlayer.getTrackSelectionParameters()
-                    .buildUpon()
-                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                    .build());
         }
 
         stopProgressLoop();
@@ -691,7 +686,10 @@ public class VideoManager {
             }
         }
 
-        if (matchedGroup == null)
+        if (matchedGroup == null || mExoPlayer == null ||
+                mExoPlayer.getPlaybackState() == Player.STATE_IDLE ||
+                mExoPlayer.getPlaybackState() == Player.STATE_ENDED ||
+                mExoPlayer.getCurrentTimeline().isEmpty())
             return false;
 
         try {

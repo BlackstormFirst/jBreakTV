@@ -1027,16 +1027,16 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     public void endPlayback(Boolean closeActivity) {
-        if (closeActivity && mFragment != null) {
-            mFragment.closePlayer();
-        }
         stop();
+        if (mVideoManager != null)
+            mVideoManager.destroy();
         if (mRefreshRateHelper != null) {
             SurfaceView surfaceView = mVideoManager != null ? mVideoManager.getSurfaceView() : null;
             mRefreshRateHelper.resetRefreshRate(surfaceView);
         }
-        if (mVideoManager != null)
-            mVideoManager.destroy();
+        if (closeActivity && mFragment != null) {
+            mFragment.closePlayer();
+        }
         mFragment = null;
         mVideoManager = null;
         resetPlayerErrors();

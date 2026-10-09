@@ -417,7 +417,11 @@ class VideoPlayerFragment : Fragment() {
 		if (!isAdded || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
 
 		val entry = playbackManager.queue.entry.value
-		val currentItem = entry?.baseItem
+		if (entry == null || playbackManager.state.playState.value == PlayState.STOPPED) {
+			Timber.w("Ignoring player error because playback is already stopped or queue entry is null")
+			return
+		}
+		val currentItem = entry.baseItem
 
 		// USB Protection: If current item is a disconnected local file, close player cleanly
 		if (currentItem != null && LocalVideoManager.isLocalItem(currentItem)) {
@@ -496,10 +500,10 @@ class VideoPlayerFragment : Fragment() {
 	}
 
 	override fun onDestroyView() {
-		super.onDestroyView()
-
+		playbackManager.state.stop()
 		val surfaceView = playbackManager.backendService.surfaceView?.surface
 		refreshRateHelper?.resetRefreshRate(surfaceView)
+		super.onDestroyView()
 	}
 
 	override fun onPause() {
@@ -519,11 +523,10 @@ class VideoPlayerFragment : Fragment() {
 	}
 
 	override fun onStop() {
-		super.onStop()
-
+		playbackManager.state.stop()
 		val surfaceView = playbackManager.backendService.surfaceView?.surface
 		refreshRateHelper?.resetRefreshRate(surfaceView)
-		playbackManager.state.stop()
+		super.onStop()
 	}
 
 	override fun onDestroy() {

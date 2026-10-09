@@ -324,14 +324,15 @@ class ExoPlayerBackend(
 		}
 
 		override fun onTracksChanged(tracks: Tracks) {
-			applyPreferredTrackOverrides()
+			if (!tracks.groups.isEmpty() && exoPlayer.currentMediaItem != null) {
+				applyPreferredTrackOverrides()
+			}
 			listener?.onTracksChanged()
 		}
 
 		override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
 			val queueEntry = mediaItem?.localConfiguration?.tag as? QueueEntry
 			audioPipeline.normalizationGain = queueEntry?.normalizationGain
-			exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().clearOverrides().build()
 		}
 
 		override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -416,14 +417,6 @@ class ExoPlayerBackend(
 		val stream = requireNotNull(item.mediaStream)
 		if (currentStream == stream) return
 
-		// Clear stale track selection overrides from previous media items
-		val cleanParams = exoPlayer.trackSelectionParameters.buildUpon()
-			.clearOverridesOfType(C.TRACK_TYPE_TEXT)
-			.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-			.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
-			.build()
-		exoPlayer.trackSelectionParameters = cleanParams
-
 		currentStream = stream
 
 		val mediaItem = buildMediaItem(item)
@@ -488,9 +481,10 @@ class ExoPlayerBackend(
 	}
 
 	override fun stop() {
-		exoPlayer.stop()
-		audioPipeline.release()
 		currentStream = null
+		exoPlayer.stop()
+		exoPlayer.clearMediaItems()
+		audioPipeline.release()
 	}
 
 	override fun seekTo(position: Duration) {
@@ -778,6 +772,9 @@ class ExoPlayerBackend(
 
 	private fun applyPreferredTrackOverrides() {
 		val queueEntry = currentStream?.queueEntry ?: return
+		if (exoPlayer.currentMediaItem == null || exoPlayer.currentTracks.groups.isEmpty()) return
+		if (exoPlayer.playbackState == Player.STATE_IDLE || exoPlayer.playbackState == Player.STATE_ENDED || exoPlayer.currentTimeline.isEmpty) return
+
 		val prefSub = queueEntry.preferredSubtitleIndex
 		val prefAudio = queueEntry.preferredAudioIndex
 
@@ -785,18 +782,26 @@ class ExoPlayerBackend(
 		var changed = false
 
 		if (prefSub == -1) {
-			builder.clearOverridesOfType(C.TRACK_TYPE_TEXT)
-			builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-			changed = true
+			val isTextDisabled = exoPlayer.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+			val hasTextOverrides = exoPlayer.trackSelectionParameters.overrides.keys.any { it.type == C.TRACK_TYPE_TEXT }
+			if (!isTextDisabled || hasTextOverrides) {
+				builder.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+				builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+				changed = true
+			}
 		} else if (prefSub != null && prefSub >= 0) {
 			val allTextTracks = getTracks(C.TRACK_TYPE_TEXT)
 			val targetTrack = allTextTracks.firstOrNull { it.mediaStreamIndex == prefSub }
 			val group = targetTrack?.group as? TrackGroup
 			if (group != null) {
-				builder.clearOverridesOfType(C.TRACK_TYPE_TEXT)
-				builder.addOverride(TrackSelectionOverride(group, targetTrack.trackIndex))
-				builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-				changed = true
+				val currentOverride = exoPlayer.trackSelectionParameters.overrides[group]
+				val isTextDisabled = exoPlayer.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+				if (currentOverride == null || currentOverride.trackIndices != listOf(targetTrack.trackIndex) || isTextDisabled) {
+					builder.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+					builder.addOverride(TrackSelectionOverride(group, targetTrack.trackIndex))
+					builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+					changed = true
+				}
 			}
 		}
 
@@ -805,10 +810,14 @@ class ExoPlayerBackend(
 			val targetTrack = allAudioTracks.firstOrNull { it.mediaStreamIndex == prefAudio }
 			val group = targetTrack?.group as? TrackGroup
 			if (group != null) {
-				builder.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-				builder.addOverride(TrackSelectionOverride(group, targetTrack.trackIndex))
-				builder.setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
-				changed = true
+				val currentOverride = exoPlayer.trackSelectionParameters.overrides[group]
+				val isAudioDisabled = exoPlayer.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_AUDIO)
+				if (currentOverride == null || currentOverride.trackIndices != listOf(targetTrack.trackIndex) || isAudioDisabled) {
+					builder.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+					builder.addOverride(TrackSelectionOverride(group, targetTrack.trackIndex))
+					builder.setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+					changed = true
+				}
 			}
 		}
 
@@ -818,16 +827,25 @@ class ExoPlayerBackend(
 			val targetTrack = allVideoTracks.firstOrNull { it.mediaStreamIndex == prefVideo }
 			val group = targetTrack?.group as? TrackGroup
 			if (group != null) {
-				builder.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
-				builder.addOverride(TrackSelectionOverride(group, targetTrack.trackIndex))
-				builder.setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
-				changed = true
+				val currentOverride = exoPlayer.trackSelectionParameters.overrides[group]
+				val isVideoDisabled = exoPlayer.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO)
+				if (currentOverride == null || currentOverride.trackIndices != listOf(targetTrack.trackIndex) || isVideoDisabled) {
+					builder.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+					builder.addOverride(TrackSelectionOverride(group, targetTrack.trackIndex))
+					builder.setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, false)
+					changed = true
+				}
 			}
 		}
 
 		if (changed) {
 			val newParams = builder.build()
-			if (exoPlayer.trackSelectionParameters != newParams) {
+			if (exoPlayer.playbackState != Player.STATE_IDLE &&
+				exoPlayer.playbackState != Player.STATE_ENDED &&
+				!exoPlayer.currentTimeline.isEmpty &&
+				exoPlayer.currentMediaItem != null &&
+				!exoPlayer.currentTracks.groups.isEmpty() &&
+				exoPlayer.trackSelectionParameters != newParams) {
 				exoPlayer.trackSelectionParameters = newParams
 			}
 		}
@@ -870,7 +888,12 @@ class ExoPlayerBackend(
 			}
 		}
 		val newParams = builder.build()
-		if (currentParams != newParams) {
+		if (exoPlayer.playbackState != Player.STATE_IDLE &&
+			exoPlayer.playbackState != Player.STATE_ENDED &&
+			!exoPlayer.currentTimeline.isEmpty &&
+			exoPlayer.currentMediaItem != null &&
+			!exoPlayer.currentTracks.groups.isEmpty() &&
+			currentParams != newParams) {
 			exoPlayer.trackSelectionParameters = newParams
 		}
 		listener?.onTracksChanged()

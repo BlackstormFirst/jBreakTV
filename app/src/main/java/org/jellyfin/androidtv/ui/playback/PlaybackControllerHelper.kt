@@ -3,6 +3,7 @@ package org.jellyfin.androidtv.ui.playback
 import androidx.annotation.OptIn
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.Dispatchers
@@ -88,8 +89,14 @@ fun PlaybackController.getLiveTvChannel(
 fun PlaybackController.disableDefaultSubtitles() {
 	Timber.i("Disabling non-baked subtitles")
 
-	with(mVideoManager.mExoPlayer.trackSelector!!) {
-		parameters = parameters.buildUpon()
+	val exoPlayer = mVideoManager?.mExoPlayer
+	val selector = exoPlayer?.trackSelector
+	if (exoPlayer != null && selector != null &&
+		exoPlayer.playbackState != Player.STATE_IDLE &&
+		exoPlayer.playbackState != Player.STATE_ENDED &&
+		!exoPlayer.currentTimeline.isEmpty
+	) {
+		selector.parameters = selector.parameters.buildUpon()
 			.clearOverridesOfType(C.TRACK_TYPE_TEXT)
 			.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
 			.build()
@@ -204,8 +211,14 @@ fun PlaybackController.setSubtitleIndex(index: Int, force: Boolean = false) {
 
 				Timber.i("Enabling subtitle group $index via method ${stream.deliveryMethod}")
 				mCurrentOptions.subtitleStreamIndex = index
-				with(mVideoManager.mExoPlayer.trackSelector!!) {
-					parameters = parameters.buildUpon()
+				val exoPlayer = mVideoManager?.mExoPlayer
+				val selector = exoPlayer?.trackSelector
+				if (exoPlayer != null && selector != null &&
+					exoPlayer.playbackState != Player.STATE_IDLE &&
+					exoPlayer.playbackState != Player.STATE_ENDED &&
+					!exoPlayer.currentTimeline.isEmpty
+				) {
+					selector.parameters = selector.parameters.buildUpon()
 						.clearOverridesOfType(C.TRACK_TYPE_TEXT)
 						.addOverride(TrackSelectionOverride(group, 0))
 						.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
