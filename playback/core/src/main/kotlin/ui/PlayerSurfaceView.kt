@@ -16,7 +16,13 @@ class PlayerSurfaceView @JvmOverloads constructor(
 	defStyleAttr: Int = 0,
 	defStyleRes: Int = 0,
 ) : FrameLayout(context, attrs, defStyleAttr, defStyleRes) {
-	lateinit var playbackManager: PlaybackManager
+	var playbackManager: PlaybackManager? = null
+		set(value) {
+			field = value
+			if (value != null && isAttachedToWindow && !isInEditMode) {
+				value.backendService.attachSurfaceView(this)
+			}
+		}
 
 	val surface = SurfaceView(context, attrs).apply {
 		addView(this, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -26,7 +32,7 @@ class PlayerSurfaceView @JvmOverloads constructor(
 		super.onAttachedToWindow()
 
 		if (!isInEditMode) {
-			playbackManager.backendService.attachSurfaceView(this)
+			playbackManager?.backendService?.attachSurfaceView(this)
 		}
 	}
 }

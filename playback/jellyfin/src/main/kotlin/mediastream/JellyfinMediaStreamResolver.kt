@@ -277,9 +277,12 @@ class JellyfinMediaStreamResolver(
 			val updatedSources = if (existingSources.none { it.id == mediaSource.id }) {
 				listOf(mediaSource) + existingSources
 			} else existingSources
+			val updatedMediaStreams = currentBaseItem.mediaStreams?.takeIf { it.isNotEmpty() }
+				?: mediaSource.mediaStreams
 			val clearedUserData = currentBaseItem.userData?.copy(playbackPositionTicks = 0L)
 			queueEntry.baseItem = currentBaseItem.copy(
 				mediaSources = updatedSources,
+				mediaStreams = updatedMediaStreams,
 				userData = clearedUserData
 			)
 		}

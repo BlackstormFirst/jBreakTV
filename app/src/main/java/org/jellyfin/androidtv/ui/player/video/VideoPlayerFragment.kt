@@ -34,6 +34,7 @@ import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.VideoSize
 import org.jellyfin.playback.core.queue.preferredVideoIndex
 import org.jellyfin.playback.core.queue.queue
+import org.jellyfin.playback.core.ui.PlayerSurfaceView
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -405,6 +406,11 @@ class VideoPlayerFragment : Fragment() {
 					handlePlayerError(error)
 				}
 			}
+
+			override fun onSurfaceAttached(surfaceView: PlayerSurfaceView) {
+				val videoSize = playbackManager.state.videoSize.value
+				applyRefreshRate(videoSize)
+			}
 		}.also { listener ->
 			playbackManager.addListener(listener)
 		}
@@ -469,24 +475,51 @@ class VideoPlayerFragment : Fragment() {
 	private fun applyRefreshRate(videoSize: VideoSize) {
 		val entry = playbackManager.queue.entry.value
 		val baseItem = entry?.baseItem
-		val mediaStreamFrameRate = baseItem?.mediaStreams
-			?.firstOrNull { it.type == MediaStreamType.VIDEO }
-			?.realFrameRate
+		val mediaStreams = baseItem?.mediaStreams?.takeIf { it.isNotEmpty() }
+			?: baseItem?.mediaSources?.firstOrNull()?.mediaStreams
+		val preferredIndex = entry?.preferredVideoIndex
+		val videoStream = if (preferredIndex != null) {
+			mediaStreams?.firstOrNull { it.index == preferredIndex }
+		} else {
+			mediaStreams?.firstOrNull { it.type == MediaStreamType.VIDEO }
+		}
+
+		val mediaStreamFrameRate = videoStream?.realFrameRate?.takeIf { it > 0f }
+			?: videoStream?.averageFrameRate?.takeIf { it > 0f }
 
 		val frameRate = when {
 			videoSize.frameRate > 0f -> videoSize.frameRate
-			mediaStreamFrameRate != null && mediaStreamFrameRate > 0f -> mediaStreamFrameRate
-			else -> return
+			mediaStreamFrameRate != null -> mediaStreamFrameRate
+			else -> null
 		}
+
+		if (frameRate == null || frameRate <= 0f) {
+			Timber.d("No valid frame rate found to apply refresh rate switching (videoSize=${videoSize.frameRate}, mediaStream=$mediaStreamFrameRate)")
+			return
+		}
+
+		val videoWidth = if (videoSize.width > 0) videoSize.width else (videoStream?.width ?: 0)
+		val videoHeight = if (videoSize.height > 0) videoSize.height else (videoStream?.height ?: 0)
 
 		val surfaceView = playbackManager.backendService.surfaceView?.surface
 
-		refreshRateHelper?.updateRefreshRate(
+		val changed = refreshRateHelper?.updateRefreshRate(
 			frameRate = frameRate,
-			videoWidth = videoSize.width,
-			videoHeight = videoSize.height,
+			videoWidth = videoWidth,
+			videoHeight = videoHeight,
 			surfaceView = surfaceView,
-		)
+		) == true
+
+		if (changed) {
+			lifecycleScope.launch {
+				// Pause briefly to allow display refresh rate switch / HDMI handshake to complete smoothly
+				playbackManager.state.pause()
+				kotlinx.coroutines.delay(1200L)
+				if (isAdded && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+					playbackManager.state.unpause()
+				}
+			}
+		}
 	}
 
 	override fun onCreateView(
@@ -500,9 +533,9 @@ class VideoPlayerFragment : Fragment() {
 	}
 
 	override fun onDestroyView() {
-		playbackManager.state.stop()
 		val surfaceView = playbackManager.backendService.surfaceView?.surface
 		refreshRateHelper?.resetRefreshRate(surfaceView)
+		playbackManager.state.stop()
 		super.onDestroyView()
 	}
 
@@ -524,8 +557,6 @@ class VideoPlayerFragment : Fragment() {
 
 	override fun onStop() {
 		playbackManager.state.stop()
-		val surfaceView = playbackManager.backendService.surfaceView?.surface
-		refreshRateHelper?.resetRefreshRate(surfaceView)
 		super.onStop()
 	}
 

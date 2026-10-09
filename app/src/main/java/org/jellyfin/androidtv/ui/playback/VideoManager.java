@@ -153,28 +153,10 @@ public class VideoManager {
             assHandler.init(mExoPlayer);
             if (libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
                 mVideoFrameMetadataListener = (presentationTimeUs, releaseTimeNs, format, mediaFormat) -> {
-                    if (mAssHandler == null || mExoPlayer == null) return;
+                    if (mAssHandler == null) return;
                     Function1<Long, Unit> callback = assHandler.getVideoTimeCallback();
                     if (callback != null) {
-                        long delayMs = 0;
-                        if (releaseTimeNs != C.TIME_UNSET) {
-                            long nowNs = System.nanoTime();
-                            if (releaseTimeNs > nowNs) {
-                                delayMs = (releaseTimeNs - nowNs) / 1_000_000L;
-                            }
-                        }
-                        if (delayMs > 0 && delayMs < 200) {
-                            mHandler.postDelayed(() -> {
-                                if (mAssHandler == null || mExoPlayer == null) return;
-                                if (mExoPlayer.getPlaybackState() == Player.STATE_BUFFERING) return;
-                                Function1<Long, Unit> cb = assHandler.getVideoTimeCallback();
-                                if (cb != null) {
-                                    cb.invoke(presentationTimeUs);
-                                }
-                            }, delayMs);
-                        } else {
-                            callback.invoke(presentationTimeUs);
-                        }
+                        callback.invoke(presentationTimeUs);
                     }
                 };
                 mExoPlayer.setVideoFrameMetadataListener(mVideoFrameMetadataListener);

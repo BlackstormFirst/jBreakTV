@@ -2,6 +2,7 @@ package org.jellyfin.playback.core.backend
 
 import org.jellyfin.playback.core.mediastream.PlayableMediaStream
 import org.jellyfin.playback.core.model.PlayState
+import org.jellyfin.playback.core.ui.PlayerSurfaceView
 
 abstract class PlayerBackendEventListener {
 	open fun onPlayStateChange(state: PlayState) = Unit
@@ -10,4 +11,5 @@ abstract class PlayerBackendEventListener {
 	open fun onMediaStreamEnd(mediaStream: PlayableMediaStream) = Unit
 	open fun onTracksChanged() = Unit
 	open fun onError(error: Throwable) = Unit
+	open fun onSurfaceAttached(surfaceView: PlayerSurfaceView) = Unit
 }

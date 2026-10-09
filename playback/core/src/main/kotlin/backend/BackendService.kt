@@ -62,6 +62,10 @@ class BackendService {
 				}
 			}
 		}
+
+		listeners.forEach { listener ->
+			listener.onSurfaceAttached(surfaceView)
+		}
 	}
 
 	fun attachSubtitleView(subtitleView: PlayerSubtitleView) {
@@ -119,6 +123,10 @@ class BackendService {
 
 		override fun onError(error: Throwable) {
 			callListeners { onError(error) }
+		}
+
+		override fun onSurfaceAttached(surfaceView: PlayerSurfaceView) {
+			callListeners { onSurfaceAttached(surfaceView) }
 		}
 	}
 }

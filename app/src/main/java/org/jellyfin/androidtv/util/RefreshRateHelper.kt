@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Build
 import android.view.Display
 import android.view.Surface
+import android.view.SurfaceHolder
 import android.view.SurfaceView
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.constant.RefreshRateSwitchingBehavior
@@ -39,19 +40,16 @@ class RefreshRateHelper(
 			try {
 				val surface = surfaceView.holder.surface
 				if (surface != null && surface.isValid) {
-					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-						surface.setFrameRate(
-							frameRate,
-							Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
-							Surface.CHANGE_FRAME_RATE_ALWAYS
-						)
-					} else {
-						surface.setFrameRate(
-							frameRate,
-							Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
-						)
-					}
-					Timber.i("Set surface frame rate to $frameRate")
+					setSurfaceFrameRate(surface, frameRate)
+				} else {
+					surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
+						override fun surfaceCreated(holder: SurfaceHolder) {
+							holder.removeCallback(this)
+							setSurfaceFrameRate(holder.surface, frameRate)
+						}
+						override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+						override fun surfaceDestroyed(holder: SurfaceHolder) {}
+					})
 				}
 			} catch (e: Exception) {
 				Timber.w(e, "Failed to set frame rate directly on Surface")
@@ -78,12 +76,16 @@ class RefreshRateHelper(
 		)
 
 		if (bestMode != null && currentMode.modeId != bestMode.modeId) {
+			val params = window.attributes
+			if (params.preferredDisplayModeId == bestMode.modeId) {
+				Timber.d("Display mode change to %s (%fHz) already pending", bestMode.modeId, bestMode.refreshRate)
+				return false
+			}
 			Timber.i(
 				"Changing display mode from %s (%dx%d@%fHz) to %s (%dx%d@%fHz)",
 				currentMode.modeId, currentMode.physicalWidth, currentMode.physicalHeight, currentMode.refreshRate,
 				bestMode.modeId, bestMode.physicalWidth, bestMode.physicalHeight, bestMode.refreshRate
 			)
-			val params = window.attributes
 			params.preferredDisplayModeId = bestMode.modeId
 			window.attributes = params
 			return true
@@ -117,6 +119,28 @@ class RefreshRateHelper(
 			}
 		} catch (e: Exception) {
 			Timber.w(e, "Error resetting refresh rate")
+		}
+	}
+
+	private fun setSurfaceFrameRate(surface: Surface?, frameRate: Float) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && surface != null && surface.isValid) {
+			try {
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+					surface.setFrameRate(
+						frameRate,
+						Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
+						Surface.CHANGE_FRAME_RATE_ALWAYS
+					)
+				} else {
+					surface.setFrameRate(
+						frameRate,
+						Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
+					)
+				}
+				Timber.i("Set surface frame rate to $frameRate")
+			} catch (e: Exception) {
+				Timber.w(e, "Failed to set frame rate directly on Surface")
+			}
 		}
 	}
 
@@ -170,7 +194,7 @@ class RefreshRateHelper(
 		val multipliers = floatArrayOf(1f, 2f, 2.5f, 3f, 4f, 5f)
 		for (m in multipliers) {
 			val target = videoFrameRate * m
-			if (abs(modeRefreshRate - target) < 0.08f) {
+			if (abs(modeRefreshRate - target) < 0.15f) {
 				return true
 			}
 		}
@@ -179,6 +203,7 @@ class RefreshRateHelper(
 		val isCloseTo24Group = (videoFrameRate in 23.9f..24.1f) && (modeRefreshRate in 23.9f..24.1f)
 		val isCloseTo30Group = (videoFrameRate in 29.9f..30.1f) && (modeRefreshRate in 29.9f..30.1f)
 		val isCloseTo60Group = (videoFrameRate in 59.9f..60.1f) && (modeRefreshRate in 59.9f..60.1f)
-		return isCloseTo24Group || isCloseTo30Group || isCloseTo60Group
+		val isCloseTo120Group = (videoFrameRate in 23.9f..24.1f || videoFrameRate in 29.9f..30.1f || videoFrameRate in 59.9f..60.1f || videoFrameRate in 119.9f..120.1f) && (modeRefreshRate in 119.9f..120.1f)
+		return isCloseTo24Group || isCloseTo30Group || isCloseTo60Group || isCloseTo120Group
 	}
 }

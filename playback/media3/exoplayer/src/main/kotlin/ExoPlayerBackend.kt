@@ -4,7 +4,6 @@ import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
 import org.jellyfin.playback.media3.exoplayer.mapping.getFfmpegSubtitleMimeType
@@ -206,27 +205,8 @@ class ExoPlayerBackend(
 				if (exoPlayerOptions.enableLibass) {
 					assHandler.init(player)
 					if (exoPlayerOptions.libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
-						val mainHandler = Handler(Looper.getMainLooper())
-						val metadataListener = VideoFrameMetadataListener { presentationTimeUs, releaseTimeNs, _, _ ->
-							val callback = assHandler.videoTimeCallback
-							if (callback != null) {
-								var delayMs = 0L
-								if (releaseTimeNs != C.TIME_UNSET) {
-									val nowNs = System.nanoTime()
-									if (releaseTimeNs > nowNs) {
-										delayMs = (releaseTimeNs - nowNs) / 1_000_000L
-									}
-								}
-								if (delayMs in 1..200) {
-									mainHandler.postDelayed({
-										if (player.playbackState != Player.STATE_BUFFERING) {
-											assHandler.videoTimeCallback?.invoke(presentationTimeUs)
-										}
-									}, delayMs)
-								} else {
-									callback.invoke(presentationTimeUs)
-								}
-							}
+						val metadataListener = VideoFrameMetadataListener { presentationTimeUs, _, _, _ ->
+							assHandler.videoTimeCallback?.invoke(presentationTimeUs)
 						}
 						videoFrameMetadataListener = metadataListener
 						player.setVideoFrameMetadataListener(metadataListener)

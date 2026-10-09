@@ -17,6 +17,7 @@ fun PlayerSurface(
 	AndroidView(
 		factory = { context ->
 			PlayerSurfaceView(context).apply {
+				this.playbackManager = playbackManager
 				isFocusable = false
 				isClickable = false
 				importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
