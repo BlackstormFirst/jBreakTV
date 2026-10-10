@@ -4,12 +4,14 @@ import android.content.Context
 import androidx.lifecycle.ProcessLifecycleOwner
 import coil3.ImageLoader
 import coil3.annotation.ExperimentalCoilApi
+import coil3.decode.BitmapFactoryDecoder
 import coil3.disk.DiskCache
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
 import coil3.memory.MemoryCache
 import coil3.network.NetworkFetcher
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.request.ErrorResult
 import coil3.serviceLoaderEnabled
 import coil3.svg.SvgDecoder
 import coil3.util.Logger
@@ -57,7 +59,6 @@ import org.jellyfin.androidtv.ui.settings.screen.library.SettingsLibrariesScreen
 import org.jellyfin.androidtv.ui.startup.ServerAddViewModel
 import org.jellyfin.androidtv.ui.startup.StartupViewModel
 import org.jellyfin.androidtv.ui.startup.UserLoginViewModel
-import kotlinx.coroutines.Dispatchers
 import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.KeyProcessor
 import org.jellyfin.androidtv.util.MarkdownRenderer
@@ -131,14 +132,13 @@ val appModule = module {
 		val diskMaxCacheSize = userPreferences[UserPreferences.diskMaxCacheSize]
 		val memoryMaxCachePercent = userPreferences[UserPreferences.memoryMaxCachePercent]
 		val context = androidContext()
+		val diskCacheInstance = DiskCache.Builder()
+			.directory(context.cacheDir.resolve("image_cache").toOkioPath())
+			.maxSizeBytes(diskMaxCacheSize * 1024 * 1024)
+			.build()
+
 		ImageLoader.Builder(context).apply {
-			coroutineContext(Dispatchers.IO.limitedParallelism(3))
-			diskCache {
-				DiskCache.Builder()
-					.directory(context.cacheDir.resolve("image_cache").toOkioPath())
-					.maxSizeBytes(diskMaxCacheSize * 1024 * 1024)
-					.build()
-			}
+			diskCache(diskCacheInstance)
 			memoryCache {
 				MemoryCache.Builder()
 					.maxSizePercent(context, (memoryMaxCachePercent / 100.0))
@@ -154,6 +154,24 @@ val appModule = module {
 				if (AndroidVersion.isAtLeastP) add(AnimatedImageDecoder.Factory())
 				else add(GifDecoder.Factory())
 				add(SvgDecoder.Factory())
+				add(BitmapFactoryDecoder.Factory())
+
+				add { chain ->
+					val result = chain.proceed()
+					if (result is ErrorResult) {
+						val throwable = result.throwable
+						val isImageDecoderException = (AndroidVersion.isAtLeastP && throwable is android.graphics.ImageDecoder.DecodeException)
+						val isOtherDecodeException = throwable is java.io.IOException ||
+							throwable is IllegalArgumentException ||
+							throwable is NullPointerException ||
+							throwable.javaClass.name.contains("DecodeException")
+						if (isImageDecoderException || isOtherDecodeException) {
+							val cacheKey = chain.request.diskCacheKey ?: chain.request.data.toString()
+							diskCacheInstance.remove(cacheKey)
+						}
+					}
+					result
+				}
 			}
 		}.build()
 	}

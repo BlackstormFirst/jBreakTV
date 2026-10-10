@@ -12,9 +12,7 @@ import androidx.core.view.doOnAttach
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import coil3.ImageLoader
-import coil3.asDrawable
 import coil3.asImage
-import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.target
@@ -23,14 +21,13 @@ import coil3.transform.CircleCropTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.util.BlurHashDecoder
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.math.round
 import kotlin.time.Duration.Companion.milliseconds
-
-private val imageDispatcher = Dispatchers.IO.limitedParallelism(2)
 
 /**
  * An extension to the [ImageView] that makes it easy to load images from the network.
@@ -47,11 +44,11 @@ class AsyncImageView @JvmOverloads constructor(
 	private var loadJob: Job? = null
 
 	/**
-	 * The duration of the crossfade when changing switching the images of the url, blurhash and
+	 * The duration of the crossfade when switching the images of the url, blurhash and
 	 * placeholder.
 	 */
 	@Suppress("MagicNumber")
-	var crossFadeDuration = 100.milliseconds
+	var crossFadeDuration = 0.milliseconds
 
 	/**
 	 * Shape the image to a circle and remove all corners.
@@ -62,7 +59,7 @@ class AsyncImageView @JvmOverloads constructor(
 		if (attrs != null) {
 			val styledAttributes = context.obtainStyledAttributes(attrs, R.styleable.AsyncImageView, defStyleAttr, 0)
 			try {
-				crossFadeDuration = styledAttributes.getInt(R.styleable.AsyncImageView_crossfadeDuration, 100).milliseconds
+				crossFadeDuration = styledAttributes.getInt(R.styleable.AsyncImageView_crossfadeDuration, 0).milliseconds
 				circleCrop = styledAttributes.getBoolean(R.styleable.AsyncImageView_circleCrop, false)
 			} finally {
 				styledAttributes.recycle()
@@ -82,57 +79,51 @@ class AsyncImageView @JvmOverloads constructor(
 		aspectRatio: Double = 1.0,
 		blurHashResolution: Int = 16,
 	) = doOnAttach {
-		// 1. Quick memory cache check to avoid BlurHash decoding and flickering
-		if (url != null) {
-			val cacheKey = MemoryCache.Key(url)
-			val cachedImage = imageLoader.memoryCache?.get(cacheKey)?.image
-			if (cachedImage != null) {
-				loadJob?.cancel()
-				this.setImageDrawable(cachedImage.asDrawable(resources))
-				return@doOnAttach
-			}
-		}
-
-		// Cancel the previous load if still running
 		loadJob?.cancel()
 
-		loadJob = lifeCycleOwner?.lifecycleScope?.launch(imageDispatcher) {
-			var placeholderOrBlurHash = placeholder
+		if (url == null) {
+			val request = ImageRequest.Builder(context).apply {
+				target(this@AsyncImageView)
+				data(placeholder)
+				if (circleCrop) transformations(CircleCropTransformation())
+			}.build()
+			imageLoader.enqueue(request)
+			return@doOnAttach
+		}
 
-			// Only show blurhash if an image is going to be loaded from the network
+		loadJob = lifeCycleOwner?.lifecycleScope?.launch(Dispatchers.Main.immediate) {
 			val isLowRamDevice = context.getSystemService<ActivityManager>()?.isLowRamDevice == true
-			if (url != null && blurHash != null && !isLowRamDevice && aspectRatio > 0) {
-				val blurHashBitmap = BlurHashDecoder.decode(
-					blurHash,
-					if (aspectRatio > 1) round(blurHashResolution * aspectRatio).toInt() else blurHashResolution,
-					if (aspectRatio >= 1) blurHashResolution else round(blurHashResolution / aspectRatio).toInt(),
-				)
-				if (blurHashBitmap != null) placeholderOrBlurHash = blurHashBitmap.toDrawable(resources)
+			var initialPlaceholder = placeholder
+
+			// Decode BlurHash asynchronously on IO dispatcher if available
+			if (blurHash != null && !isLowRamDevice && aspectRatio > 0) {
+				val blurHashDrawable = withContext(Dispatchers.IO) {
+					BlurHashDecoder.decode(
+						blurHash,
+						if (aspectRatio > 1) round(blurHashResolution * aspectRatio).toInt() else blurHashResolution,
+						if (aspectRatio >= 1) blurHashResolution else round(blurHashResolution / aspectRatio).toInt(),
+						context = context,
+					)?.toDrawable(resources)
+				}
+				if (blurHashDrawable != null) {
+					initialPlaceholder = blurHashDrawable
+				}
 			}
 
-			// Start loading image or placeholder
-			val request = if (url == null) {
-				ImageRequest.Builder(context).apply {
-					target(this@AsyncImageView)
-					data(placeholder)
-					if (circleCrop) transformations(CircleCropTransformation())
-				}.build()
-			} else {
-				ImageRequest.Builder(context).apply {
-					val crossFadeDurationMs = crossFadeDuration.inWholeMilliseconds.toInt()
-					if (crossFadeDurationMs > 0) crossfade(crossFadeDurationMs)
-					else crossfade(false)
+			val request = ImageRequest.Builder(context).apply {
+				val crossFadeDurationMs = crossFadeDuration.inWholeMilliseconds.toInt()
+				if (crossFadeDurationMs > 0) crossfade(crossFadeDurationMs)
+				else crossfade(false)
 
-					target(this@AsyncImageView)
-					data(url)
-					memoryCacheKey(url)
-					placeholder(placeholderOrBlurHash?.asImage())
-					if (circleCrop) transformations(CircleCropTransformation())
-					error(placeholder?.asImage())
-				}.build()
-			}
+				target(this@AsyncImageView)
+				data(url)
+				memoryCacheKey(url)
+				if (initialPlaceholder != null) placeholder(initialPlaceholder.asImage())
+				if (placeholder != null) error(placeholder.asImage())
+				if (circleCrop) transformations(CircleCropTransformation())
+			}.build()
 
-			imageLoader.enqueue(request).job.await()
+			imageLoader.enqueue(request)
 		}
 	}
 }

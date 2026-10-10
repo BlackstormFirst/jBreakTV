@@ -1,12 +1,23 @@
 package org.jellyfin.androidtv.util
 
+import android.app.ActivityManager
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.os.Build
 import android.util.LruCache
+import androidx.core.content.getSystemService
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.withSign
+
+private data class BlurHashKey(
+	val blurHash: String,
+	val width: Int,
+	val height: Int,
+	val punch: Float,
+)
 
 @Suppress("MagicNumber", "NestedBlockDepth")
 object BlurHashDecoder {
@@ -17,16 +28,32 @@ object BlurHashDecoder {
 			if (c in indices) this[c] = i
 		}
 	}
-	private val cache = LruCache<String, Bitmap>(80)
+
+	@Volatile
+	private var isSizeInitialized = false
+	private val cache = LruCache<BlurHashKey, Bitmap>(
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) 256 else 128
+	)
+
+	private fun initCacheSizeIfNeeded(context: Context?) {
+		if (isSizeInitialized || context == null) return
+		isSizeInitialized = true
+		val isLowRam = context.getSystemService<ActivityManager>()?.isLowRamDevice == true
+		if (isLowRam) {
+			cache.resize(80)
+		}
+	}
 
 	/**
 	 * Decode a blur hash into a new bitmap.
 	 */
-	fun decode(blurHash: String?, width: Int, height: Int, punch: Float = 1f): Bitmap? {
+	fun decode(blurHash: String?, width: Int, height: Int, punch: Float = 1f, context: Context? = null): Bitmap? {
 		if (blurHash == null || blurHash.length < 6 || width <= 0 || height <= 0) return null
 
-		val cacheKey = "$blurHash-$width-$height-$punch"
-		val cached = cache[cacheKey]
+		initCacheSizeIfNeeded(context)
+
+		val key = BlurHashKey(blurHash, width, height, punch)
+		val cached = cache[key]
 		if (cached != null && !cached.isRecycled) return cached
 
 		val numCompEnc = decode83(blurHash, 0, 1)
@@ -48,7 +75,7 @@ object BlurHashDecoder {
 		}
 
 		val bitmap = composeBitmap(width, height, numCompX, numCompY, colors)
-		cache.put(cacheKey, bitmap)
+		cache.put(key, bitmap)
 		return bitmap
 	}
 

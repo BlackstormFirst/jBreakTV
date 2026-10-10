@@ -52,7 +52,6 @@ import org.jellyfin.androidtv.util.getActivity
 import org.jellyfin.design.Tokens
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
-import org.koin.compose.koinInject
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import androidx.compose.foundation.shape.CircleShape
@@ -61,13 +60,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
 class CardPresenter(
 	val showInfo: Boolean,
 	val imageType: ImageType,
 	val staticHeight: Int,
 	val uniformAspect: Boolean,
-) : Presenter() {
+) : Presenter(), KoinComponent {
+	private val userPreferences by inject<UserPreferences>()
+	private val api by inject<ApiClient>()
+
 	constructor(showInfo: Boolean, imageType: ImageType, staticHeight: Int) : this(showInfo, imageType, staticHeight, false)
 	constructor(showInfo: Boolean, staticHeight: Int) : this(showInfo, ImageType.POSTER, staticHeight)
 	constructor(showInfo: Boolean) : this(showInfo, 150)
@@ -118,6 +122,8 @@ class CardPresenter(
 					imageType = imageType,
 					staticHeight = staticHeight,
 					uniformAspect = uniformAspect,
+					userPreferences = userPreferences,
+					api = api,
 				)
 			}
 
@@ -297,11 +303,11 @@ private fun CardViewHolderContent(
 	imageType: ImageType,
 	staticHeight: Int,
 	uniformAspect: Boolean,
+	userPreferences: UserPreferences,
+	api: ApiClient,
 ) {
 	val context = LocalContext.current
 	val localDensity = LocalDensity.current
-	val userPreferences = koinInject<UserPreferences>()
-	val api = koinInject<ApiClient>()
 	val displayCirclePersonCards by rememberPreference(userPreferences, UserPreferences.displayCirclePersonCards)
 
 	val title = remember(item, context) { item?.getCardName(context) }
@@ -327,17 +333,21 @@ private fun CardViewHolderContent(
 
 	val isCircular = isPersonItem && displayCirclePersonCards
 
+	val imageUrl = remember(image, api, size, localDensity) {
+		image?.getUrl(
+			api,
+			maxWidth = with(localDensity) { size.width.roundToPx() },
+			maxHeight = with(localDensity) { size.height.roundToPx() },
+		)
+	}
+
 	val card = @Composable {
 		ItemCard(
 			image = {
-				if (image != null) {
+				if (imageUrl != null) {
 					AsyncImage(
-						url = image.getUrl(
-							api,
-							maxWidth = with(localDensity) { size.width.roundToPx() },
-							maxHeight = with(localDensity) { size.height.roundToPx() },
-						),
-						blurHash = image.blurHash,
+						url = imageUrl,
+						blurHash = image?.blurHash,
 						aspectRatio = aspectRatio,
 						scaleType = displayConfig.scaleType ?: ImageView.ScaleType.CENTER_CROP,
 						modifier = Modifier
