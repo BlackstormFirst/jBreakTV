@@ -51,8 +51,45 @@ import org.jellyfin.sdk.model.api.request.GetSeasonsRequest
 import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
 import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
 import org.jellyfin.androidtv.util.sdk.isRealAvailableMedia
+import coil3.ImageLoader
+import coil3.request.ImageRequest
+import org.jellyfin.androidtv.util.apiclient.getUrl
 import timber.log.Timber
 import kotlin.math.min
+
+fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 10) {
+	val api = runCatching { get<ApiClient>(ApiClient::class.java) }.getOrNull() ?: return
+	val imageLoader = runCatching { get<ImageLoader>(ImageLoader::class.java) }.getOrNull() ?: return
+	val density = context.resources.displayMetrics.density
+
+	ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
+		val baseItems = items.filterIsInstance<BaseRowItem>().take(maxCount)
+		for (item in baseItems) {
+			val image = item.getImage(org.jellyfin.androidtv.constant.ImageType.POSTER)
+				?: item.getImage(org.jellyfin.androidtv.constant.ImageType.THUMB)
+				?: item.getImage(org.jellyfin.androidtv.constant.ImageType.BANNER)
+				?: continue
+
+			val aspectRatio = (item.baseItem?.primaryImageAspectRatio?.toFloat() ?: 0.667f).coerceAtLeast(0.1f)
+			val heightDp = 150f
+			val widthDp = heightDp * aspectRatio
+			val maxWidthPx = (widthDp * density).toInt().coerceAtLeast(1)
+			val maxHeightPx = (heightDp * density).toInt().coerceAtLeast(1)
+
+			val url = image.getUrl(
+				api = api,
+				maxWidth = maxWidthPx,
+				maxHeight = maxHeightPx,
+			)
+
+			val request = ImageRequest.Builder(context)
+				.data(url)
+				.memoryCacheKey(url)
+				.build()
+			imageLoader.enqueue(request)
+		}
+	}
+}
 
 fun <T : Any> ItemRowAdapter.setItems(
 	items: Collection<T>,
@@ -80,6 +117,7 @@ fun <T : Any> ItemRowAdapter.setItems(
 
 	replaceAll(allItems)
 	itemsLoaded = allItems.size
+	preloadRowImages(allItems)
 }
 
 fun ItemRowAdapter.retrieveResumeItems(api: ApiClient, query: GetResumeItemsRequest) {

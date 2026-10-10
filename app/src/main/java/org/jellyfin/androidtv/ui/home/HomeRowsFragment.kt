@@ -1,6 +1,7 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.os.Bundle
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Toast
@@ -16,6 +17,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -99,6 +101,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
 
+	private val sharedRecycledViewPool by lazy {
+		RecyclerView.RecycledViewPool().apply {
+			setMaxRecycledViews(0, 25)
+		}
+	}
+
 	@Suppress("UNCHECKED_CAST")
 	private val rowsAdapter: MutableObjectAdapter<Row>?
 		get() = adapter as? MutableObjectAdapter<Row>
@@ -106,7 +114,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
-		adapter = MutableObjectAdapter<Row>(PositionableListRowPresenter())
+		adapter = MutableObjectAdapter<Row>(PositionableListRowPresenter(sharedRecycledViewPool))
 
 		lifecycleScope.launch(Dispatchers.IO) {
 			val currentUser = withTimeout(30.seconds) {
@@ -211,6 +219,17 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		super.onViewCreated(view, savedInstanceState)
 		// Optimization for vertical scrolling: prevent rows from being unloaded immediately
 		verticalGridView?.setItemViewCacheSize(10)
+
+		// Pre-warm Compose card views into sharedRecycledViewPool during idle time
+		verticalGridView?.let { gridView ->
+			Looper.myQueue().addIdleHandler {
+				if (isAdded && !isDetached) {
+					val cardPresenter = CardPresenter()
+					cardPresenter.prewarm(gridView, sharedRecycledViewPool, count = 15)
+				}
+				false
+			}
+		}
 	}
 
 	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {

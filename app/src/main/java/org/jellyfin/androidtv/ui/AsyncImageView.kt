@@ -13,6 +13,7 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import coil3.ImageLoader
 import coil3.asImage
+import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.request.target
@@ -26,6 +27,7 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.util.BlurHashDecoder
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import kotlin.math.max
 import kotlin.math.round
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -95,13 +97,20 @@ class AsyncImageView @JvmOverloads constructor(
 			val isLowRamDevice = context.getSystemService<ActivityManager>()?.isLowRamDevice == true
 			var initialPlaceholder = placeholder
 
-			// Decode BlurHash asynchronously on IO dispatcher if available
-			if (blurHash != null && !isLowRamDevice && aspectRatio > 0) {
+			// Skip BlurHash decoding if image is already cached in memory
+			val isInMemoryCache = imageLoader.memoryCache?.get(MemoryCache.Key(url)) != null
+
+			// Decode BlurHash asynchronously on IO dispatcher if available and not cached in memory
+			if (blurHash != null && !isLowRamDevice && aspectRatio > 0 && !isInMemoryCache) {
+				val res = max(16, blurHashResolution)
+				val w = max(16, if (aspectRatio > 1) round(res * aspectRatio).toInt() else res)
+				val h = max(16, if (aspectRatio < 1) round(res / aspectRatio).toInt() else res)
+
 				val blurHashDrawable = withContext(Dispatchers.IO) {
 					BlurHashDecoder.decode(
-						blurHash,
-						if (aspectRatio > 1) round(blurHashResolution * aspectRatio).toInt() else blurHashResolution,
-						if (aspectRatio >= 1) blurHashResolution else round(blurHashResolution / aspectRatio).toInt(),
+						blurHash = blurHash,
+						width = w,
+						height = h,
 						context = context,
 					)?.toDrawable(resources)
 				}

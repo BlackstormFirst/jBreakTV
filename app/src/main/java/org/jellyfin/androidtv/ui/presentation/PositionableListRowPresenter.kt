@@ -1,6 +1,7 @@
 package org.jellyfin.androidtv.ui.presentation
 
 import androidx.leanback.widget.RowPresenter
+import androidx.recyclerview.widget.RecyclerView
 import timber.log.Timber
 
 class PositionableListRowPresenter : CustomListRowPresenter {
@@ -8,6 +9,8 @@ class PositionableListRowPresenter : CustomListRowPresenter {
 
 	constructor() : super()
 	constructor(padding: Int?) : super(padding)
+	constructor(padding: Int?, recycledViewPool: RecyclerView.RecycledViewPool?) : super(padding, recycledViewPool)
+	constructor(recycledViewPool: RecyclerView.RecycledViewPool?) : super(null, recycledViewPool)
 
 	init {
 		shadowEnabled = false

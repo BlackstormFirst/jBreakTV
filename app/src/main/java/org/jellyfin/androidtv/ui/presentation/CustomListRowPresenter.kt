@@ -5,9 +5,11 @@ import androidx.core.view.isVisible
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
 import androidx.leanback.widget.RowPresenter
+import androidx.recyclerview.widget.RecyclerView
 
 open class CustomListRowPresenter @JvmOverloads constructor(
-	private val topPadding: Int? = null
+	private val topPadding: Int? = null,
+	var sharedRecycledViewPool: RecyclerView.RecycledViewPool? = null,
 ) : ListRowPresenter() {
 	init {
 		headerPresenter = CustomRowHeaderPresenter()
@@ -19,6 +21,13 @@ open class CustomListRowPresenter @JvmOverloads constructor(
 
 	override fun onBindRowViewHolder(holder: RowPresenter.ViewHolder, item: Any) {
 		super.onBindRowViewHolder(holder, item)
+
+		if (holder is ViewHolder) {
+			if (sharedRecycledViewPool != null) {
+				holder.gridView.setRecycledViewPool(sharedRecycledViewPool)
+			}
+			holder.gridView.setItemViewCacheSize(10)
+		}
 
 		val view = holder.view?.parent as? View ?: return
 		if (topPadding != null) view.setPadding(view.paddingLeft, topPadding, view.paddingRight, view.paddingBottom)

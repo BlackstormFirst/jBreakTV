@@ -27,6 +27,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.leanback.widget.ArrayObjectAdapter
+import androidx.leanback.widget.ItemBridgeAdapter
 import androidx.leanback.widget.Presenter
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -60,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
+import androidx.recyclerview.widget.RecyclerView
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -76,6 +79,19 @@ class CardPresenter(
 	constructor(showInfo: Boolean, staticHeight: Int) : this(showInfo, ImageType.POSTER, staticHeight)
 	constructor(showInfo: Boolean) : this(showInfo, 150)
 	constructor() : this(true)
+
+	fun prewarm(parent: ViewGroup, pool: RecyclerView.RecycledViewPool, count: Int = 12, viewType: Int = 0) {
+		val adapter = ArrayObjectAdapter(this@CardPresenter).apply {
+			add("dummy")
+		}
+		val itemBridgeAdapter = ItemBridgeAdapter().apply {
+			setAdapter(adapter)
+		}
+		repeat(count) {
+			val rvh = itemBridgeAdapter.onCreateViewHolder(parent, viewType)
+			pool.putRecycledView(rvh)
+		}
+	}
 
 	override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
 		val view = ComposeView(parent.context).apply {
