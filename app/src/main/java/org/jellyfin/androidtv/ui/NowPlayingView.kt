@@ -52,6 +52,7 @@ import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.baseItemFlow
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.MediaType
 import org.koin.compose.koinInject
 
 @Composable
@@ -65,6 +66,7 @@ fun NowPlayingComposable(
 
 	val entry by rememberQueueEntry(playbackManager)
 	val item = entry?.run { baseItemFlow.collectAsState(baseItem) }?.value
+		?.takeIf { it.mediaType == MediaType.AUDIO }
 	val progress by rememberPlayerProgress(playbackManager)
 
 	LaunchedEffect(item == null) { onFocusableChange(item != null) }
