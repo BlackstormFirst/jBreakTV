@@ -341,6 +341,12 @@ class VideoPlayerFragment : Fragment() {
 							)
 						}
 
+						// Double check fragment is active and playing the same item before mutating track selections
+						if (!isAdded || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@launch
+						if (playbackManager.state.playState.value == PlayState.STOPPED) return@launch
+						val activeEntry = playbackManager.queue.entry.value ?: return@launch
+						if (activeEntry.baseItem?.id != baseItem.id) return@launch
+
 						// Apply track selection back on the main thread
 						if (trackSelection.videoIndex != null && trackSelection.targetVideoTrack != null) {
 							backend.selectTrack(2, trackSelection.targetVideoTrack)
@@ -532,13 +538,6 @@ class VideoPlayerFragment : Fragment() {
 		}
 	}
 
-	override fun onDestroyView() {
-		val surfaceView = playbackManager.backendService.surfaceView?.surface
-		refreshRateHelper?.resetRefreshRate(surfaceView)
-		playbackManager.state.stop()
-		super.onDestroyView()
-	}
-
 	override fun onPause() {
 		super.onPause()
 
@@ -555,11 +554,6 @@ class VideoPlayerFragment : Fragment() {
 		}
 	}
 
-	override fun onStop() {
-		playbackManager.state.stop()
-		super.onStop()
-	}
-
 	override fun onDestroy() {
 		super.onDestroy()
 
@@ -567,5 +561,11 @@ class VideoPlayerFragment : Fragment() {
 			playbackManager.removeListener(listener)
 		}
 		playerEventListener = null
+
+		if (isRemoving || requireActivity().isFinishing) {
+			val surfaceView = playbackManager.backendService.surfaceView?.surface
+			refreshRateHelper?.resetRefreshRate(surfaceView)
+			playbackManager.state.stop()
+		}
 	}
 }
