@@ -130,7 +130,7 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 						seriesId = query.seriesId!!,
 						seasonId = firstNextUp.seasonId,
 						startItemId = firstNextUp.id,
-						fields = ItemRepository.itemFields
+						fields = ItemRepository.browseFields,
 					).content
 				}
 
@@ -255,7 +255,7 @@ fun ItemRowAdapter.retrieveNextEpisodes(api: ApiClient, query: GetNextEpisodesRe
 					seriesId = query.seriesId,
 					seasonId = query.seasonId,
 					startItemId = query.startItemId,
-					fields = ItemRepository.itemFields
+					fields = ItemRepository.browseFields,
 				).content
 			}
 

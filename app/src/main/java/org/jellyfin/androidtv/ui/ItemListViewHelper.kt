@@ -17,7 +17,7 @@ fun ItemListView.refresh() {
 		val response = withContext(Dispatchers.IO) {
 			api.itemsApi.getItems(
 				ids = mItemIds,
-				fields = ItemRepository.itemFields
+				fields = ItemRepository.browseFields,
 			).content
 		}
 

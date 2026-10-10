@@ -35,7 +35,7 @@ class SearchRepositoryImpl(
 			limit = QUERY_LIMIT,
 			imageTypeLimit = 1,
 			includeItemTypes = itemTypes,
-			fields = ItemRepository.itemFields,
+			fields = ItemRepository.browseFields,
 			recursive = true,
 			enableTotalRecordCount = false,
 		)

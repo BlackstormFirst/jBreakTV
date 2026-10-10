@@ -23,15 +23,15 @@ object ItemRepository {
 		ItemFields.TRICKPLAY,
 	)
 
-	// Lighter field set for home screen rows - excludes heavy fields like
+	// Lighter field set for browsing rows & grids - excludes heavy fields like
 	// MediaSources, MediaStreams, Chapters, Trickplay that aren't needed for display.
-	// Overview and Genres are also excluded here to speed up home screen loading
-	// for large libraries, as they are not shown on home cards.
+	// Includes Overview for description text in Leanback headers/summaries.
 	// Full item data is fetched when user selects an item.
 	val browseFields = setOf(
 		ItemFields.CAN_DELETE,
 		ItemFields.CHILD_COUNT,
 		ItemFields.DATE_CREATED,
+		ItemFields.OVERVIEW,
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
 	)
 
@@ -46,20 +46,26 @@ object ItemRepository {
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
 	)
 
-	// Light field set for playback queues and playlists retrieval.
-	// Includes media source info and image aspect ratio required for queue playback,
-	// while excluding heavy fields like Chapters, Trickplay, Overview, Taglines, Genres, etc.
-	// to drastically speed up query response times and lower server load.
+	// Field set for playback queues and playlists retrieval.
+	// Includes media sources, streams, chapters, trickplay, overview, and path required for
+	// OSD interface displays, chapter selection, trickplay thumbnails, and playback track selection.
 	val playbackFields = setOf(
 		ItemFields.CAN_DELETE,
+		ItemFields.CHANNEL_INFO,
+		ItemFields.CHAPTERS,
 		ItemFields.MEDIA_SOURCES,
+		ItemFields.MEDIA_STREAMS,
+		ItemFields.OVERVIEW,
+		ItemFields.PATH,
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
+		ItemFields.TRICKPLAY,
 	)
 
-	// Even lighter field set for Next Up - excludes ChildCount as it's not needed for episodes.
+	// Field set for Next Up - includes Overview for episode description in headers.
 	val nextUpFields = setOf(
 		ItemFields.CAN_DELETE,
 		ItemFields.DATE_CREATED,
+		ItemFields.OVERVIEW,
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
 	)
 }

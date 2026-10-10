@@ -32,7 +32,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 		if (showSpecialViewTypes.contains(mFolder.type)) {
 			if (mFolder.type != BaseItemKind.CHANNEL_FOLDER_ITEM) {
 				val resume = GetItemsRequest(
-					fields = ItemRepository.itemFields,
+					fields = ItemRepository.browseFields,
 					parentId = mFolder.id,
 					limit = 50,
 					isMissing = false,
@@ -46,7 +46,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 			}
 
 			val latest = GetItemsRequest(
-				fields = ItemRepository.itemFields,
+				fields = ItemRepository.browseFields,
 				parentId = mFolder.id,
 				limit = 50,
 				isMissing = false,
@@ -60,7 +60,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 		}
 
 		val byName = GetItemsRequest(
-			fields = ItemRepository.itemFields,
+			fields = ItemRepository.browseFields,
 			parentId = mFolder.id,
 		)
 		val header = when (mFolder.type) {
@@ -77,7 +77,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 			val seriesId = mFolder.seriesId ?: mFolder.parentId
 			if (seriesId != null) {
 				val otherSeasons = GetItemsRequest(
-					fields = ItemRepository.itemFields,
+					fields = ItemRepository.browseFields,
 					parentId = seriesId,
 					includeItemTypes = setOf(BaseItemKind.SEASON),
 					excludeItemIds = setOf(mFolder.id),
@@ -85,7 +85,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 				mRows.add(BrowseRowDef(getString(R.string.lbl_seasons), otherSeasons, 100))
 
 				val series = GetItemsRequest(
-					fields = ItemRepository.itemFields,
+					fields = ItemRepository.browseFields,
 					ids = setOf(seriesId),
 				)
 				mRows.add(BrowseRowDef(getString(R.string.lbl_series), series, 100))
