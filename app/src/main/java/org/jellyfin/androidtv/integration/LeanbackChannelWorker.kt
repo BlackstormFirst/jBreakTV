@@ -47,13 +47,14 @@ import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.exception.TimeoutException
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.api.client.extensions.tvShowsApi
-import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.MediaType
+import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.extensions.ticks
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -111,14 +112,6 @@ class LeanbackChannelWorker(
 		// Retry later if no authenticated user is found
 		!api.isUsable -> Result.retry()
 		else -> try {
-			// Get next up episodes
-			val (resumeItems, nextUpItems) = getNextUpItems()
-			// Get latest media
-			val (latestEpisodes, latestMovies, latestMedia) = getLatestMedia()
-			val myMedia = getMyMedia()
-			// Delete current items from the channels
-			context.contentResolver.delete(TvContractCompat.PreviewPrograms.CONTENT_URI, null, null)
-
 			// Get channel URIs
 			val latestMediaChannel = getChannelUri(
 				"latest_media", Channel.Builder()
@@ -156,29 +149,66 @@ class LeanbackChannelWorker(
 					.setAppLinkIntent(Intent(context, StartupActivity::class.java))
 					.build()
 			)
+
+			val isLatestMediaBrowsable = isChannelBrowsable(latestMediaChannel)
+			val isMyMediaBrowsable = isChannelBrowsable(myMediaChannel)
+			val isNextUpBrowsable = isChannelBrowsable(nextUpChannel)
+			val isLatestMoviesBrowsable = isChannelBrowsable(latestMoviesChannel)
+			val isLatestEpisodesBrowsable = isChannelBrowsable(latestEpisodesChannel)
+
+			// Get next up episodes
+			val (resumeItems, nextUpItems) = getNextUpItems()
+
+			// Fetch user views once if any preview channel that needs libraries is browsable
+			val userViews = if (isLatestMediaBrowsable || isLatestMoviesBrowsable || isLatestEpisodesBrowsable || isMyMediaBrowsable) {
+				api.userViewsApi.getUserViews(includeHidden = false).content.items
+			} else {
+				emptyList()
+			}
+
+			// Get latest media and my media (only queries server for channels enabled/browsable by user)
+			val (latestEpisodes, latestMovies, latestMedia) = getLatestMedia(
+				userViews = userViews,
+				isLatestEpisodesBrowsable = isLatestEpisodesBrowsable,
+				isLatestMoviesBrowsable = isLatestMoviesBrowsable,
+				isLatestMediaBrowsable = isLatestMediaBrowsable,
+			)
+			val myMedia = getMyMedia(userViews = userViews, isMyMediaBrowsable = isMyMediaBrowsable)
+
 			val preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled]
 
-			// Add new items
+			// Update channel items: delete old items for each channel right before inserting new ones,
+			// so channels never become empty or disappear from the home screen during data loading
 			arrayOf(
-				nextUpItems to nextUpChannel,
+				(if (isNextUpBrowsable) nextUpItems else emptyList()) to nextUpChannel,
 				latestMedia to latestMediaChannel,
 				latestMovies to latestMoviesChannel,
 				latestEpisodes to latestEpisodesChannel,
 				myMedia to myMediaChannel,
 			).forEach { (items, channel) ->
-				if (channel == null) {
-					Timber.e("Skipping channel because it was not available")
-				} else {
-					items.map { item ->
-						createPreviewProgram(
-							channel,
-							item,
-							preferParentThumb
+				if (channel != null) {
+					val channelId = ContentUris.parseId(channel)
+					val previewProgramsUri = TvContractCompat.buildPreviewProgramsUriForChannel(channelId)
+
+					if (items.isNotEmpty()) {
+						val programs = items.map { item ->
+							createPreviewProgram(
+								channel,
+								item,
+								preferParentThumb
+							)
+						}
+
+						// Delete old programs ONLY for this specific channel right before inserting new ones
+						context.contentResolver.delete(
+							previewProgramsUri,
+							null,
+							null
 						)
-					}.let {
+
 						context.contentResolver.bulkInsert(
 							TvContractCompat.PreviewPrograms.CONTENT_URI,
-							it.toTypedArray()
+							programs.toTypedArray()
 						)
 					}
 				}
@@ -205,20 +235,26 @@ class LeanbackChannelWorker(
 	 */
 	private fun getChannelUri(name: String, settings: Channel, default: Boolean = false): Uri? {
 		val store = context.getSharedPreferences("leanback_channels", Context.MODE_PRIVATE)
-		var uri: Uri? = null
+		var uri: Uri? = store.getString(name, null)?.toUri()
 
-		// Try and re-use our existing channel definition
-		if (store.contains(name)) {
-			uri = store.getString(name, null)?.toUri()
-
-			if (uri != null) {
-				val result = context.contentResolver.update(uri, settings.toContentValues(), null, null)
-				// If we did not affect exactly 1 row there might be something wrong, so recreate it
-				if (result != 1) uri = null
+		var channelExists = false
+		if (uri != null) {
+			try {
+				context.contentResolver.query(uri, arrayOf(TvContractCompat.Channels._ID), null, null, null)?.use { cursor ->
+					channelExists = cursor.moveToFirst()
+				}
+			} catch (e: Exception) {
+				Timber.w(e, "Failed to query channel URI $uri")
 			}
 		}
 
-		if (uri == null) {
+		if (channelExists && uri != null) {
+			try {
+				context.contentResolver.update(uri, settings.toContentValues(), null, null)
+			} catch (e: Exception) {
+				Timber.w(e, "Failed to update channel $uri")
+			}
+		} else {
 			// Create new channel
 			uri = context.contentResolver.insert(
 				TvContractCompat.Channels.CONTENT_URI,
@@ -249,15 +285,40 @@ class LeanbackChannelWorker(
 	}
 
 	/**
+	 * Checks if a channel is marked as browsable (enabled) by the user in Android TV home screen settings.
+	 */
+	private fun isChannelBrowsable(channelUri: Uri?): Boolean {
+		if (channelUri == null) return false
+		return try {
+			context.contentResolver.query(
+				channelUri,
+				arrayOf(TvContractCompat.Channels.COLUMN_BROWSABLE),
+				null,
+				null,
+				null
+			)?.use { cursor ->
+				if (cursor.moveToFirst()) {
+					val columnIndex = cursor.getColumnIndex(TvContractCompat.Channels.COLUMN_BROWSABLE)
+					if (columnIndex != -1) cursor.getInt(columnIndex) == 1 else true
+				} else true
+			} ?: true
+		} catch (e: Exception) {
+			Timber.w(e, "Error checking channel browsability")
+			true
+		}
+	}
+
+	/**
 	 * Updates the "my media" row with current media libraries.
 	 */
 	@Suppress("RestrictedApi")
-	private suspend fun getMyMedia(): List<BaseItemDto> {
-		val response by api.userViewsApi.getUserViews(includeHidden = false)
+	private fun getMyMedia(
+		userViews: List<BaseItemDto>,
+		isMyMediaBrowsable: Boolean,
+	): List<BaseItemDto> {
+		if (!isMyMediaBrowsable) return emptyList()
 
-		// Add new items
-		return response.items
-			.filter { userViewsRepository.isSupported(it.collectionType) }
+		return userViews.filter { userViewsRepository.isSupported(it.collectionType) }
 	}
 
 	/**
@@ -267,9 +328,10 @@ class LeanbackChannelWorker(
 	private fun BaseItemDto.getPosterArtImageUrl(
 		preferParentThumb: Boolean
 	): Uri = when {
-		type == BaseItemKind.MOVIE || type == BaseItemKind.SERIES -> itemImages[ImageType.PRIMARY]
+		type == BaseItemKind.MOVIE || type == BaseItemKind.SERIES ->
+			itemImages[ImageType.PRIMARY] ?: itemImages[ImageType.THUMB] ?: itemImages[ImageType.BACKDROP]
 		(preferParentThumb || !itemImages.contains(ImageType.PRIMARY)) && parentImages.contains(ImageType.THUMB) -> parentImages[ImageType.THUMB]
-		else -> itemImages[ImageType.PRIMARY]
+		else -> itemImages[ImageType.PRIMARY] ?: itemImages[ImageType.THUMB] ?: itemImages[ImageType.BACKDROP]
 	}.let { image ->
 		ImageProvider.getImageUri(image?.getUrl(api) ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv))
 	}
@@ -283,7 +345,7 @@ class LeanbackChannelWorker(
 		withContext(Dispatchers.IO) {
 			val resume = async {
 				api.itemsApi.getResumeItems(
-					fields = ItemRepository.itemFields,
+					fields = ItemRepository.channelWorkerFields,
 					imageTypeLimit = 1,
 					limit = 10,
 					mediaTypes = listOf(MediaType.VIDEO),
@@ -297,7 +359,7 @@ class LeanbackChannelWorker(
 					imageTypeLimit = 1,
 					limit = 10,
 					enableResumable = false,
-					fields = ItemRepository.itemFields,
+					fields = ItemRepository.channelWorkerFields,
 				).content.items
 			}
 
@@ -305,60 +367,83 @@ class LeanbackChannelWorker(
 			Pair(resume.await().filter { it.isRealAvailableMedia() }, nextUp.await().filter { it.isRealAvailableMedia() })
 		}
 
-	private suspend fun getLatestMedia(): Triple<List<BaseItemDto>, List<BaseItemDto>, List<BaseItemDto>> =
+	private suspend fun getLatestMedia(
+		userViews: List<BaseItemDto>,
+		isLatestEpisodesBrowsable: Boolean,
+		isLatestMoviesBrowsable: Boolean,
+		isLatestMediaBrowsable: Boolean,
+	): Triple<List<BaseItemDto>, List<BaseItemDto>, List<BaseItemDto>> =
 		withContext(Dispatchers.IO) {
 			val configuration = userRepository.currentUser.value?.configuration
 			val latestItemsExcludes = configuration?.latestItemsExcludes.orEmpty()
-			val userViews = api.userViewsApi.getUserViews(includeHidden = false).content.items
+			val filteredUserViews = userViews
 				.filter { userViewsRepository.isSupported(it.collectionType) }
 				.filterNot { it.id in latestItemsExcludes }
 
-			val movieLibraries = userViews.filter { it.collectionType == CollectionType.MOVIES }
-			val tvLibraries = userViews.filter { it.collectionType == CollectionType.TVSHOWS }
+			val movieLibraries = filteredUserViews.filter { it.collectionType == CollectionType.MOVIES }
+			val tvLibraries = filteredUserViews.filter { it.collectionType == CollectionType.TVSHOWS }
 
 			val latestEpisodes = async {
-				tvLibraries.flatMap { library ->
-					api.userLibraryApi.getLatestMedia(
-						parentId = library.id,
-						fields = ItemRepository.itemFields,
-						limit = 50,
-						includeItemTypes = listOf(BaseItemKind.EPISODE),
-						isPlayed = false
-					).content
+				if (!isLatestEpisodesBrowsable) {
+					emptyList()
+				} else {
+					tvLibraries.flatMap { library ->
+						api.itemsApi.getItems(
+							parentId = library.id,
+							fields = ItemRepository.channelWorkerFields,
+							limit = 50,
+							includeItemTypes = listOf(BaseItemKind.SERIES),
+							recursive = true,
+							sortBy = listOf(ItemSortBy.DATE_LAST_CONTENT_ADDED),
+							sortOrder = listOf(SortOrder.DESCENDING),
+						).content.items
+					}
+					.filter { it.isRealAvailableMedia() }
+					.sortedWith(compareByDescending(nullsLast()) { it.dateLastMediaAdded ?: it.dateCreated })
+					.take(50)
 				}
-				.filter { it.isRealAvailableMedia() }
-				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
-				.take(50)
 			}
 
 			val latestMovies = async {
-				movieLibraries.flatMap { library ->
-					api.userLibraryApi.getLatestMedia(
-						parentId = library.id,
-						fields = ItemRepository.itemFields,
-						limit = 50,
-						includeItemTypes = listOf(BaseItemKind.MOVIE),
-						isPlayed = false
-					).content
+				if (!isLatestMoviesBrowsable) {
+					emptyList()
+				} else {
+					movieLibraries.flatMap { library ->
+						api.itemsApi.getItems(
+							parentId = library.id,
+							fields = ItemRepository.channelWorkerFields,
+							limit = 50,
+							includeItemTypes = listOf(BaseItemKind.MOVIE),
+							recursive = true,
+							sortBy = listOf(ItemSortBy.DATE_LAST_CONTENT_ADDED),
+							sortOrder = listOf(SortOrder.DESCENDING),
+						).content.items
+					}
+					.filter { it.isRealAvailableMedia() }
+					.sortedWith(compareByDescending(nullsLast()) { it.dateLastMediaAdded ?: it.dateCreated })
+					.take(50)
 				}
-				.filter { it.isRealAvailableMedia() }
-				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
-				.take(50)
 			}
 
 			val latestMedia = async {
-				userViews.flatMap { library ->
-					api.userLibraryApi.getLatestMedia(
-						parentId = library.id,
-						fields = ItemRepository.itemFields,
-						limit = 50,
-						includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
-						isPlayed = false
-					).content
+				if (!isLatestMediaBrowsable) {
+					emptyList()
+				} else {
+					filteredUserViews.flatMap { library ->
+						api.itemsApi.getItems(
+							parentId = library.id,
+							fields = ItemRepository.channelWorkerFields,
+							limit = 50,
+							includeItemTypes = listOf(BaseItemKind.SERIES, BaseItemKind.MOVIE),
+							recursive = true,
+							sortBy = listOf(ItemSortBy.DATE_LAST_CONTENT_ADDED),
+							sortOrder = listOf(SortOrder.DESCENDING),
+						).content.items
+					}
+					.filter { it.isRealAvailableMedia() }
+					.sortedWith(compareByDescending(nullsLast()) { it.dateLastMediaAdded ?: it.dateCreated })
+					.take(50)
 				}
-				.filter { it.isRealAvailableMedia() }
-				.sortedWith(compareByDescending(nullsLast()) { it.dateCreated })
-				.take(50)
 			}
 
 			Triple(latestEpisodes.await(), latestMovies.await(), latestMedia.await())

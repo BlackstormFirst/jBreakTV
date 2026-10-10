@@ -47,9 +47,9 @@ class HomeFragmentHelper(
 
 	fun loadLatestLiveTvRecordings(): HomeFragmentRow {
 		val query = GetRecordingsRequest(
-			fields = ItemRepository.itemFields,
+			fields = ItemRepository.browseFields,
 			enableImages = true,
-			limit = ITEM_LIMIT_RECORDINGS
+			limit = ITEM_LIMIT_RECORDINGS,
 		)
 
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_recordings), query))
@@ -62,7 +62,7 @@ class HomeFragmentHelper(
 			enableResumable = false,
 			fields = ItemRepository.nextUpFields,
 			nextUpDateCutoff = userPreferences.nextUpDateCutoff,
-			enableTotalRecordCount = false
+			enableTotalRecordCount = false,
 		)
 
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_next_up), query, arrayOf(ChangeTriggerType.TvPlayback)))
@@ -71,10 +71,10 @@ class HomeFragmentHelper(
 	fun loadOnNow(): HomeFragmentRow {
 		val query = GetRecommendedProgramsRequest(
 			isAiring = true,
-			fields = ItemRepository.itemFields,
+			fields = ItemRepository.browseFields,
 			imageTypeLimit = 1,
 			enableTotalRecordCount = false,
-			limit = ITEM_LIMIT_ON_NOW
+			limit = ITEM_LIMIT_ON_NOW,
 		)
 
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_on_now), query))

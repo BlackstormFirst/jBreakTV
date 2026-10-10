@@ -35,6 +35,17 @@ object ItemRepository {
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
 	)
 
+	// Light field set for Android TV background channel worker (LeanbackChannelWorker).
+	// Includes Overview for preview program descriptions, while excluding heavy fields like
+	// MediaSources, MediaStreams, Chapters, Trickplay that aren't needed for channel cards.
+	val channelWorkerFields = setOf(
+		ItemFields.CAN_DELETE,
+		ItemFields.CHILD_COUNT,
+		ItemFields.DATE_CREATED,
+		ItemFields.OVERVIEW,
+		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
+	)
+
 	// Light field set for playback queues and playlists retrieval.
 	// Includes media source info and image aspect ratio required for queue playback,
 	// while excluding heavy fields like Chapters, Trickplay, Overview, Taglines, Genres, etc.
