@@ -217,21 +217,5 @@ class VideoQueueManager {
 		_selectedAudioStreamIndex = null
 		_selectedSubtitleStreamIndex = null
 		_selectedVideoStreamIndex = null
-		_lastPlayedAudioCodec = null
-		_lastPlayedAudioDefaultState = false
-		_lastPlayedAudioHearingImpairedState = false
-		_lastPlayedAudioLanguageIsoCode = null
-		_lastPlayedAudioTitle = null
-		_lastPlayedAudioIndexInType = null
-		_lastPlayedSubtitleCodec = null
-		_lastPlayedSubtitleDefaultState = false
-		_lastPlayedSubtitleForcedState = false
-		_lastPlayedSubtitleHearingImpairedState = false
-		_lastPlayedSubtitleLanguageIsoCode = null
-		_lastPlayedSubtitleTitle = null
-		_lastPlayedVideoDefaultState = null
-		_lastPlayedVideoIndexInType = null
-		_lastPlayedVideoCodec = null
-		_lastPlayedVideoTitle = null
 	}
 }

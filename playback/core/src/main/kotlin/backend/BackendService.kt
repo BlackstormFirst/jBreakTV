@@ -6,6 +6,8 @@ import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.ui.PlayerSubtitleView
 import org.jellyfin.playback.core.ui.PlayerSurfaceView
 
+import timber.log.Timber
+
 /**
  * Service keeping track of the current playback backend and its related surface view.
  */
@@ -19,6 +21,7 @@ class BackendService {
 	private var _subtitleView: PlayerSubtitleView? = null
 
 	fun switchBackend(backend: PlayerBackend) {
+		Timber.d("PlayerDebug [BackendService.switchBackend]: Switching backend to $backend")
 		_backend?.stop()
 		_backend?.release()
 		_backend?.setListener(null)
@@ -33,6 +36,7 @@ class BackendService {
 	}
 
 	fun release() {
+		Timber.d("PlayerDebug [BackendService.release]: Releasing BackendService")
 		_backend?.stop()
 		_backend?.release()
 		_backend?.setListener(null)
@@ -45,18 +49,15 @@ class BackendService {
 	}
 
 	fun attachSurfaceView(surfaceView: PlayerSurfaceView) {
-		// Remove existing surface view
-		if (_surfaceView != null) {
-			_backend?.setSurfaceView(null)
-		}
-
+		Timber.d("PlayerDebug [BackendService.attachSurfaceView]: Attaching surfaceView hash=${surfaceView.hashCode()}")
 		// Apply new surface view
 		_surfaceView = surfaceView.apply {
 			_backend?.setSurfaceView(surfaceView)
 
-			// Automatically detach
+			// Automatically detach when surface view is detached from window
 			doOnDetach {
-				if (surfaceView == _surfaceView) {
+				if (surfaceView == _surfaceView && !surfaceView.isAttachedToWindow) {
+					Timber.d("PlayerDebug [BackendService.attachSurfaceView.doOnDetach]: Detaching surfaceView hash=${surfaceView.hashCode()}")
 					_surfaceView = null
 					_backend?.setSurfaceView(null)
 				}

@@ -183,7 +183,9 @@ class ExoPlayerBackend(
 			.setRenderersFactory(renderersFactory)
 			.setTrackSelector(DefaultTrackSelector(context).apply {
 				setParameters(buildUponParameters().apply {
-					setTunnelingEnabled(exoPlayerOptions.enableTunneling)
+					val allowTunneling = exoPlayerOptions.enableTunneling &&
+						(!exoPlayerOptions.enableLibass || exoPlayerOptions.libassRenderMode != LibassRenderMode.FRAME_ACCURATE)
+					setTunnelingEnabled(allowTunneling)
 					setAudioOffloadPreferences(
 						TrackSelectionParameters.AudioOffloadPreferences.DEFAULT.buildUpon().apply {
 							setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
@@ -205,8 +207,24 @@ class ExoPlayerBackend(
 				if (exoPlayerOptions.enableLibass) {
 					assHandler.init(player)
 					if (exoPlayerOptions.libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
-						val metadataListener = VideoFrameMetadataListener { presentationTimeUs, _, _, _ ->
-							assHandler.videoTimeCallback?.invoke(presentationTimeUs)
+						val metadataListener = VideoFrameMetadataListener { presentationTimeUs, releaseTimeNs, _, _ ->
+							if (presentationTimeUs >= 0) {
+								val nowNs = System.nanoTime()
+								val vsyncLeadUs = if (releaseTimeNs > nowNs) (releaseTimeNs - nowNs) / 1000L else 0L
+								val targetPresentationTimeUs = presentationTimeUs + vsyncLeadUs
+
+								val currentMediaPosUs = runCatching { player.currentPosition * 1000L }.getOrDefault(targetPresentationTimeUs)
+								val expectedPosUs = targetPresentationTimeUs - activeStreamOffsetUs
+								if (abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
+									activeStreamOffsetUs = targetPresentationTimeUs - currentMediaPosUs
+								}
+
+								val correctedTimeUs = (targetPresentationTimeUs - activeStreamOffsetUs).coerceAtLeast(0L)
+
+								runCatching {
+									assHandler.videoTimeCallback?.invoke(correctedTimeUs)
+								}
+							}
 						}
 						videoFrameMetadataListener = metadataListener
 						player.setVideoFrameMetadataListener(metadataListener)
@@ -214,6 +232,7 @@ class ExoPlayerBackend(
 				}
 			}
 	}
+	private var activeStreamOffsetUs: Long = 0L
 	private var videoFrameMetadataListener: VideoFrameMetadataListener? = null
 	private val exoPlayer by exoPlayerDelegate
 
@@ -241,7 +260,7 @@ class ExoPlayerBackend(
 			val seekMs = pendingInitialSeekMs ?: return
 			if (exoPlayer.playbackState == Player.STATE_READY && exoPlayer.duration > 0) {
 				pendingInitialSeekMs = null
-				if (exoPlayer.isCurrentMediaItemSeekable && abs(exoPlayer.currentPosition - seekMs) > 1000) {
+				if (exoPlayer.isCurrentMediaItemSeekable && abs(exoPlayer.currentPosition - seekMs) > 3000) {
 					exoPlayer.seekTo(seekMs)
 				}
 			}
@@ -264,6 +283,10 @@ class ExoPlayerBackend(
 
 		override fun onPlayerError(error: PlaybackException) {
 			Timber.e(error, "***** Got error from player")
+			if (currentStream == null || exoPlayer.playbackState == Player.STATE_IDLE) {
+				Timber.w("Ignoring player error on stopped player: ${error.message}")
+				return
+			}
 			listener?.onError(error)
 			listener?.onPlayStateChange(PlayState.ERROR)
 		}
@@ -286,8 +309,31 @@ class ExoPlayerBackend(
 			}
 		}
 
+		private fun isCurrentTextTrackAss(): Boolean {
+			if (!exoPlayerOptions.enableLibass) return false
+			for (group in exoPlayer.currentTracks.groups) {
+				if (group.type == C.TRACK_TYPE_TEXT && group.isSelected) {
+					for (i in 0 until group.length) {
+						if (group.isTrackSelected(i)) {
+							val format = group.getTrackFormat(i)
+							val mime = format.sampleMimeType?.lowercase(Locale.ROOT) ?: ""
+							val codecs = format.codecs?.lowercase(Locale.ROOT) ?: ""
+							if (mime.contains("ssa") || mime.contains("ass") || codecs.contains("ssa") || codecs.contains("ass")) {
+								return true
+							}
+						}
+					}
+				}
+			}
+			return false
+		}
+
 		override fun onCues(cueGroup: CueGroup) {
-			subtitleView?.setCues(cueGroup.cues)
+			if (isCurrentTextTrackAss()) {
+				subtitleView?.setCues(emptyList())
+			} else {
+				subtitleView?.setCues(cueGroup.cues)
+			}
 		}
 
 		override fun onPlaybackStateChanged(playbackState: Int) {
@@ -342,20 +388,23 @@ class ExoPlayerBackend(
 	}
 
 	override fun setSubtitleView(surfaceView: PlayerSubtitleView?) {
-
-		if (surfaceView != null) {
-			if (subtitleView == null) {
-				subtitleView = SubtitleView(surfaceView.context).apply {
-					if (exoPlayerOptions.enableLibass) {
-						addView(AssSubtitleView(surfaceView.context, assHandler))
-					}
-					exoPlayerOptions.configureSubtitleView?.invoke(this)
+		val subView = subtitleView ?: if (surfaceView != null) {
+			SubtitleView(surfaceView.context).apply {
+				if (exoPlayerOptions.enableLibass) {
+					addView(AssSubtitleView(surfaceView.context, assHandler))
 				}
-			}
+				exoPlayerOptions.configureSubtitleView?.invoke(this)
+			}.also { subtitleView = it }
+		} else null
 
-			surfaceView.addView(subtitleView)
-		} else {
-			(subtitleView?.parent as? ViewGroup)?.removeView(subtitleView)
+		if (surfaceView != null && subView != null) {
+			if (subView.parent != surfaceView) {
+				(subView.parent as? ViewGroup)?.removeView(subView)
+				surfaceView.addView(subView)
+			}
+		} else if (subView != null) {
+			subView.removeAllViews()
+			(subView.parent as? ViewGroup)?.removeView(subView)
 			subtitleView = null
 		}
 	}
@@ -398,8 +447,13 @@ class ExoPlayerBackend(
 
 	override fun playItem(item: QueueEntry) {
 		val stream = requireNotNull(item.mediaStream)
-		if (currentStream == stream) return
+		val needsReload = currentStream != stream ||
+			exoPlayer.playbackState == Player.STATE_IDLE ||
+			exoPlayer.currentMediaItem == null
 
+		if (!needsReload) return
+
+		activeStreamOffsetUs = 0L
 		currentStream = stream
 
 		val mediaItem = buildMediaItem(item)
@@ -419,8 +473,9 @@ class ExoPlayerBackend(
 			exoPlayer.seekTo(startPositionMs)
 		} else {
 			pendingInitialSeekMs = null
-			exoPlayer.seekTo(0)
 		}
+
+		exoPlayer.playWhenReady = true
 
 
 		// Update audio attributes
@@ -463,10 +518,16 @@ class ExoPlayerBackend(
 
 	override fun stop() {
 		currentStream = null
+		pendingInitialSeekMs = null
 		if (exoPlayerOptions.enableLibass) {
 			AssFontManager.cancelPreload()
 		}
 		if (exoPlayerDelegate.isInitialized()) {
+			videoFrameMetadataListener?.let { exoPlayer.clearVideoFrameMetadataListener(it) }
+			videoFrameMetadataListener = null
+			runCatching {
+				exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().clearOverrides().build()
+			}
 			exoPlayer.stop()
 			exoPlayer.clearMediaItems()
 		}
@@ -840,13 +901,16 @@ class ExoPlayerBackend(
 
 		if (changed) {
 			val newParams = builder.build()
-			if (exoPlayer.playbackState != Player.STATE_IDLE &&
-				exoPlayer.playbackState != Player.STATE_ENDED &&
+			if (exoPlayer.playbackState == Player.STATE_READY &&
 				!exoPlayer.currentTimeline.isEmpty &&
 				exoPlayer.currentMediaItem != null &&
 				!exoPlayer.currentTracks.groups.isEmpty() &&
 				exoPlayer.trackSelectionParameters != newParams) {
-				exoPlayer.trackSelectionParameters = newParams
+				runCatching {
+					exoPlayer.trackSelectionParameters = newParams
+				}.onFailure { e ->
+					Timber.w(e, "Error applying trackSelectionParameters in applyPreferredTrackOverrides")
+				}
 			}
 		}
 	}
@@ -888,13 +952,94 @@ class ExoPlayerBackend(
 			}
 		}
 		val newParams = builder.build()
-		if (exoPlayer.playbackState != Player.STATE_IDLE &&
-			exoPlayer.playbackState != Player.STATE_ENDED &&
+		if (exoPlayer.playbackState == Player.STATE_READY &&
 			!exoPlayer.currentTimeline.isEmpty &&
 			exoPlayer.currentMediaItem != null &&
 			!exoPlayer.currentTracks.groups.isEmpty() &&
 			currentParams != newParams) {
-			exoPlayer.trackSelectionParameters = newParams
+			runCatching {
+				exoPlayer.trackSelectionParameters = newParams
+			}.onFailure { e ->
+				Timber.w(e, "Error applying trackSelectionParameters in selectTrack")
+			}
+		}
+		listener?.onTracksChanged()
+	}
+
+	override fun selectTracks(
+		videoTrack: BackendTrack?,
+		audioTrack: BackendTrack?,
+		subtitleTrack: BackendTrack?,
+	) {
+		val queueEntry = currentStream?.queueEntry
+		if (queueEntry != null) {
+			if (videoTrack != null) queueEntry.preferredVideoIndex = videoTrack.mediaStreamIndex
+			if (audioTrack != null) queueEntry.preferredAudioIndex = audioTrack.mediaStreamIndex
+			if (subtitleTrack != null) queueEntry.preferredSubtitleIndex = subtitleTrack.mediaStreamIndex
+		}
+
+		val currentParams = exoPlayer.trackSelectionParameters
+		val builder = currentParams.buildUpon()
+
+		// Video
+		if (videoTrack == null) {
+			builder.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+		} else {
+			val group = videoTrack.group as? TrackGroup
+			if (group != null) {
+				builder.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+				builder.addOverride(TrackSelectionOverride(group, videoTrack.trackIndex.coerceAtLeast(0)))
+			}
+		}
+
+		// Audio
+		if (audioTrack == null) {
+			builder.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+		} else {
+			val group = audioTrack.group as? TrackGroup
+			if (group != null) {
+				builder.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+				builder.addOverride(TrackSelectionOverride(group, audioTrack.trackIndex.coerceAtLeast(0)))
+			}
+		}
+
+		// Subtitle
+		if (subtitleTrack == null) {
+			builder.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+			builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+		} else {
+			builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+			var group = subtitleTrack.group as? TrackGroup
+			if (subtitleTrack.mediaStreamIndex != -1) {
+				val targetIndex = subtitleTrack.mediaStreamIndex
+				val matchedGroupInfo = exoPlayer.currentTracks.groups.firstOrNull { g ->
+					g.type == C.TRACK_TYPE_TEXT && (
+						g.mediaTrackGroup.id.endsWith(":$targetIndex") ||
+						g.mediaTrackGroup.id == targetIndex.toString() ||
+						(g.length == 1 && g.getTrackFormat(0).id?.endsWith(":JF_EXTERNAL:$targetIndex") == true)
+					)
+				} ?: exoPlayer.currentTracks.groups.firstOrNull { g -> g.type == C.TRACK_TYPE_TEXT }
+				if (matchedGroupInfo != null) {
+					group = matchedGroupInfo.mediaTrackGroup
+				}
+			}
+			if (group != null) {
+				builder.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+				builder.addOverride(TrackSelectionOverride(group, subtitleTrack.trackIndex.coerceAtLeast(0)))
+			}
+		}
+
+		val newParams = builder.build()
+		if (exoPlayer.playbackState == Player.STATE_READY &&
+			!exoPlayer.currentTimeline.isEmpty &&
+			exoPlayer.currentMediaItem != null &&
+			!exoPlayer.currentTracks.groups.isEmpty() &&
+			currentParams != newParams) {
+			runCatching {
+				exoPlayer.trackSelectionParameters = newParams
+			}.onFailure { e ->
+				Timber.w(e, "Error applying trackSelectionParameters in selectTracks")
+			}
 		}
 		listener?.onTracksChanged()
 	}

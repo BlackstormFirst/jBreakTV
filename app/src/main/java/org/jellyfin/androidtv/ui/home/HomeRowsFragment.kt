@@ -224,8 +224,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		verticalGridView?.let { gridView ->
 			Looper.myQueue().addIdleHandler {
 				if (isAdded && !isDetached) {
-					val cardPresenter = CardPresenter()
-					cardPresenter.prewarm(gridView, sharedRecycledViewPool, count = 15)
+					runCatching {
+						val cardPresenter = CardPresenter()
+						cardPresenter.prewarm(gridView, sharedRecycledViewPool, count = 15)
+					}
 				}
 				false
 			}

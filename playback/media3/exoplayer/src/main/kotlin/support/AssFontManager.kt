@@ -99,12 +99,14 @@ object AssFontManager {
 			if (fontFiles.isNotEmpty()) {
 				Timber.d("Preloading ${fontFiles.size} cached ASS fonts into libass for: $url")
 				var totalLoadedBytes = 0L
-				val maxTotalBytes = 30 * 1024 * 1024L // Max 30MB total preloaded fonts
+				val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+				val isLowRam = am?.isLowRamDevice == true
+				val maxTotalBytes = if (isLowRam) 15 * 1024 * 1024L else 45 * 1024 * 1024L
 
 				for (fontFile in fontFiles) {
 					if (!coroutineContext.isActive) break
 					if (totalLoadedBytes + fontFile.length() > maxTotalBytes) {
-						Timber.w("Reached max font preload limit (30MB), skipping remaining fonts")
+						Timber.w("Reached max font preload limit (${maxTotalBytes / (1024 * 1024)}MB), skipping remaining fonts")
 						break
 					}
 					runCatching {

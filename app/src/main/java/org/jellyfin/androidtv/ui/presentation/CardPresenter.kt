@@ -81,15 +81,18 @@ class CardPresenter(
 	constructor() : this(true)
 
 	fun prewarm(parent: ViewGroup, pool: RecyclerView.RecycledViewPool, count: Int = 12, viewType: Int = 0) {
-		val adapter = ArrayObjectAdapter(this@CardPresenter).apply {
-			add("dummy")
-		}
-		val itemBridgeAdapter = ItemBridgeAdapter().apply {
-			setAdapter(adapter)
-		}
-		repeat(count) {
-			val rvh = itemBridgeAdapter.onCreateViewHolder(parent, viewType)
-			pool.putRecycledView(rvh)
+		runCatching {
+			val adapter = ArrayObjectAdapter(this@CardPresenter).apply {
+				add("dummy")
+			}
+			val itemBridgeAdapter = ItemBridgeAdapter().apply {
+				setAdapter(adapter)
+			}
+			val computedViewType = if (adapter.size() > 0) itemBridgeAdapter.getItemViewType(0) else viewType
+			repeat(count) {
+				val rvh = itemBridgeAdapter.onCreateViewHolder(parent, computedViewType)
+				pool.putRecycledView(rvh)
+			}
 		}
 	}
 

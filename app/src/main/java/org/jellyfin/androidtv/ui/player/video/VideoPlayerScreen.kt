@@ -18,7 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -130,18 +130,34 @@ fun VideoPlayerScreen() {
 				.aspectRatio(aspectRatio, videoSize.height < videoSize.width)
 				.fillMaxSize()
 				.align(Alignment.Center)
-			ZoomMode.AUTO_CROP -> {
-				val screenRatio = 16f / 9f
-				val cropScale = when {
-					aspectRatio > screenRatio -> aspectRatio / screenRatio
-					aspectRatio < screenRatio -> screenRatio / aspectRatio
-					else -> 1f
+			ZoomMode.AUTO_CROP -> Modifier
+				.layout { measurable, constraints ->
+					val screenWidth = constraints.maxWidth
+					val screenHeight = constraints.maxHeight
+					val screenRatio = if (screenHeight > 0) screenWidth.toFloat() / screenHeight.toFloat() else 16f / 9f
+
+					val (targetWidth, targetHeight) = if (aspectRatio > screenRatio) {
+						val width = (screenHeight * aspectRatio).toInt()
+						width to screenHeight
+					} else {
+						val height = (screenWidth / aspectRatio).toInt()
+						screenWidth to height
+					}
+
+					val childConstraints = constraints.copy(
+						minWidth = targetWidth,
+						maxWidth = targetWidth,
+						minHeight = targetHeight,
+						maxHeight = targetHeight,
+					)
+					val placeable = measurable.measure(childConstraints)
+					layout(screenWidth, screenHeight) {
+						val x = (screenWidth - targetWidth) / 2
+						val y = (screenHeight - targetHeight) / 2
+						placeable.place(x, y)
+					}
 				}
-				Modifier
-					.graphicsLayer(scaleX = cropScale, scaleY = cropScale)
-					.fillMaxSize()
-					.align(Alignment.Center)
-			}
+				.align(Alignment.Center)
 			ZoomMode.STRETCH -> Modifier
 				.fillMaxSize()
 				.align(Alignment.Center)

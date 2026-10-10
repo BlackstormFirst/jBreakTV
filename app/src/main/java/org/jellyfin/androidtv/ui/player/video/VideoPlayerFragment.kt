@@ -28,6 +28,7 @@ import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
+import org.jellyfin.playback.core.mediastream.MediaStreamService
 import org.jellyfin.playback.core.mediastream.PlayableMediaStream
 import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
@@ -80,6 +81,7 @@ class VideoPlayerFragment : Fragment() {
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
+		Timber.d("PlayerDebug [VideoPlayerFragment.onCreate]: Created fragment instance hash=${this.hashCode()}")
 
 		refreshRateHelper = RefreshRateHelper(requireActivity(), userPreferences)
 
@@ -99,30 +101,36 @@ class VideoPlayerFragment : Fragment() {
 			}
 
 			val targetItem = items[currentMediaPosition]
-			if (arguments?.containsKey(EXTRA_POSITION) == true) {
+			val resumeSubtractSeconds = userPreferences[UserPreferences.resumeSubtractDuration].toLongOrNull() ?: 0L
+			val resumeSubtractTicks = resumeSubtractSeconds * 10000000L
+
+			val targetTicks = if (arguments?.containsKey(EXTRA_POSITION) == true) {
 				val startPositionMs = arguments?.getInt(EXTRA_POSITION, 0) ?: 0
 				val startPositionTicks = startPositionMs.toLong() * 10000L
-				val updatedUserData = targetItem.userData?.copy(playbackPositionTicks = startPositionTicks)
-					?: UserItemDataDto(
-						itemId = targetItem.id,
-						playbackPositionTicks = startPositionTicks,
-						playCount = 0,
-						isFavorite = false,
-						played = false,
-						key = targetItem.id.toString(),
-					)
-				items[currentMediaPosition] = targetItem.copy(userData = updatedUserData)
+				if (startPositionTicks > 0L) {
+					(startPositionTicks - resumeSubtractTicks).coerceAtLeast(0L)
+				} else {
+					0L
+				}
 			} else {
 				val serverTicks = targetItem.userData?.playbackPositionTicks ?: 0L
 				if (serverTicks > 0L) {
-					val resumeSubtractSeconds = userPreferences[UserPreferences.resumeSubtractDuration].toLongOrNull() ?: 0L
-					val adjustedTicks = (serverTicks - (resumeSubtractSeconds * 10000000L)).coerceAtLeast(0L)
-					val updatedUserData = targetItem.userData?.copy(playbackPositionTicks = adjustedTicks)
-					if (updatedUserData != null) {
-						items[currentMediaPosition] = targetItem.copy(userData = updatedUserData)
-					}
+					(serverTicks - resumeSubtractTicks).coerceAtLeast(0L)
+				} else {
+					0L
 				}
 			}
+
+			val updatedUserData = targetItem.userData?.copy(playbackPositionTicks = targetTicks)
+				?: UserItemDataDto(
+					itemId = targetItem.id,
+					playbackPositionTicks = targetTicks,
+					playCount = 0,
+					isFavorite = false,
+					played = false,
+					key = targetItem.id.toString(),
+				)
+			items[currentMediaPosition] = targetItem.copy(userData = updatedUserData)
 			videoQueueManager.setCurrentVideoQueue(items)
 		}
 
@@ -143,19 +151,6 @@ class VideoPlayerFragment : Fragment() {
 			playbackManager.queue.entryIndex.collect { index ->
 				if (index >= 0) {
 					videoQueueManager.setCurrentMediaPosition(index)
-					val fullSeriesQueue = videoQueueManager.getFullSeriesQueue()
-					if (fullSeriesQueue != null) {
-						val updatedQueue = videoQueueManager.getCurrentVideoQueue()
-						val updatedPos = videoQueueManager.getCurrentMediaPosition()
-						val currentEntries = playbackManager.queue.entries.value
-						val currentIds = currentEntries.mapNotNull { it.baseItem?.id }
-						val updatedIds = updatedQueue.map { it.id }
-						if (currentIds != updatedIds) {
-							val queueSupplier = RewriteMediaManager.BaseItemQueueSupplier(api, updatedQueue, false)
-							playbackManager.queue.clear()
-							playbackManager.queue.addSupplier(queueSupplier, updatedPos)
-						}
-					}
 					lastAutoSelectedEntryId = null
 					isNavigatingToNextUp = false
 
@@ -347,20 +342,12 @@ class VideoPlayerFragment : Fragment() {
 						val activeEntry = playbackManager.queue.entry.value ?: return@launch
 						if (activeEntry.baseItem?.id != baseItem.id) return@launch
 
-						// Apply track selection back on the main thread
-						if (trackSelection.videoIndex != null && trackSelection.targetVideoTrack != null) {
-							backend.selectTrack(2, trackSelection.targetVideoTrack)
-						}
-
-						if (trackSelection.audioIndex != null && trackSelection.targetAudioTrack != null) {
-							backend.selectTrack(1, trackSelection.targetAudioTrack)
-						}
-
-						if (trackSelection.subIndex == null || trackSelection.subIndex < 0) {
-							backend.selectTrack(3, null)
-						} else if (trackSelection.targetSubTrack != null) {
-							backend.selectTrack(3, trackSelection.targetSubTrack)
-						}
+						// Apply track selections atomically back on the main thread
+						backend.selectTracks(
+							videoTrack = if (trackSelection.videoIndex != null) trackSelection.targetVideoTrack else null,
+							audioTrack = if (trackSelection.audioIndex != null) trackSelection.targetAudioTrack else null,
+							subtitleTrack = if (trackSelection.subIndex != null && trackSelection.subIndex >= 0) trackSelection.targetSubTrack else null,
+						)
 
 						// Save active audio/subtitle/video properties to VideoQueueManager for queue persistence across episodes
 						val selectedAudioStream = baseItem.mediaStreams?.firstOrNull { it.index == trackSelection.audioIndex }
@@ -420,9 +407,6 @@ class VideoPlayerFragment : Fragment() {
 		}.also { listener ->
 			playbackManager.addListener(listener)
 		}
-
-		// Pause player until the initial resume
-		playbackManager.state.pause()
 	}
 
 	private fun handlePlayerError(error: Throwable?) {
@@ -467,8 +451,9 @@ class VideoPlayerFragment : Fragment() {
 			Timber.i("Player error encountered (attempt $playbackRetries/3) - retrying")
 
 			isRetrying = true
-			playbackManager.state.stop()
-			playbackManager.state.play()
+			lifecycleScope.launch {
+				playbackManager.getService<MediaStreamService>()?.reloadStream(entry)
+			}
 		} else {
 			isRetrying = false
 			Toast.makeText(requireContext(), getString(R.string.too_many_errors), Toast.LENGTH_LONG).show()
@@ -533,6 +518,7 @@ class VideoPlayerFragment : Fragment() {
 		container: ViewGroup?,
 		savedInstanceState: Bundle?
 	) = content {
+		Timber.d("PlayerDebug [VideoPlayerFragment.onCreateView]: Creating view for fragment hash=${this.hashCode()}")
 		BaseScreen {
 			VideoPlayerScreen()
 		}
@@ -540,12 +526,14 @@ class VideoPlayerFragment : Fragment() {
 
 	override fun onPause() {
 		super.onPause()
+		Timber.d("PlayerDebug [VideoPlayerFragment.onPause]: Pausing fragment hash=${this.hashCode()}")
 
 		playbackManager.state.pause()
 	}
 
 	override fun onResume() {
 		super.onResume()
+		Timber.d("PlayerDebug [VideoPlayerFragment.onResume]: Resuming fragment hash=${this.hashCode()}, playState=${playbackManager.state.playState.value}")
 
 		if (playbackManager.state.playState.value == PlayState.STOPPED) {
 			playbackManager.state.play()
@@ -556,13 +544,15 @@ class VideoPlayerFragment : Fragment() {
 
 	override fun onDestroy() {
 		super.onDestroy()
+		val isRemoving = isRemoving || requireActivity().isFinishing
+		Timber.d("PlayerDebug [VideoPlayerFragment.onDestroy]: Destroying fragment hash=${this.hashCode()}, isRemoving=$isRemoving")
 
 		playerEventListener?.let { listener ->
 			playbackManager.removeListener(listener)
 		}
 		playerEventListener = null
 
-		if (isRemoving || requireActivity().isFinishing) {
+		if (isRemoving) {
 			val surfaceView = playbackManager.backendService.surfaceView?.surface
 			refreshRateHelper?.resetRefreshRate(surfaceView)
 			playbackManager.state.stop()

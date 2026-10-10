@@ -24,6 +24,7 @@ import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.createBaseItemQueueEntry
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
 
 @Suppress("TooManyFunctions")
@@ -48,9 +49,21 @@ class RewriteMediaManager(
 	override val currentAudioQueueDisplaySize: String
 		get() = playbackManager.queue.estimatedSize.toString()
 
+	private fun isAudioItem(baseItem: BaseItemDto?): Boolean {
+		if (baseItem == null) return false
+		if (baseItem.type == BaseItemKind.AUDIO) return true
+		if (baseItem.mediaType == MediaType.AUDIO &&
+			baseItem.type != BaseItemKind.EPISODE &&
+			baseItem.type != BaseItemKind.MOVIE &&
+			baseItem.type != BaseItemKind.VIDEO &&
+			baseItem.type != BaseItemKind.RECORDING &&
+			baseItem.type != BaseItemKind.TV_CHANNEL
+		) return true
+		return false
+	}
+
 	override val currentAudioItem: BaseItemDto?
-		get() = playbackManager.queue.entry.value?.baseItem
-			?.takeIf { it.mediaType == MediaType.AUDIO }
+		get() = playbackManager.queue.entry.value?.baseItem?.takeIf { isAudioItem(it) }
 
 	override fun toggleRepeat(): Boolean {
 		val newMode = when (playbackManager.state.repeatMode.value) {
@@ -109,7 +122,7 @@ class RewriteMediaManager(
 		playbackManager.queue.entry.onEach { entry ->
 			val baseItem = entry?.baseItem
 			notifyListeners {
-				onQueueStatusChanged(baseItem?.mediaType == MediaType.AUDIO)
+				onQueueStatusChanged(isAudioItem(baseItem))
 			}
 		}.launchIn(this)
 

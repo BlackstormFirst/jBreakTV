@@ -730,7 +730,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
         if (refreshRateChanged) {
             // Delay player preparation to allow the display refresh rate switch / HDMI handshake to complete smoothly
-            mHandler.postDelayed(prepareAndStartPlayer, 1500);
+            mHandler.postDelayed(prepareAndStartPlayer, 2500);
         } else {
             prepareAndStartPlayer.run();
         }

@@ -31,6 +31,7 @@ import androidx.media3.common.TrackGroup;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.text.CueGroup;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.HttpDataSource;
@@ -63,8 +64,11 @@ import org.koin.java.KoinJavaComponent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
+import androidx.media3.extractor.text.DefaultSubtitleParserFactory;
+import androidx.media3.extractor.text.SubtitleParser;
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener;
 import org.jellyfin.playback.core.LibassRenderMode;
 import kotlin.jvm.functions.Function1;
@@ -102,6 +106,7 @@ public class VideoManager {
 
     public boolean isContracted = false;
     public AssHandler mAssHandler;
+    private long mActiveStreamOffsetUs = 0L;
     private VideoFrameMetadataListener mVideoFrameMetadataListener = null;
 
     private final UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
@@ -153,10 +158,24 @@ public class VideoManager {
             assHandler.init(mExoPlayer);
             if (libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
                 mVideoFrameMetadataListener = (presentationTimeUs, releaseTimeNs, format, mediaFormat) -> {
-                    if (mAssHandler == null) return;
-                    Function1<Long, Unit> callback = assHandler.getVideoTimeCallback();
+                    AssHandler handler = mAssHandler;
+                    if (handler == null || presentationTimeUs < 0) return;
+                    Function1<Long, Unit> callback = handler.getVideoTimeCallback();
                     if (callback != null) {
-                        callback.invoke(presentationTimeUs);
+                        try {
+                            long nowNs = System.nanoTime();
+                            long vsyncLeadUs = (releaseTimeNs > nowNs) ? (releaseTimeNs - nowNs) / 1000L : 0L;
+                            long targetPresentationTimeUs = presentationTimeUs + vsyncLeadUs;
+
+                            long currentMediaPosUs = (mExoPlayer != null) ? mExoPlayer.getCurrentPosition() * 1000L : targetPresentationTimeUs;
+                            long expectedPosUs = targetPresentationTimeUs - mActiveStreamOffsetUs;
+                            if (Math.abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
+                                mActiveStreamOffsetUs = targetPresentationTimeUs - currentMediaPosUs;
+                            }
+
+                            long correctedTimeUs = Math.max(0L, targetPresentationTimeUs - mActiveStreamOffsetUs);
+                            callback.invoke(correctedTimeUs);
+                        } catch (Exception ignored) {}
                     }
                 };
                 mExoPlayer.setVideoFrameMetadataListener(mVideoFrameMetadataListener);
@@ -228,7 +247,34 @@ public class VideoManager {
                     mActivity.runOnUiThread(() -> _helper.getFragment().updateDisplay());
                 }
             }
+
+            @Override
+            public void onCues(@NonNull CueGroup cueGroup) {
+                if (isCurrentTextTrackAss() && mExoPlayerView != null && mExoPlayerView.getSubtitleView() != null) {
+                    mExoPlayerView.getSubtitleView().setCues(Collections.emptyList());
+                }
+            }
         });
+    }
+
+    private boolean isCurrentTextTrackAss() {
+        if (mAssHandler == null || mExoPlayer == null) return false;
+        Tracks tracks = mExoPlayer.getCurrentTracks();
+        for (Tracks.Group group : tracks.getGroups()) {
+            if (group.getType() == C.TRACK_TYPE_TEXT && group.isSelected()) {
+                for (int i = 0; i < group.getMediaTrackGroup().length; i++) {
+                    if (group.isTrackSelected(i)) {
+                        Format format = group.getTrackFormat(i);
+                        String mime = format.sampleMimeType != null ? format.sampleMimeType.toLowerCase(Locale.ROOT) : "";
+                        String codecs = format.codecs != null ? format.codecs.toLowerCase(Locale.ROOT) : "";
+                        if (mime.contains("ssa") || mime.contains("ass") || codecs.contains("ssa") || codecs.contains("ass")) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     public void subscribe(@NonNull PlaybackControllerNotifiable notifier) {
@@ -275,9 +321,11 @@ public class VideoManager {
         defaultRendererFactory.setExtensionRendererMode(determineExoPlayerExtensionRendererMode());
 
         boolean tunnelingEnabled = userPreferences.get(UserPreferences.Companion.getCodecTunneling());
+        LibassRenderMode libassRenderMode = userPreferences.get(UserPreferences.Companion.getLibassRenderMode());
+        boolean allowTunneling = tunnelingEnabled && (assHandler == null || libassRenderMode != LibassRenderMode.FRAME_ACCURATE);
         DefaultTrackSelector trackSelector = new DefaultTrackSelector(context);
         trackSelector.setParameters(trackSelector.buildUponParameters()
-                .setTunnelingEnabled(tunnelingEnabled)
+                .setTunnelingEnabled(allowTunneling)
                 .setAudioOffloadPreferences(new TrackSelectionParameters.AudioOffloadPreferences.Builder()
                         .setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
                         .build()
@@ -295,7 +343,31 @@ public class VideoManager {
             AssSubtitleParserFactory assSubtitleParserFactory = new AssSubtitleParserFactory(assHandler);
             ExtractorsFactory assExtractorsFactory = AssPlayerKt.withAssMkvSupport(extractorsFactory, assSubtitleParserFactory, assHandler);
             DefaultMediaSourceFactory mediaSourceFactory = new DefaultMediaSourceFactory(dataSourceFactory, assExtractorsFactory);
-            mediaSourceFactory.setSubtitleParserFactory(assSubtitleParserFactory);
+            SubtitleParser.Factory defaultSubtitleParserFactory = new DefaultSubtitleParserFactory();
+            SubtitleParser.Factory delegatingSubtitleParserFactory = new SubtitleParser.Factory() {
+                private boolean isAssFormat(Format format) {
+                    String mime = format.sampleMimeType != null ? format.sampleMimeType.toLowerCase(Locale.ROOT) : "";
+                    String codecs = format.codecs != null ? format.codecs.toLowerCase(Locale.ROOT) : "";
+                    return mime.contains("ssa") || mime.contains("ass") || codecs.contains("ssa") || codecs.contains("ass");
+                }
+
+                @Override
+                public boolean supportsFormat(@NonNull Format format) {
+                    return isAssFormat(format) ? assSubtitleParserFactory.supportsFormat(format) : defaultSubtitleParserFactory.supportsFormat(format);
+                }
+
+                @Override
+                public int getCueReplacementBehavior(@NonNull Format format) {
+                    return isAssFormat(format) ? assSubtitleParserFactory.getCueReplacementBehavior(format) : defaultSubtitleParserFactory.getCueReplacementBehavior(format);
+                }
+
+                @Override
+                @NonNull
+                public SubtitleParser create(@NonNull Format format) {
+                    return isAssFormat(format) ? assSubtitleParserFactory.create(format) : defaultSubtitleParserFactory.create(format);
+                }
+            };
+            mediaSourceFactory.setSubtitleParserFactory(delegatingSubtitleParserFactory);
             exoPlayerBuilder.setMediaSourceFactory(mediaSourceFactory);
             exoPlayerBuilder.setRenderersFactory(new AssRenderersFactory(assHandler, defaultRendererFactory));
         } else {

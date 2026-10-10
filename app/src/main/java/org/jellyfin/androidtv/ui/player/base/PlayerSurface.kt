@@ -26,6 +26,7 @@ fun PlayerSurface(
 		modifier = modifier.focusProperties { canFocus = false },
 		update = { view ->
 			view.playbackManager = playbackManager
+			view.attachToBackend()
 		}
 	)
 }

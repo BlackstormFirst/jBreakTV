@@ -46,6 +46,16 @@ interface PlayerBackend {
 	fun getTracks(trackType: Int): List<BackendTrack> = emptyList()
 
 	fun selectTrack(trackType: Int, track: BackendTrack?) {}
+
+	fun selectTracks(
+		videoTrack: BackendTrack?,
+		audioTrack: BackendTrack?,
+		subtitleTrack: BackendTrack?,
+	) {
+		selectTrack(2, videoTrack)
+		selectTrack(1, audioTrack)
+		selectTrack(3, subtitleTrack)
+	}
 }
 
 data class BackendTrack(

@@ -17,6 +17,7 @@ import org.jellyfin.playback.core.queue.order.OrderIndexProvider
 import org.jellyfin.playback.core.queue.order.RandomOrderIndexProvider
 import org.jellyfin.playback.core.queue.order.ShuffleOrderIndexProvider
 import org.jellyfin.playback.core.queue.supplier.QueueSupplier
+import timber.log.Timber
 import kotlin.math.max
 
 class QueueService internal constructor() : PlayerService(), Queue {
@@ -65,6 +66,7 @@ class QueueService internal constructor() : PlayerService(), Queue {
 	// Entry management
 
 	override fun addSupplier(supplier: QueueSupplier, initialIndex: Int) {
+		Timber.d("PlayerDebug [QueueService.addSupplier]: Adding supplier with size=${supplier.size}, initialIndex=$initialIndex")
 		suppliers.add(supplier)
 
 		if (_entryIndex.value == Queue.INDEX_NONE) {
@@ -132,6 +134,7 @@ class QueueService internal constructor() : PlayerService(), Queue {
 	}
 
 	override fun clear() {
+		Timber.d("PlayerDebug [QueueService.clear]: Clearing queue (previous fetchedEntries size=${fetchedEntries.size})")
 		suppliers.clear()
 		currentSupplierIndex = 0
 		currentSupplierEntryIndex = 0

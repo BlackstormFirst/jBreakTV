@@ -16,6 +16,7 @@ fun PlayerSubtitles(
 ) = AndroidView(
 	factory = { context ->
 		PlayerSubtitleView(context).apply {
+			this.playbackManager = playbackManager
 			isFocusable = false
 			isClickable = false
 			importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
