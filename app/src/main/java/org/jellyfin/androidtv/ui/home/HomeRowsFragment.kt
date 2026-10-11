@@ -6,6 +6,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.Toast
 import androidx.leanback.app.RowsSupportFragment
+import androidx.leanback.widget.HeaderItem
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.ListRowPresenter
 import androidx.leanback.widget.OnItemViewClickedListener
@@ -20,6 +21,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -55,9 +59,11 @@ import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
+import org.jellyfin.androidtv.ui.presentation.GridButtonPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter
 import org.jellyfin.androidtv.util.KeyProcessor
+import org.jellyfin.androidtv.util.Utils
 import org.jellyfin.androidtv.util.usbdevices.USB_GRID_BUTTON_ID
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
@@ -70,7 +76,6 @@ import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.koin.android.ext.android.inject
 import timber.log.Timber
-import kotlin.time.Duration.Companion.milliseconds
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
@@ -111,63 +116,155 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val rowsAdapter: MutableObjectAdapter<Row>?
 		get() = adapter as? MutableObjectAdapter<Row>
 
+	private val rowSectionIndices = mutableMapOf<Row, Int>()
+
+	private fun getSectionIndex(row: Row): Int {
+		return rowSectionIndices[row] ?: when (row) {
+			notificationsRow.listRow -> -200
+			nowPlaying.row -> -100
+			else -> Int.MAX_VALUE
+		}
+	}
+
+	private fun addRowInOrder(row: ListRow, sectionIndex: Int) {
+		val targetAdapter = rowsAdapter ?: return
+		rowSectionIndices[row] = sectionIndex
+
+		var insertPos = targetAdapter.size()
+		for (i in 0 until targetAdapter.size()) {
+			val existingRow = targetAdapter[i] ?: continue
+			val existingIndex = getSectionIndex(existingRow)
+			if (existingIndex > sectionIndex) {
+				insertPos = i
+				break
+			}
+		}
+
+		val itemAdapter = row.adapter as? ItemRowAdapter
+		itemAdapter?.parent = targetAdapter
+		targetAdapter.add(insertPos, row)
+
+		if (itemAdapter?.queryType == QueryType.LiveTvProgram && insertPos > 0) {
+			val previousRow = targetAdapter[insertPos - 1]
+			previousRow?.let { itemAdapter.setSiblingRow(it) }
+		}
+	}
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
 		adapter = MutableObjectAdapter<Row>(PositionableListRowPresenter(sharedRecycledViewPool))
+
+		val cardPresenter = CardPresenter()
+		rowsAdapter?.let { targetAdapter ->
+			notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, targetAdapter)
+			nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, targetAdapter)
+		}
 
 		lifecycleScope.launch(Dispatchers.IO) {
 			val currentUser = withTimeout(30.seconds) {
 				userRepository.currentUser.filterNotNull().first()
 			}
 
-			// Start out with default sections
-			val homesections = userSettingPreferences.activeHomesections
+			val userViews = userViewsRepository.getCachedOrFetchedViews()
 
-			// Make sure the rows are empty
-			val rows = mutableListOf<HomeFragmentRow>()
-
-			// Check for coroutine cancellation
 			if (!isActive) return@launch
 
-			// Actually add the sections
-			for (section in homesections) when (section) {
-				HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
-				HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
-				HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
-				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())
-				HomeSectionType.RESUME_AUDIO -> rows.add(helper.loadResumeAudio())
-				HomeSectionType.RESUME_BOOK -> Unit // Books are not (yet) supported
-				HomeSectionType.ACTIVE_RECORDINGS -> rows.add(helper.loadLatestLiveTvRecordings())
-				HomeSectionType.NEXT_UP -> rows.add(helper.loadNextUp())
-				HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
-					rows.add(HomeFragmentLiveTVRow(requireActivity(), userRepository))
-					rows.add(helper.loadOnNow())
-				}
+			val homesections = userSettingPreferences.activeHomesections
 
-				HomeSectionType.NONE -> Unit
-			}
+			homesections.forEachIndexed { sIndex, section ->
+				val baseSectionIndex = sIndex * 100
 
-			// Add sections to layout
-			withContext(Dispatchers.Main) {
-				val cardPresenter = CardPresenter()
-				val targetAdapter = rowsAdapter ?: return@withContext
-
-				// Add rows in order
-				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, targetAdapter)
-				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, targetAdapter)
-				for (row in rows) {
-					row.addToRowsAdapter(requireContext(), cardPresenter, targetAdapter)
-				}
-
-				// Wire up Live TV sibling rows so the On Now row removes the buttons row when empty
-				for (i in 0 until targetAdapter.size()) {
-					val listRow = (targetAdapter[i] as? ListRow) ?: continue
-					val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
-					if ((itemAdapter.queryType == QueryType.LiveTvProgram) && (i > 0)) {
-						val previousRow = targetAdapter[i - 1]
-						previousRow?.let { itemAdapter.setSiblingRow(it) }
+				when (section) {
+					HomeSectionType.LIBRARY_TILES_SMALL -> launch {
+						val r = HomeFragmentViewsRow(small = false)
+						val listRow = r.createListRow(requireContext(), userViewsRepository)
+						if (listRow != null && isActive) {
+							withContext(Dispatchers.Main) {
+								addRowInOrder(listRow, baseSectionIndex)
+							}
+						}
 					}
+					HomeSectionType.LIBRARY_BUTTONS -> launch {
+						val r = HomeFragmentViewsRow(small = true)
+						val listRow = r.createListRow(requireContext(), userViewsRepository)
+						if (listRow != null && isActive) {
+							withContext(Dispatchers.Main) {
+								addRowInOrder(listRow, baseSectionIndex)
+							}
+						}
+					}
+					HomeSectionType.RESUME -> launch {
+						val r = helper.loadResumeVideo() as HomeFragmentBrowseRowDefRow
+						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
+						if (listRow != null && isActive) {
+							withContext(Dispatchers.Main) {
+								addRowInOrder(listRow, baseSectionIndex)
+							}
+						}
+					}
+					HomeSectionType.RESUME_AUDIO -> launch {
+						val r = helper.loadResumeAudio() as HomeFragmentBrowseRowDefRow
+						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
+						if (listRow != null && isActive) {
+							withContext(Dispatchers.Main) {
+								addRowInOrder(listRow, baseSectionIndex)
+							}
+						}
+					}
+					HomeSectionType.ACTIVE_RECORDINGS -> launch {
+						val r = helper.loadLatestLiveTvRecordings() as HomeFragmentBrowseRowDefRow
+						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
+						if (listRow != null && isActive) {
+							withContext(Dispatchers.Main) {
+								addRowInOrder(listRow, baseSectionIndex)
+							}
+						}
+					}
+					HomeSectionType.NEXT_UP -> launch {
+						val r = helper.loadNextUp() as HomeFragmentBrowseRowDefRow
+						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
+						if (listRow != null && isActive) {
+							withContext(Dispatchers.Main) {
+								addRowInOrder(listRow, baseSectionIndex)
+							}
+						}
+					}
+					HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
+						launch {
+							val liveTvRow = HomeFragmentLiveTVRow(requireActivity(), userRepository)
+							val tempAdapter = MutableObjectAdapter<Row>()
+							liveTvRow.addToRowsAdapter(requireContext(), cardPresenter, tempAdapter)
+							val rows = (0 until tempAdapter.size()).mapNotNull { tempAdapter[it] as? ListRow }
+							if (isActive) {
+								withContext(Dispatchers.Main) {
+									rows.forEachIndexed { idx, row ->
+										addRowInOrder(row, baseSectionIndex + idx)
+									}
+								}
+							}
+						}
+						launch {
+							val r = helper.loadOnNow() as HomeFragmentBrowseRowDefRow
+							val listRow = r.prepareRow(requireContext(), cardPresenter, api)
+							if (listRow != null && isActive) {
+								withContext(Dispatchers.Main) {
+									addRowInOrder(listRow, baseSectionIndex + 10)
+								}
+							}
+						}
+					}
+					HomeSectionType.LATEST_MEDIA -> launch {
+						val latestRow = helper.loadRecentlyAdded(userViews) as HomeFragmentLatestRow
+						latestRow.prepareRows(requireContext(), cardPresenter, api).forEachIndexed { vIdx, listRow ->
+							if (isActive) {
+								withContext(Dispatchers.Main) {
+									addRowInOrder(listRow, baseSectionIndex + vIdx)
+								}
+							}
+						}
+					}
+					HomeSectionType.NONE, HomeSectionType.RESUME_BOOK -> Unit
 				}
 			}
 		}
@@ -193,19 +290,30 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
 				api.webSocket.subscribe<UserDataChangedMessage>()
-					.onEach {
+					.onEach { message ->
 						val now = Instant.now()
 						dataRefreshService.lastPlayback = now
 						dataRefreshService.lastTvPlayback = now
 						dataRefreshService.lastMoviePlayback = now
-						refreshRows(force = true, delayed = true)
+
+						val changedData = message.data
+						val changedUserId = changedData?.userId
+						val currentUserId = userRepository.currentUser.value?.id
+						if (changedUserId == null || changedUserId == currentUserId) {
+							changedData?.userDataList?.forEach { userData ->
+								refreshItemById(userData.itemId)
+							}
+						}
+
+						refreshRows(force = false, delayed = true)
 					}
 					.launchIn(this)
 
 				api.webSocket.subscribe<LibraryChangedMessage>()
 					.onEach {
 						dataRefreshService.lastLibraryChange = Instant.now()
-						refreshRows(force = true, delayed = true)
+						userViewsRepository.clearCache()
+						refreshRows(force = false, delayed = true)
 					}
 					.launchIn(this)
 			}
@@ -339,6 +447,20 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		}
 	}
 
+	private fun refreshItemById(itemId: java.util.UUID) {
+		val currentRowsAdapter = rowsAdapter ?: return
+		repeat(currentRowsAdapter.size()) { i ->
+			val listRow = currentRowsAdapter[i] as? ListRow ?: return@repeat
+			val itemAdapter = listRow.adapter as? ItemRowAdapter ?: return@repeat
+			repeat(itemAdapter.size()) { j ->
+				val rowItem = itemAdapter[j] as? BaseRowItem ?: return@repeat
+				if (rowItem.itemId == itemId) {
+					itemAdapter.refreshItem(api, this, rowItem)
+				}
+			}
+		}
+	}
+
 	private fun refreshCurrentItem() {
 		val adapter = (currentRow?.adapter as? ItemRowAdapter) ?: return
 		val item = currentItem ?: return
@@ -438,7 +560,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				// Delay background update to avoid jank during navigation
 				backgroundJob?.cancel()
 				backgroundJob = lifecycleScope.launch {
-					delay(200.milliseconds)
 					backgroundService.setBackground(item.baseItem)
 				}
 			}

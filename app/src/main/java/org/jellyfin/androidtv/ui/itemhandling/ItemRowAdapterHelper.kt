@@ -91,6 +91,20 @@ fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 10) {
 	}
 }
 
+fun <T : Any> ItemRowAdapter.setInitialItems(
+	items: Collection<T>,
+	transform: (T, Int) -> BaseRowItem?,
+) {
+	val mappedItems = items.mapIndexedNotNull { index, item ->
+		transform(item, index)
+	}
+	replaceAll(mappedItems)
+	itemsLoaded = mappedItems.size
+	totalItems = mappedItems.size
+	lastFullRetrieve = java.time.Instant.now()
+	preloadRowImages(mappedItems)
+}
+
 fun <T : Any> ItemRowAdapter.setItems(
 	items: Collection<T>,
 	transform: (T, Int) -> BaseRowItem?,

@@ -1,7 +1,12 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
+import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.Row
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
@@ -9,6 +14,7 @@ import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
+import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.request.GetLatestMediaRequest
@@ -17,6 +23,35 @@ class HomeFragmentLatestRow(
 	private val userRepository: UserRepository,
 	private val userViews: Collection<BaseItemDto>,
 ) : HomeFragmentRow {
+	suspend fun prepareRows(
+		context: Context,
+		cardPresenter: CardPresenter,
+		api: ApiClient,
+		rowsAdapter: MutableObjectAdapter<Row>? = null,
+	): List<ListRow> = coroutineScope {
+		val configuration = userRepository.currentUser.value?.configuration
+		val latestItemsExcludes = configuration?.latestItemsExcludes.orEmpty()
+
+		val validViews = userViews.filterNot { item ->
+			item.collectionType in EXCLUDED_COLLECTION_TYPES || item.id in latestItemsExcludes
+		}
+
+		validViews.map { item ->
+			async(Dispatchers.IO) {
+				val request = GetLatestMediaRequest(
+					fields = ItemRepository.browseFields,
+					imageTypeLimit = 1,
+					parentId = item.id,
+					groupItems = true,
+					limit = ITEM_LIMIT,
+				)
+				val title = context.getString(R.string.lbl_latest_in, item.name)
+				val rowDef = BrowseRowDef(title, request, arrayOf(ChangeTriggerType.LibraryUpdated))
+				HomeFragmentBrowseRowDefRow(rowDef).prepareRow(context, cardPresenter, api, rowsAdapter)
+			}
+		}.awaitAll().filterNotNull()
+	}
+
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
 		// Get configuration (to find excluded items)
 		val configuration = userRepository.currentUser.value?.configuration

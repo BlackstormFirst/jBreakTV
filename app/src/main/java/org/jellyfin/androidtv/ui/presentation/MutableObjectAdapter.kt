@@ -5,6 +5,7 @@ import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.PresenterSelector
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListUpdateCallback
+import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 
 /**
  * A leanback ObjectAdapter using a Kotlin list as backend. Implements Iterable to allow collection
@@ -43,7 +44,18 @@ open class MutableObjectAdapter<T : Any> : ObjectAdapter, Iterable<T> {
 
 	fun replaceAll(
 		items: List<T>,
-		areItemsTheSame: (old: T, new: T) -> Boolean = { old, new -> old == new },
+		areItemsTheSame: (old: T, new: T) -> Boolean = { old, new ->
+			when {
+				old is BaseRowItem && new is BaseRowItem -> {
+					if (old.itemId != null && new.itemId != null) {
+						old.itemId == new.itemId
+					} else {
+						old == new
+					}
+				}
+				else -> old == new
+			}
+		},
 		areContentsTheSame: (old: T, new: T) -> Boolean = { old, new -> old == new },
 	) {
 		val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {

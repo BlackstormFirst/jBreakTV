@@ -20,7 +20,7 @@ class NotificationsHomeFragmentRow(
 	private val notificationsRepository: NotificationsRepository,
 ) : HomeFragmentRow, OnItemViewClickedListener {
 	private val announcementAdapter by lazy { MutableObjectAdapter<AppNotification>(AppNotificationPresenter()) }
-	private val listRow by lazy { ListRow(null, announcementAdapter) }
+	val listRow by lazy { ListRow(null, announcementAdapter) }
 	private var rowsAdapter: MutableObjectAdapter<Row>? = null
 	private var rowAdded = false
 

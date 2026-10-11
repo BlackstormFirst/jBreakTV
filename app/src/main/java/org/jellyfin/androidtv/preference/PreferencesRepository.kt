@@ -1,11 +1,13 @@
 package org.jellyfin.androidtv.preference
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userApi
 import timber.log.Timber
-import kotlin.collections.set
 
 /**
  * Repository to access special preference stores.
@@ -15,6 +17,7 @@ class PreferencesRepository(
 	private val liveTvPreferences: LiveTvPreferences,
 	private val userSettingPreferences: UserSettingPreferences,
 ) {
+	private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 	private val libraryPreferences = mutableMapOf<String, LibraryPreferences>()
 
 	fun getLibraryPreferences(preferencesId: String): LibraryPreferences {
@@ -22,10 +25,23 @@ class PreferencesRepository(
 
 		libraryPreferences[preferencesId] = store
 
-		// FIXME: Make [getLibraryPreferences] suspended when usages are converted to Kotlin
-		if (store.shouldUpdate) runBlocking(Dispatchers.IO) { store.update() }
+		if (store.shouldUpdate) {
+			scope.launch { store.update() }
+		}
 
 		return store
+	}
+
+	suspend fun getLibraryPreferencesAsync(preferencesId: String): LibraryPreferences = withContext(Dispatchers.IO) {
+		val store = libraryPreferences[preferencesId] ?: LibraryPreferences(preferencesId, api)
+
+		libraryPreferences[preferencesId] = store
+
+		if (store.shouldUpdate) {
+			store.update()
+		}
+
+		store
 	}
 
 	suspend fun refreshServerUserSettings() {

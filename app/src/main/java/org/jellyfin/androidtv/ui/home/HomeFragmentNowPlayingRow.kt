@@ -17,7 +17,7 @@ class HomeFragmentNowPlayingRow(
 	private val playbackManager: PlaybackManager,
 	private val mediaManager: MediaManager,
 ) : HomeFragmentRow {
-	private var row: ListRow? = null
+	var row: ListRow? = null
 
 	override fun addToRowsAdapter(
 		context: Context,

@@ -363,6 +363,22 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         this.queryType = QueryType.Resume;
     }
 
+    public void setParent(MutableObjectAdapter<Row> parent) {
+        this.mParent = parent;
+    }
+
+    public MutableObjectAdapter<Row> getParent() {
+        return mParent;
+    }
+
+    public void setLastFullRetrieve(Instant lastFullRetrieve) {
+        this.lastFullRetrieve = lastFullRetrieve;
+    }
+
+    public Instant getLastFullRetrieve() {
+        return lastFullRetrieve;
+    }
+
     public void setItemsLoaded(int itemsLoaded) {
         this.itemsLoaded = itemsLoaded;
         this.fullyLoaded = chunkSize == 0 || itemsLoaded >= totalItems;

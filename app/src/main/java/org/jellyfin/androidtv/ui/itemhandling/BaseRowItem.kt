@@ -28,7 +28,13 @@ abstract class BaseRowItem protected constructor(
 	open fun getSummary(context: Context): String? = null
 
 	override fun equals(other: Any?): Boolean {
-		if (other is BaseRowItem) return other.itemId == itemId
+		if (this === other) return true
+		if (other !is BaseRowItem) return false
+		if (itemId != null || other.itemId != null) return itemId == other.itemId
 		return super.equals(other)
+	}
+
+	override fun hashCode(): Int {
+		return itemId?.hashCode() ?: super.hashCode()
 	}
 }

@@ -32,6 +32,7 @@ import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.repository.SessionRepositoryState
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.data.eventhandling.SocketHandler
+import org.jellyfin.androidtv.data.service.BackgroundService
 import org.jellyfin.androidtv.databinding.ActivityStartupBinding
 import org.jellyfin.androidtv.integration.LeanbackChannelWorker
 import org.jellyfin.androidtv.ui.background.AppBackground
@@ -70,6 +71,7 @@ class StartupActivity : FragmentActivity() {
 	private val itemLauncher: ItemLauncher by inject()
 	private val workManager: WorkManager by inject()
 	private val socketListener: SocketHandler by inject()
+	private val backgroundService: BackgroundService by inject()
 
 	private lateinit var binding: ActivityStartupBinding
 
@@ -91,6 +93,8 @@ class StartupActivity : FragmentActivity() {
 		applyTheme()
 
 		super.onCreate(savedInstanceState)
+
+		backgroundService.resetToThemeAndSaveExisting()
 
 		binding = ActivityStartupBinding.inflate(layoutInflater)
 		binding.background.setContent { AppBackground() }
@@ -186,6 +190,8 @@ class StartupActivity : FragmentActivity() {
 		} else if (!navigationRepository.canGoBack) {
 			navigationRepository.reset(null, true)
 		}
+
+		backgroundService.restoreSavedBackground()
 
 		val intent = Intent(this, MainActivity::class.java)
 		// Clear navigation history

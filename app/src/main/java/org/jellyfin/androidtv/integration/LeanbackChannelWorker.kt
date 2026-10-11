@@ -80,8 +80,9 @@ class LeanbackChannelWorker(
 		suspend fun enqueue(workManager: WorkManager) {
 			workManager.enqueueUniquePeriodicWork(
 				PERIODIC_UPDATE_REQUEST_NAME,
-				ExistingPeriodicWorkPolicy.UPDATE,
+				ExistingPeriodicWorkPolicy.KEEP,
 				PeriodicWorkRequestBuilder<LeanbackChannelWorker>(1, TimeUnit.HOURS)
+					.setInitialDelay(15, TimeUnit.MINUTES)
 					.setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
 					.build()
 			).await()

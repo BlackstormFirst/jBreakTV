@@ -56,6 +56,33 @@ class BackgroundService(
 	val blurBackground get() = _blurBackground.asStateFlow()
 	val enabled get() = _enabled.asStateFlow()
 
+	// Saved background for restoration after splash screen
+	private var savedBackground: ImageBitmap? = null
+	private var savedBackgrounds: List<ImageBitmap> = emptyList()
+
+	/**
+	 * Temporarily resets the background to the default theme background,
+	 * while preserving the current background in memory to restore it after the splash screen.
+	 */
+	fun resetToThemeAndSaveExisting() {
+		if (_currentBackground.value != null) {
+			savedBackground = _currentBackground.value
+			savedBackgrounds = _backgrounds
+		}
+		_currentBackground.value = null
+	}
+
+	/**
+	 * Restores the previously saved background after the splash screen completes.
+	 */
+	fun restoreSavedBackground() {
+		val saved = savedBackground ?: return
+		_backgrounds = savedBackgrounds
+		_currentBackground.value = saved
+		savedBackground = null
+		savedBackgrounds = emptyList()
+	}
+
 	/**
 	 * Use all available backdrops from [baseItem] as background.
 	 */
@@ -103,7 +130,7 @@ class BackgroundService(
 		}
 	}
 
-	private fun loadBackgrounds(backdropUrls: Set<String>, debounceMs: Long = 250L) {
+	private fun loadBackgrounds(backdropUrls: Set<String>, debounceMs: Long = 150L) {
 		if (backdropUrls.isEmpty()) return clearBackgrounds()
 
 		// Re-enable backgrounds if disabled
