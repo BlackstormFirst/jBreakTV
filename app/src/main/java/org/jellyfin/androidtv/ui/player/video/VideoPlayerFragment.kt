@@ -565,10 +565,15 @@ class VideoPlayerFragment : Fragment() {
 		if (changed) {
 			lifecycleScope.launch {
 				// Pause briefly to allow display refresh rate switch / HDMI handshake to complete smoothly
-				playbackManager.state.pause()
+				val wasPlaying = playbackManager.state.playState.value == PlayState.PLAYING
+				if (wasPlaying) {
+					playbackManager.state.pause()
+				}
 				kotlinx.coroutines.delay(1200L)
 				if (isAdded && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-					playbackManager.state.unpause()
+					if (wasPlaying || playbackManager.state.playState.value == PlayState.PAUSED) {
+						playbackManager.state.unpause()
+					}
 				}
 			}
 		}
@@ -600,7 +605,10 @@ class VideoPlayerFragment : Fragment() {
 
 		if (activeInstanceHash == this.hashCode()) {
 			if (playbackManager.state.playState.value == PlayState.STOPPED) {
-				playbackManager.state.play()
+				val currentEntry = playbackManager.queue.entry.value
+				if (currentEntry?.mediaStream != null) {
+					playbackManager.state.play()
+				}
 			} else {
 				playbackManager.state.unpause()
 			}
@@ -642,8 +650,6 @@ class VideoPlayerFragment : Fragment() {
 		playerEventListener = null
 
 		if (isRemoving && activeInstanceHash == this.hashCode()) {
-			val surfaceView = playbackManager.backendService.surfaceView?.surface
-			refreshRateHelper?.resetRefreshRate(surfaceView)
 			val rawItem = playbackManager.queue.entry.value?.baseItem
 				?: videoQueueManager.getCurrentVideoQueue().getOrNull(videoQueueManager.getCurrentMediaPosition())
 			if (rawItem != null) {
@@ -657,6 +663,9 @@ class VideoPlayerFragment : Fragment() {
 				}
 			}
 			playbackManager.state.stop()
+
+			val surfaceView = playbackManager.backendService.surfaceView?.surface
+			refreshRateHelper?.resetRefreshRate(surfaceView)
 		}
 	}
 }

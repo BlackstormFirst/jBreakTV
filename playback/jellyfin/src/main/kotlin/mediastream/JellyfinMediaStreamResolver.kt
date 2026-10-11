@@ -86,7 +86,16 @@ class JellyfinMediaStreamResolver(
 				hasSegments = false,
 				transcodingSubProtocol = MediaStreamProtocol.HTTP,
 			)
-			streamIndexResolver?.invoke(itemToUse, initialSource)
+			val (bestAudioIndex, bestSubIndex, bestVideoIndex) = streamIndexResolver?.invoke(itemToUse, initialSource) ?: Triple(null, null, null)
+			if (queueEntry.preferredAudioIndex == null && bestAudioIndex != null) {
+				queueEntry.preferredAudioIndex = bestAudioIndex
+			}
+			if (queueEntry.preferredSubtitleIndex == null && bestSubIndex != null) {
+				queueEntry.preferredSubtitleIndex = bestSubIndex
+			}
+			if (queueEntry.preferredVideoIndex == null && bestVideoIndex != null) {
+				queueEntry.preferredVideoIndex = bestVideoIndex
+			}
 
 			return PlayableMediaStream(
 				identifier = "local_" + file.name.hashCode(),
