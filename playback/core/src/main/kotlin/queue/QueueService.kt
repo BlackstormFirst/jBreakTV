@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.core.mediastream.PlayableMediaStream
@@ -81,6 +82,7 @@ class QueueService internal constructor() : PlayerService(), Queue {
 	private suspend fun getOrSupplyEntry(index: Int): QueueEntry? {
 		// Fetch additional entries from suppliers until we reach the desired index
 		var entriesChanged = false
+		var count = 0
 		while (index >= fetchedEntries.size) {
 			// No more suppliers to try
 			if (currentSupplierIndex >= suppliers.size) break
@@ -97,6 +99,10 @@ class QueueService internal constructor() : PlayerService(), Queue {
 				// Move to the next supplier if current one is exhausted
 				currentSupplierIndex++
 				currentSupplierEntryIndex = 0
+			}
+			count++
+			if (count % 50 == 0) {
+				yield()
 			}
 		}
 		if (entriesChanged) _entries.value = fetchedEntries.toList()

@@ -1,11 +1,10 @@
 package org.jellyfin.playback.core.mediastream
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jellyfin.playback.core.plugin.PlayerService
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.queue.queue
@@ -29,24 +28,28 @@ class MediaStreamService(
 	}
 
 	override suspend fun onInitialize() {
-		manager.queue.entry.onEach { entry ->
+		manager.queue.entry.collectLatest { entry ->
 			Timber.d("Queue entry changed to $entry")
 
 			if (entry == null) {
 				val backend = requireNotNull(manager.backend)
-				backend.stop()
+				withContext(Dispatchers.Main) {
+					backend.stop()
+				}
 			} else {
 				playEntry(entry)
 				entry.ensurePreloadTimedEvent()
 			}
-		}.launchIn(coroutineScope + Dispatchers.Main)
+		}
 	}
 
 	private suspend fun QueueEntry.ensureMediaStream(): Boolean {
 		mediaStream = mediaStream ?: mediaStreamResolvers.firstNotNullOfOrNull { resolver ->
 			runCatching {
 				withContext(Dispatchers.IO) {
-					resolver.getStream(this@ensureMediaStream)
+					withTimeoutOrNull(15000L) {
+						resolver.getStream(this@ensureMediaStream)
+					}
 				}
 			}.onFailure {
 				Timber.e(it, "Media stream resolver failed for $this")
@@ -76,21 +79,23 @@ class MediaStreamService(
 		val backend = requireNotNull(manager.backend)
 		val hasMediaStream = entry.ensureMediaStream()
 
-		if (hasMediaStream) {
-			backend.playItem(entry)
-		} else {
-			Timber.e("Unable to resolve stream for entry $entry")
-			manager.backendService.BackendEventListener().onError(IllegalStateException("Unable to resolve stream for entry $entry"))
-
-			if (manager.queue.peekNext() != null) {
-				manager.queue.next(usePlaybackOrder = true, useRepeatMode = false)
+		withContext(Dispatchers.Main) {
+			if (hasMediaStream) {
+				backend.playItem(entry)
 			} else {
-				backend.stop()
+				Timber.e("Unable to resolve stream for entry $entry")
+				manager.backendService.BackendEventListener().onError(IllegalStateException("Unable to resolve stream for entry $entry"))
+
+				if (manager.queue.peekNext() != null) {
+					manager.queue.next(usePlaybackOrder = true, useRepeatMode = false)
+				} else {
+					backend.stop()
+				}
 			}
 		}
 	}
 
-	private fun preloadNextEntry() = coroutineScope.launch(Dispatchers.Main) {
+	private fun preloadNextEntry() = coroutineScope.launch(Dispatchers.IO) {
 		// Peek into the next item to preload
 		val nextItem = manager.queue.peekNext() ?: return@launch
 

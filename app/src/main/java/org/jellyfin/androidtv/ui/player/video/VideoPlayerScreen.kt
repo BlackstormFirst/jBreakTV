@@ -36,6 +36,7 @@ import org.jellyfin.androidtv.ui.player.base.toast.MediaToastRegistry
 import org.jellyfin.androidtv.ui.player.video.toast.rememberPlaybackManagerMediaToastEmitter
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.playback.core.PlaybackManager
+import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.baseItemFlow
@@ -83,8 +84,8 @@ fun VideoPlayerScreen() {
 	var showSpinner by remember { mutableStateOf(false) }
 
 	LaunchedEffect(entry, baseItem, isLocalInspecting, isBackendBuffering, playState) {
-		val isMediaOrMetadataLoading = entry == null || baseItem == null || isLocalInspecting
-		val isInitialPreparing = playState == PlayState.STOPPED && isBackendBuffering
+		val isMediaOrMetadataLoading = entry == null || baseItem == null || entry?.mediaStream == null || isLocalInspecting
+		val isInitialPreparing = (playState == PlayState.STOPPED || playState == PlayState.PAUSED) && (entry?.mediaStream == null || isBackendBuffering)
 
 		if (isMediaOrMetadataLoading || isInitialPreparing) {
 			// Phase de chargement initiale (médias, métadonnées, USB ou préparation ExoPlayer)

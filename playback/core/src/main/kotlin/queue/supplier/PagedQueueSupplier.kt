@@ -6,7 +6,7 @@ abstract class PagedQueueSupplier(
 	private val pageSize: Int = 10,
 ) : QueueSupplier {
 	companion object {
-		const val MAX_SIZE = 100
+		const val MAX_SIZE = 10_000
 	}
 
 	private val buffer: MutableList<QueueEntry> = mutableListOf()

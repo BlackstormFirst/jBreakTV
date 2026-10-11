@@ -186,7 +186,7 @@ class VideoPlayerFragment : Fragment() {
 					// so returning to a previous episode starts from position 0 instead of resuming at the end
 					val entries = playbackManager.queue.entries.value
 					entries.forEachIndexed { i, entry ->
-						if (i != index) {
+						if (i != index && (entry.mediaStream != null || (entry.baseItem?.userData?.playbackPositionTicks ?: 0L) > 0L)) {
 							val item = entry.baseItem
 							if (item != null && (item.userData?.playbackPositionTicks ?: 0L) > 0L) {
 								val clearedUserData = item.userData?.copy(playbackPositionTicks = 0L)
