@@ -16,6 +16,8 @@ import org.jellyfin.playback.core.model.RepeatMode
 import org.jellyfin.playback.core.plugin.PlayerService
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.queue.queue
+import org.jellyfin.playback.core.queue.preferredAudioIndex
+import org.jellyfin.playback.core.queue.preferredSubtitleIndex
 import org.jellyfin.playback.core.util.isLocalPath
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.mediaSourceId
@@ -41,6 +43,7 @@ class PlaySessionService(
 	private var lastActivePositionMs: Long = 0L
 	private var activeEntry: QueueEntry? = null
 	private var activeItem: BaseItemDto? = null
+	private var hasLastPlaybackFailed = false
 
 	private fun isLocalMedia(item: BaseItemDto): Boolean {
 		//if (item.mediaSources?.firstOrNull()?.eTag != null || !item.serverId.isNullOrEmpty()) return false
@@ -57,10 +60,21 @@ class PlaySessionService(
 
 		state.playState.onEach { playState ->
 			when (playState) {
-				PlayState.PLAYING -> sendStreamStart()
-				PlayState.STOPPED -> sendStreamStop(failed = false)
+				PlayState.PLAYING -> {
+					hasLastPlaybackFailed = false
+					sendStreamStart()
+				}
 				PlayState.PAUSED -> sendStreamUpdate()
-				PlayState.ERROR -> sendStreamStop(failed = true)
+				PlayState.ERROR -> {
+					hasLastPlaybackFailed = true
+					if (!isSessionStarted) {
+						sendStreamStop(failed = true)
+					}
+				}
+				PlayState.STOPPED -> {
+					sendStreamStop(failed = hasLastPlaybackFailed)
+					hasLastPlaybackFailed = false
+				}
 			}
 		}.launchIn(coroutineScope)
 
@@ -155,7 +169,9 @@ class PlaySessionService(
 							org.jellyfin.playback.core.model.PlaybackOrder.DEFAULT -> PlaybackOrder.DEFAULT
 							org.jellyfin.playback.core.model.PlaybackOrder.RANDOM -> PlaybackOrder.SHUFFLE
 							org.jellyfin.playback.core.model.PlaybackOrder.SHUFFLE -> PlaybackOrder.SHUFFLE
-						}
+						},
+						audioStreamIndex = entry.preferredAudioIndex,
+						subtitleStreamIndex = entry.preferredSubtitleIndex,
 					)
 				)
 				isSessionStarted = true
@@ -205,7 +221,9 @@ class PlaySessionService(
 							org.jellyfin.playback.core.model.PlaybackOrder.DEFAULT -> PlaybackOrder.DEFAULT
 							org.jellyfin.playback.core.model.PlaybackOrder.RANDOM -> PlaybackOrder.SHUFFLE
 							org.jellyfin.playback.core.model.PlaybackOrder.SHUFFLE -> PlaybackOrder.SHUFFLE
-						}
+						},
+						audioStreamIndex = entry.preferredAudioIndex,
+						subtitleStreamIndex = entry.preferredSubtitleIndex,
 					)
 				)
 				Timber.d("Reported playback progress for ${item.name} at reportMs=$reportMs")

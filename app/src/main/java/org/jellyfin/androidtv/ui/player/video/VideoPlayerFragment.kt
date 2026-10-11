@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.preference.UserPreferences
@@ -39,6 +40,7 @@ import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.core.ui.PlayerSurfaceView
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.extensions.clientLogApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaProtocol
@@ -418,6 +420,8 @@ class VideoPlayerFragment : Fragment() {
 						}
 
 						lastAutoSelectedEntryId = entryId
+					} catch (e: Exception) {
+						Timber.e(e, "Error during automatic track selection")
 					} finally {
 						isApplyingAutoTracks = false
 					}
@@ -488,6 +492,33 @@ class VideoPlayerFragment : Fragment() {
 			isRetrying = false
 			Toast.makeText(requireContext(), getString(R.string.too_many_errors), Toast.LENGTH_LONG).show()
 			Timber.e(error, "Too many playback errors ($playbackRetries retries), closing player")
+
+			lifecycleScope.launch(Dispatchers.IO) {
+				runCatching {
+					val report = buildString {
+						appendLine("---")
+						appendLine("client: jBreakTV for Android TV")
+						appendLine("client_version: ${BuildConfig.VERSION_NAME}")
+						appendLine("type: playback_error")
+						appendLine("format: markdown")
+						appendLine("---")
+						appendLine()
+						appendLine("## Playback Error Report")
+						appendLine("- Item: ${currentItem?.name} (ID: ${currentItem?.id})")
+						appendLine("- Error: ${error?.message}")
+						appendLine("- Cause: ${error?.cause?.message}")
+						appendLine("- Retries: $playbackRetries")
+						if (error != null) {
+							appendLine()
+							appendLine("```log")
+							appendLine(error.stackTraceToString())
+							appendLine("```")
+						}
+					}
+					api.clientLogApi.logFile(report)
+				}.onFailure { e -> Timber.w(e, "Failed to upload playback error log to server") }
+			}
+
 			playbackManager.state.stop()
 			navigationRepository.goBack()
 		}
