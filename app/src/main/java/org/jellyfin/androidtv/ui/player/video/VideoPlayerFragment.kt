@@ -64,6 +64,9 @@ private data class TrackSelectionResult(
 class VideoPlayerFragment : Fragment() {
 	companion object {
 		const val EXTRA_POSITION: String = "position"
+
+		@Volatile
+		private var activeInstanceHash: Int? = null
 	}
 
 	private val videoQueueManager by inject<VideoQueueManager>()
@@ -85,6 +88,7 @@ class VideoPlayerFragment : Fragment() {
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
+		activeInstanceHash = this.hashCode()
 		Timber.d("PlayerDebug [VideoPlayerFragment.onCreate]: Created fragment instance hash=${this.hashCode()}")
 
 		refreshRateHelper = RefreshRateHelper(requireActivity(), userPreferences)
@@ -554,17 +558,21 @@ class VideoPlayerFragment : Fragment() {
 		super.onPause()
 		Timber.d("PlayerDebug [VideoPlayerFragment.onPause]: Pausing fragment hash=${this.hashCode()}")
 
-		playbackManager.state.pause()
+		if (activeInstanceHash == this.hashCode()) {
+			playbackManager.state.pause()
+		}
 	}
 
 	override fun onResume() {
 		super.onResume()
 		Timber.d("PlayerDebug [VideoPlayerFragment.onResume]: Resuming fragment hash=${this.hashCode()}, playState=${playbackManager.state.playState.value}")
 
-		if (playbackManager.state.playState.value == PlayState.STOPPED) {
-			playbackManager.state.play()
-		} else {
-			playbackManager.state.unpause()
+		if (activeInstanceHash == this.hashCode()) {
+			if (playbackManager.state.playState.value == PlayState.STOPPED) {
+				playbackManager.state.play()
+			} else {
+				playbackManager.state.unpause()
+			}
 		}
 	}
 
@@ -602,7 +610,7 @@ class VideoPlayerFragment : Fragment() {
 		}
 		playerEventListener = null
 
-		if (isRemoving) {
+		if (isRemoving && activeInstanceHash == this.hashCode()) {
 			val surfaceView = playbackManager.backendService.surfaceView?.surface
 			refreshRateHelper?.resetRefreshRate(surfaceView)
 			val rawItem = playbackManager.queue.entry.value?.baseItem
