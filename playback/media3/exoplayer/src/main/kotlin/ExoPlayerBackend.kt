@@ -206,35 +206,41 @@ class ExoPlayerBackend(
 
 				if (exoPlayerOptions.enableLibass) {
 					assHandler.init(player)
-					if (exoPlayerOptions.libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
-						val metadataListener = VideoFrameMetadataListener { presentationTimeUs, releaseTimeNs, _, _ ->
-							if (presentationTimeUs >= 0) {
-								val nowNs = System.nanoTime()
-								val vsyncLeadUs = if (releaseTimeNs > nowNs) (releaseTimeNs - nowNs) / 1000L else 0L
-								val targetPresentationTimeUs = presentationTimeUs + vsyncLeadUs
-
-								val currentMediaPosUs = runCatching { player.currentPosition * 1000L }.getOrDefault(targetPresentationTimeUs)
-								val expectedPosUs = targetPresentationTimeUs - activeStreamOffsetUs
-								if (abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
-									activeStreamOffsetUs = targetPresentationTimeUs - currentMediaPosUs
-								}
-
-								val correctedTimeUs = (targetPresentationTimeUs - activeStreamOffsetUs).coerceAtLeast(0L)
-
-								runCatching {
-									assHandler.videoTimeCallback?.invoke(correctedTimeUs)
-								}
-							}
-						}
-						videoFrameMetadataListener = metadataListener
-						player.setVideoFrameMetadataListener(metadataListener)
-					}
+					ensureVideoFrameMetadataListener()
 				}
 			}
 	}
 	private var activeStreamOffsetUs: Long = 0L
 	private var videoFrameMetadataListener: VideoFrameMetadataListener? = null
 	private val exoPlayer by exoPlayerDelegate
+
+	private fun ensureVideoFrameMetadataListener() {
+		if (exoPlayerOptions.enableLibass && exoPlayerOptions.libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
+			if (videoFrameMetadataListener == null) {
+				val metadataListener = VideoFrameMetadataListener { presentationTimeUs, releaseTimeNs, _, _ ->
+					if (presentationTimeUs >= 0) {
+						val nowNs = System.nanoTime()
+						val vsyncLeadUs = if (releaseTimeNs > nowNs) (releaseTimeNs - nowNs) / 1000L else 0L
+						val targetPresentationTimeUs = presentationTimeUs + vsyncLeadUs
+
+						val currentMediaPosUs = runCatching { exoPlayer.currentPosition * 1000L }.getOrDefault(targetPresentationTimeUs)
+						val expectedPosUs = targetPresentationTimeUs - activeStreamOffsetUs
+						if (abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
+							activeStreamOffsetUs = targetPresentationTimeUs - currentMediaPosUs
+						}
+
+						val correctedTimeUs = (targetPresentationTimeUs - activeStreamOffsetUs).coerceAtLeast(0L)
+
+						runCatching {
+							assHandler.videoTimeCallback?.invoke(correctedTimeUs)
+						}
+					}
+				}
+				videoFrameMetadataListener = metadataListener
+				exoPlayer.setVideoFrameMetadataListener(metadataListener)
+			}
+		}
+	}
 
 	private var pendingInitialSeekMs: Long? = null
 
@@ -440,6 +446,7 @@ class ExoPlayerBackend(
 
 	override fun prepareItem(item: QueueEntry) {
 		if (exoPlayerOptions.enableLibass) {
+			ensureVideoFrameMetadataListener()
 			AssFontManager.preloadFonts(context, item.mediaStream?.url, assHandler)
 		}
 	}
@@ -459,6 +466,7 @@ class ExoPlayerBackend(
 		val mediaItem = buildMediaItem(item)
 
 		if (exoPlayerOptions.enableLibass) {
+			ensureVideoFrameMetadataListener()
 			AssFontManager.preloadFonts(context, item.mediaStream?.url, assHandler)
 		}
 
