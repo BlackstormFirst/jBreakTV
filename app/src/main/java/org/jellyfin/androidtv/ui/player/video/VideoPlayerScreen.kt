@@ -25,11 +25,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import androidx.activity.compose.BackHandler
 import org.jellyfin.androidtv.data.service.BackgroundService
 import org.jellyfin.androidtv.preference.constant.ZoomMode
 import org.jellyfin.androidtv.ui.ScreensaverLock
 import org.jellyfin.androidtv.ui.base.CircularProgressIndicator
 import org.jellyfin.androidtv.ui.composable.rememberQueueEntry
+import org.jellyfin.androidtv.ui.navigation.Destinations
+import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.player.base.PlayerSubtitles
 import org.jellyfin.androidtv.ui.player.base.PlayerSurface
 import org.jellyfin.androidtv.ui.player.base.toast.MediaToastRegistry
@@ -40,6 +44,7 @@ import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.baseItemFlow
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.compose.koinInject
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
@@ -50,10 +55,22 @@ private const val DefaultVideoAspectRatio = 16f / 9f
 @Composable
 fun VideoPlayerScreen() {
 	val playbackManager = koinInject<PlaybackManager>()
+	val navigationRepository = koinInject<NavigationRepository>()
+	val videoQueueManager = koinInject<VideoQueueManager>()
 	val context = LocalContext.current
 
 	val entry by rememberQueueEntry(playbackManager)
 	val baseItem = entry?.run { baseItemFlow.collectAsState(baseItem) }?.value
+
+	BackHandler {
+		val lastPlayedItem = entry?.baseItem
+			?: videoQueueManager.getCurrentVideoQueue().getOrNull(videoQueueManager.getCurrentMediaPosition())
+		if (lastPlayedItem != null && lastPlayedItem.type != BaseItemKind.TRAILER) {
+			navigationRepository.navigate(Destinations.itemDetails(lastPlayedItem.id), true)
+		} else {
+			navigationRepository.goBack()
+		}
+	}
 
 	var isLocalInspecting by remember { mutableStateOf(false) }
 

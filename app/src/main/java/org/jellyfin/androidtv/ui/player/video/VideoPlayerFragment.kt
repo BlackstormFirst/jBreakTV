@@ -242,7 +242,7 @@ class VideoPlayerFragment : Fragment() {
 					PlayState.STOPPED -> {
 						val hasNextItem = videoQueueManager.getCurrentMediaPosition() < videoQueueManager.getCurrentVideoQueue().size - 1
 						if (hasStarted && !isRetrying && !isNavigatingToNextUp && !hasNextItem && isAdded && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-							navigationRepository.goBack()
+							navigateToLastPlayedItemOrBack()
 						}
 					}
 					else -> Unit
@@ -650,6 +650,16 @@ class VideoPlayerFragment : Fragment() {
 		)
 
 		return copy(userData = updatedUserData)
+	}
+
+	private fun navigateToLastPlayedItemOrBack() {
+		val lastPlayedItem = playbackManager.queue.entry.value?.baseItem
+			?: videoQueueManager.getCurrentVideoQueue().getOrNull(videoQueueManager.getCurrentMediaPosition())
+		if (lastPlayedItem != null && lastPlayedItem.type != BaseItemKind.TRAILER) {
+			navigationRepository.navigate(Destinations.itemDetails(lastPlayedItem.id), true)
+		} else {
+			navigationRepository.goBack()
+		}
 	}
 
 	override fun onDestroy() {
