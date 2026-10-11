@@ -82,20 +82,28 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 		BaseItemKind.PROGRAM -> baseItem.episodeTitle ?: baseItem.channelName
 
 		BaseItemKind.RECORDING -> {
-			val title = listOfNotNull(
-				baseItem.channelName,
-				baseItem.episodeTitle
-			).joinToString(" - ")
-
-			val timestamp = buildString {
-				append(DateTimeFormatter.ofPattern("d MMM", context.locale).format(baseItem.startDate))
-				append(" ")
-				append(context.getTimeFormatter().format(baseItem.startDate))
-				append(" - ")
-				append(context.getTimeFormatter().format(baseItem.endDate))
+			val channelName = baseItem.channelName
+			val episodeTitle = baseItem.episodeTitle
+			val title = when {
+				!channelName.isNullOrEmpty() && !episodeTitle.isNullOrEmpty() -> "$channelName - $episodeTitle"
+				!channelName.isNullOrEmpty() -> channelName
+				!episodeTitle.isNullOrEmpty() -> episodeTitle
+				else -> ""
 			}
 
-			"$title $timestamp"
+			val timeFormatter = context.getTimeFormatter()
+			val startDate = baseItem.startDate
+			val endDate = baseItem.endDate
+
+			val formattedDate = dayMonthFormatter.withLocale(context.locale).format(startDate)
+			val formattedStartTime = timeFormatter.format(startDate)
+			val formattedEndTime = timeFormatter.format(endDate)
+
+			if (title.isEmpty()) {
+				"$formattedDate $formattedStartTime - $formattedEndTime"
+			} else {
+				"$title $formattedDate $formattedStartTime - $formattedEndTime"
+			}
 		}
 
 		else -> baseItem?.getSubName(context)
@@ -126,5 +134,11 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 	override fun equals(other: Any?): Boolean {
 		if (other is BaseItemDtoBaseRowItem) return other.baseItem == baseItem
 		return super.equals(other)
+	}
+
+	private companion object {
+		private val dayMonthFormatter: DateTimeFormatter by lazy {
+			DateTimeFormatter.ofPattern("d MMM")
+		}
 	}
 }

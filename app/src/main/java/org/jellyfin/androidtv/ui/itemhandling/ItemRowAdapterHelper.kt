@@ -57,7 +57,7 @@ import org.jellyfin.androidtv.util.apiclient.getUrl
 import timber.log.Timber
 import kotlin.math.min
 
-fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 10) {
+fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 4) {
 	val api = runCatching { get<ApiClient>(ApiClient::class.java) }.getOrNull() ?: return
 	val imageLoader = runCatching { get<ImageLoader>(ImageLoader::class.java) }.getOrNull() ?: return
 	val density = context.resources.displayMetrics.density

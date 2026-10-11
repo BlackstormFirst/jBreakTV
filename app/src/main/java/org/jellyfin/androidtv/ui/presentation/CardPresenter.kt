@@ -55,7 +55,6 @@ import org.jellyfin.design.Tokens
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.androidtv.preference.UserPreferences
-import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -128,11 +127,13 @@ class CardPresenter(
 	private inner class CardViewHolder(composeView: ComposeView) : ViewHolder(composeView) {
 		private val _item = MutableStateFlow<BaseRowItem?>(null)
 		private val _focused = MutableStateFlow(false)
+		private val _displayCirclePersonCards = MutableStateFlow(false)
 
 		init {
 			composeView.setContent {
 				val item by _item.collectAsState()
 				val focused by _focused.collectAsState()
+				val displayCirclePersonCards by _displayCirclePersonCards.collectAsState()
 
 				CardViewHolderContent(
 					item = item,
@@ -141,7 +142,7 @@ class CardPresenter(
 					imageType = imageType,
 					staticHeight = staticHeight,
 					uniformAspect = uniformAspect,
-					userPreferences = userPreferences,
+					displayCirclePersonCards = displayCirclePersonCards,
 					api = api,
 				)
 			}
@@ -151,6 +152,7 @@ class CardPresenter(
 		}
 
 		fun bind(item: BaseRowItem) {
+			_displayCirclePersonCards.value = userPreferences[UserPreferences.displayCirclePersonCards]
 			_item.value = item
 			_focused.value = view.isFocused
 		}
@@ -322,12 +324,11 @@ private fun CardViewHolderContent(
 	imageType: ImageType,
 	staticHeight: Int,
 	uniformAspect: Boolean,
-	userPreferences: UserPreferences,
+	displayCirclePersonCards: Boolean,
 	api: ApiClient,
 ) {
 	val context = LocalContext.current
 	val localDensity = LocalDensity.current
-	val displayCirclePersonCards by rememberPreference(userPreferences, UserPreferences.displayCirclePersonCards)
 
 	val title = remember(item, context) { item?.getCardName(context) }
 	val subtitle = remember(item, context) { item?.getSubText(context) }

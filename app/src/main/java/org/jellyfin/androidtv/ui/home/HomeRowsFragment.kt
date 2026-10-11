@@ -334,7 +334,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				if (isAdded && !isDetached) {
 					runCatching {
 						val cardPresenter = CardPresenter()
-						cardPresenter.prewarm(gridView, sharedRecycledViewPool, count = 15)
+						cardPresenter.prewarm(gridView, sharedRecycledViewPool, count = 8)
 					}
 				}
 				false
@@ -437,12 +437,20 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		lifecycleScope.launch(Dispatchers.IO) {
 			if (delayed) delay(1.5.seconds)
 
+			val minInterval = Instant.now().minusSeconds(15)
+
 			repeat(adapter.size()) { i ->
 				val rowAdapter = ((adapter[i] as? ListRow)?.adapter as? ItemRowAdapter) ?: return@repeat
 				if (rowAdapter.queryType == QueryType.Views) return@repeat
 
-				if (force) rowAdapter.Retrieve()
-				else rowAdapter.ReRetrieveIfNeeded()
+				if (force) {
+					rowAdapter.Retrieve()
+				} else {
+					val lastRetrieve = rowAdapter.lastFullRetrieve
+					if (lastRetrieve == null || lastRetrieve.isBefore(minInterval)) {
+						rowAdapter.ReRetrieveIfNeeded()
+					}
+				}
 			}
 		}
 	}
