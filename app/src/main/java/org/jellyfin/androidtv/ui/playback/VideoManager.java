@@ -107,6 +107,7 @@ public class VideoManager {
     public boolean isContracted = false;
     public AssHandler mAssHandler;
     private long mActiveStreamOffsetUs = 0L;
+    private long mLastRenderedTimeUs = 0L;
     private VideoFrameMetadataListener mVideoFrameMetadataListener = null;
 
     private final UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
@@ -163,17 +164,27 @@ public class VideoManager {
                     Function1<Long, Unit> callback = handler.getVideoTimeCallback();
                     if (callback != null) {
                         try {
-                            long nowNs = System.nanoTime();
-                            long vsyncLeadUs = (releaseTimeNs > nowNs) ? (releaseTimeNs - nowNs) / 1000L : 0L;
-                            long targetPresentationTimeUs = presentationTimeUs + vsyncLeadUs;
-
-                            long currentMediaPosUs = (mExoPlayer != null) ? mExoPlayer.getCurrentPosition() * 1000L : targetPresentationTimeUs;
-                            long expectedPosUs = targetPresentationTimeUs - mActiveStreamOffsetUs;
+                            long currentMediaPosUs = (mExoPlayer != null) ? mExoPlayer.getCurrentPosition() * 1000L : presentationTimeUs;
+                            long expectedPosUs = presentationTimeUs - mActiveStreamOffsetUs;
                             if (Math.abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
-                                mActiveStreamOffsetUs = targetPresentationTimeUs - currentMediaPosUs;
+                                mActiveStreamOffsetUs = presentationTimeUs - currentMediaPosUs;
+                                mLastRenderedTimeUs = 0L;
                             }
 
-                            long correctedTimeUs = Math.max(0L, targetPresentationTimeUs - mActiveStreamOffsetUs);
+                            long ptsTimeUs = Math.max(0L, presentationTimeUs - mActiveStreamOffsetUs);
+
+                            long correctedTimeUs;
+                            if (ptsTimeUs < mLastRenderedTimeUs) {
+                                if (mLastRenderedTimeUs - ptsTimeUs > 1_000_000L) {
+                                    correctedTimeUs = ptsTimeUs;
+                                } else {
+                                    correctedTimeUs = mLastRenderedTimeUs;
+                                }
+                            } else {
+                                correctedTimeUs = ptsTimeUs;
+                            }
+                            mLastRenderedTimeUs = correctedTimeUs;
+
                             callback.invoke(correctedTimeUs);
                         } catch (Exception ignored) {}
                     }

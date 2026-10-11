@@ -211,25 +211,30 @@ class ExoPlayerBackend(
 			}
 	}
 	private var activeStreamOffsetUs: Long = 0L
+	private var lastRenderedTimeUs: Long = 0L
 	private var videoFrameMetadataListener: VideoFrameMetadataListener? = null
 	private val exoPlayer by exoPlayerDelegate
 
 	private fun ensureVideoFrameMetadataListener() {
 		if (exoPlayerOptions.enableLibass && exoPlayerOptions.libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
 			if (videoFrameMetadataListener == null) {
-				val metadataListener = VideoFrameMetadataListener { presentationTimeUs, releaseTimeNs, _, _ ->
+				val metadataListener = VideoFrameMetadataListener { presentationTimeUs, _, _, _ ->
 					if (presentationTimeUs >= 0) {
-						val nowNs = System.nanoTime()
-						val vsyncLeadUs = if (releaseTimeNs > nowNs) (releaseTimeNs - nowNs) / 1000L else 0L
-						val targetPresentationTimeUs = presentationTimeUs + vsyncLeadUs
-
-						val currentMediaPosUs = runCatching { exoPlayer.currentPosition * 1000L }.getOrDefault(targetPresentationTimeUs)
-						val expectedPosUs = targetPresentationTimeUs - activeStreamOffsetUs
+						val currentMediaPosUs = runCatching { exoPlayer.currentPosition * 1000L }.getOrDefault(presentationTimeUs)
+						val expectedPosUs = presentationTimeUs - activeStreamOffsetUs
 						if (abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
-							activeStreamOffsetUs = targetPresentationTimeUs - currentMediaPosUs
+							activeStreamOffsetUs = presentationTimeUs - currentMediaPosUs
+							lastRenderedTimeUs = 0L
 						}
 
-						val correctedTimeUs = (targetPresentationTimeUs - activeStreamOffsetUs).coerceAtLeast(0L)
+						val ptsTimeUs = (presentationTimeUs - activeStreamOffsetUs).coerceAtLeast(0L)
+
+						val correctedTimeUs = if (ptsTimeUs < lastRenderedTimeUs) {
+							if (lastRenderedTimeUs - ptsTimeUs > 1_000_000L) ptsTimeUs else lastRenderedTimeUs
+						} else {
+							ptsTimeUs
+						}
+						lastRenderedTimeUs = correctedTimeUs
 
 						runCatching {
 							assHandler.videoTimeCallback?.invoke(correctedTimeUs)
@@ -461,6 +466,7 @@ class ExoPlayerBackend(
 		if (!needsReload) return
 
 		activeStreamOffsetUs = 0L
+		lastRenderedTimeUs = 0L
 		currentStream = stream
 
 		val mediaItem = buildMediaItem(item)
