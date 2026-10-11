@@ -229,6 +229,10 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     public void onResume() {
         super.onResume();
 
+        if (mBaseItem != null) {
+            backgroundService.getValue().setBackground(mBaseItem);
+        }
+
         ClockBehavior clockBehavior = userPreferences.getValue().get(UserPreferences.Companion.getClockBehavior());
         if (clockBehavior == ClockBehavior.ALWAYS || clockBehavior == ClockBehavior.IN_MENUS) {
             startClock();

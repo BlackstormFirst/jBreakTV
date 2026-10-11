@@ -189,6 +189,9 @@ public class ItemListFragment extends Fragment implements View.OnKeyListener {
     @Override
     public void onResume() {
         super.onResume();
+        if (mBaseItem != null) {
+            backgroundService.getValue().setBackground(mBaseItem);
+        }
         mediaManager.getValue().addAudioEventListener(mAudioEventListener);
         // and fire it to be sure we're updated
         mAudioEventListener.onPlaybackStateChange(mediaManager.getValue().isPlayingAudio() ? PlaybackController.PlaybackState.PLAYING : PlaybackController.PlaybackState.IDLE, mediaManager.getValue().getCurrentAudioItem());
