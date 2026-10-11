@@ -73,7 +73,7 @@ private fun getSubtitleTrack(stream: MediaStream, api: ApiClient? = null) = Medi
 	isDefault = stream.isDefault,
 	isForced = stream.isForced,
 	deliveryUrl = stream.deliveryUrl?.let { url ->
-		if (url.startsWith("http://") || url.startsWith("https://") || api == null) url
+		if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://") || url.startsWith("content://") || url.startsWith("/") || api == null) url
 		else api.createUrl(url, ignorePathParameters = true)
 	},
 )
@@ -84,7 +84,7 @@ private fun getAttachmentTrack(stream: MediaStream, api: ApiClient? = null) = Me
 	fileName = stream.title ?: stream.displayTitle,
 	mimeType = stream.comment,
 	deliveryUrl = stream.deliveryUrl?.let { url ->
-		if (url.startsWith("http://") || url.startsWith("https://") || api == null) url
+		if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://") || url.startsWith("content://") || url.startsWith("/") || api == null) url
 		else api.createUrl(url, ignorePathParameters = true)
 	},
 )

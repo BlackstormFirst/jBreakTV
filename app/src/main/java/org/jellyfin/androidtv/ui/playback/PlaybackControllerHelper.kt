@@ -183,7 +183,7 @@ fun PlaybackController.setSubtitleIndex(index: Int, force: Boolean = false) {
 						// Verify this is a group with a single format (the subtitles) that is added by us. Because ExoPlayer uses a
 						// MergingMediaSource, each external subtitle format id is prefixed with its source index (normally starting at 1,
 						// increasing for each external subtitle). So we only check the end of the id
-						group.length == 1 && group.getTrackFormat(0).id?.endsWith(":JF_EXTERNAL:$index") == true
+						group.length == 1 && group.getTrackFormat(0).id?.endsWith("JF_EXTERNAL:$index") == true
 					}
 				} else {
 					// The server does not send a reliable index in all cases, so calculate it manually
@@ -200,7 +200,7 @@ fun PlaybackController.setSubtitleIndex(index: Int, force: Boolean = false) {
 
 					mVideoManager.mExoPlayer.currentTracks.groups
 						.filter { it.type == C.TRACK_TYPE_TEXT }
-						.filterNot { it.length == 1 && it.getTrackFormat(0).id?.endsWith(":JF_EXTERNAL:$index") == true }
+						.filterNot { it.length == 1 && it.getTrackFormat(0).id?.endsWith("JF_EXTERNAL:$index") == true }
 						.getOrNull(localIndex)
 				}?.mediaTrackGroup
 

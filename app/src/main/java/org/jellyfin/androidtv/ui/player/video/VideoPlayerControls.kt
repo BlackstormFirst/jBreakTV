@@ -793,6 +793,7 @@ private fun AudioButton(
 								val audioTypeIndex = if (mediaStream != null) audioStreams.indexOf(mediaStream) else trackIndexInList
 								if (audioTypeIndex >= 0) videoQueueManager.setLastPlayedAudioIndexInType(audioTypeIndex)
 								videoQueueManager.setSelectedAudioStreamIndex(track.mediaStreamIndex)
+								entry?.preferredAudioIndex = track.mediaStreamIndex
 
 								val currentPlayableStream = entry?.mediaStream
 								val isTranscodingOrRemux = currentPlayableStream?.conversionMethod != null && currentPlayableStream.conversionMethod != MediaConversionMethod.None
@@ -941,6 +942,7 @@ private fun VideoButton(
 									?: videoStreams.firstOrNull { (it.language != null && it.language.equals(track.language, ignoreCase = true)) || it.displayTitle == track.label || it.title == track.label }
 									?: videoStreams.getOrNull(trackIndexInList)
 								videoQueueManager.setSelectedVideoStreamIndex(track.mediaStreamIndex)
+								entry?.preferredVideoIndex = track.mediaStreamIndex
 
 								val currentPlayableStream = entry?.mediaStream
 								val isTranscodingOrRemux = currentPlayableStream?.conversionMethod != null && currentPlayableStream.conversionMethod != MediaConversionMethod.None

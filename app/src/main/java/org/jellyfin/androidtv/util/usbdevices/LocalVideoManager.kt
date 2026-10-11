@@ -391,10 +391,10 @@ object LocalVideoManager {
             streams.add(MediaStream(type = MediaStreamType.AUDIO, index = streams.size, codec = "aac", channels = LocalProbeConfig.DEFAULT_AUDIO_CHANNELS, sampleRate = LocalProbeConfig.DEFAULT_AUDIO_SAMPLE_RATE, channelLayout = "Stereo", language = "und", title = fallbackTitle, displayTitle = fallbackTitle, isDefault = true, isForced = false, isExternal = false, isHearingImpaired = false, isInterlaced = false, isTextSubtitleStream = false, supportsExternalStream = false))
         }
 
-        // Sidecars (external subtitles) - inserted before embedded subtitles so external subtitles appear first
+        // Sidecars (external subtitles) - inserted before embedded subtitles so external subtitles appear first and take priority
         val sidecars = UsbMediaHelper.findSidecarSubtitles(file)
         val externalSubStreams = sidecars.map { subFile ->
-            val subUriStr = context.getFileProviderUri(subFile)
+            val subUriStr = Uri.fromFile(subFile).toString()
             val meta = parseExternalSubtitleMeta(subFile, file, context = context)
             MediaStream(type = MediaStreamType.SUBTITLE, index = -1, codec = subFile.extension, language = meta.language ?: "und", title = meta.displayTitle, displayTitle = meta.displayTitle, isDefault = meta.isDefault, isForced = meta.isForced, isExternal = true, isHearingImpaired = meta.isHearingImpaired, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr)
         }
@@ -487,7 +487,7 @@ object LocalVideoManager {
 
         val sidecars = UsbMediaHelper.findSidecarSubtitles(file)
         sidecars.forEach { subFile ->
-            val subUriStr = context.getFileProviderUri(subFile)
+            val subUriStr = Uri.fromFile(subFile).toString()
             val meta = parseExternalSubtitleMeta(subFile, file, context = context)
             streams.add(MediaStream(type = MediaStreamType.SUBTITLE, index = streams.size, codec = subFile.extension, language = meta.language ?: "und", title = meta.displayTitle, displayTitle = meta.displayTitle, isDefault = false, isForced = meta.isForced, isExternal = true, isHearingImpaired = meta.isHearingImpaired, isInterlaced = false, isTextSubtitleStream = true, supportsExternalStream = true, deliveryMethod = SubtitleDeliveryMethod.EXTERNAL, deliveryUrl = subUriStr))
         }

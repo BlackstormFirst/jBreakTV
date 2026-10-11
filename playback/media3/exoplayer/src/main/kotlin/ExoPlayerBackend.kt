@@ -822,7 +822,15 @@ class ExoPlayerBackend(
 
 			if (mediaTrack is MediaStreamSubtitleTrack && mediaTrack.isExternal) {
 				matchedGroupInfo = activeGroups.firstOrNull { g ->
-					g.length == 1 && g.getMediaTrackGroup().getFormat(0).id?.endsWith(":JF_EXTERNAL:$index") == true
+					g.length == 1 && g.getMediaTrackGroup().getFormat(0).id?.endsWith("JF_EXTERNAL:$index") == true
+				} ?: run {
+					val externalGroups = activeGroups.filter { g ->
+						g.length == 1 && g.getMediaTrackGroup().getFormat(0).id?.contains("JF_EXTERNAL") == true
+					}
+					val extIdxInType = tracksForType.filterIsInstance<MediaStreamSubtitleTrack>()
+						.filter { it.isExternal }
+						.indexOf(mediaTrack)
+					externalGroups.getOrNull(extIdxInType)
 				}
 			} else if (isTranscoded) {
 				val isTargetTranscodedTrack = when (trackType) {
@@ -835,10 +843,24 @@ class ExoPlayerBackend(
 					matchedGroupInfo = activeGroups.firstOrNull()
 				}
 			} else {
-				matchedGroupInfo = activeGroups.firstOrNull { g ->
-					val groupId = g.mediaTrackGroup.id
-					groupId.endsWith(":$index") || groupId == index.toString()
-				} ?: activeGroups.getOrNull(indexInType)
+				if (trackType == C.TRACK_TYPE_TEXT) {
+					val embeddedGroups = activeGroups.filterNot { g ->
+						g.length == 1 && g.getMediaTrackGroup().getFormat(0).id?.contains("JF_EXTERNAL") == true
+					}
+					val embIdxInType = tracksForType.filterIsInstance<MediaStreamSubtitleTrack>()
+						.filter { !it.isExternal }
+						.indexOf(mediaTrack)
+					matchedGroupInfo = embeddedGroups.getOrNull(embIdxInType)
+						?: activeGroups.firstOrNull { g ->
+							val groupId = g.mediaTrackGroup.id
+							groupId.endsWith(":$index") || groupId == index.toString()
+						}
+				} else {
+					matchedGroupInfo = activeGroups.firstOrNull { g ->
+						val groupId = g.mediaTrackGroup.id
+						groupId.endsWith(":$index") || groupId == index.toString()
+					} ?: activeGroups.getOrNull(indexInType)
+				}
 			}
 
 			val group = matchedGroupInfo?.mediaTrackGroup
@@ -953,8 +975,7 @@ class ExoPlayerBackend(
 			return
 		}
 
-		if (exoPlayer.playbackState == Player.STATE_READY &&
-			!exoPlayer.currentTimeline.isEmpty &&
+		if (!exoPlayer.currentTimeline.isEmpty &&
 			exoPlayer.currentMediaItem != null &&
 			!exoPlayer.currentTracks.groups.isEmpty()) {
 			pendingTrackSelectionParameters = null
@@ -970,8 +991,7 @@ class ExoPlayerBackend(
 
 	private fun checkPendingTrackSelectionParameters() {
 		val pending = pendingTrackSelectionParameters ?: return
-		if (exoPlayer.playbackState == Player.STATE_READY &&
-			!exoPlayer.currentTimeline.isEmpty &&
+		if (!exoPlayer.currentTimeline.isEmpty &&
 			exoPlayer.currentMediaItem != null &&
 			!exoPlayer.currentTracks.groups.isEmpty()) {
 			pendingTrackSelectionParameters = null
@@ -1001,13 +1021,13 @@ class ExoPlayerBackend(
 		} else {
 			builder.setTrackTypeDisabled(trackType, false)
 			var group = track.group as? TrackGroup
-			if (trackType == C.TRACK_TYPE_TEXT && track.mediaStreamIndex != -1) {
+			if (group == null && track.mediaStreamIndex != -1) {
 				val targetIndex = track.mediaStreamIndex
 				val matchedGroupInfo = exoPlayer.currentTracks.groups.firstOrNull { g ->
-					g.type == C.TRACK_TYPE_TEXT && (
+					g.type == trackType && (
 						g.mediaTrackGroup.id.endsWith(":$targetIndex") ||
 						g.mediaTrackGroup.id == targetIndex.toString() ||
-						(g.length == 1 && g.getTrackFormat(0).id?.endsWith(":JF_EXTERNAL:$targetIndex") == true)
+						(g.length == 1 && g.getTrackFormat(0).id?.endsWith("JF_EXTERNAL:$targetIndex") == true)
 					)
 				}
 				if (matchedGroupInfo != null) {
@@ -1043,7 +1063,19 @@ class ExoPlayerBackend(
 		if (videoTrack == null) {
 			builder.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
 		} else {
-			val group = videoTrack.group as? TrackGroup
+			var group = videoTrack.group as? TrackGroup
+			if (group == null && videoTrack.mediaStreamIndex != -1) {
+				val targetIndex = videoTrack.mediaStreamIndex
+				val matchedGroupInfo = exoPlayer.currentTracks.groups.firstOrNull { g ->
+					g.type == C.TRACK_TYPE_VIDEO && (
+						g.mediaTrackGroup.id.endsWith(":$targetIndex") ||
+						g.mediaTrackGroup.id == targetIndex.toString()
+					)
+				}
+				if (matchedGroupInfo != null) {
+					group = matchedGroupInfo.mediaTrackGroup
+				}
+			}
 			if (group != null) {
 				builder.clearOverridesOfType(C.TRACK_TYPE_VIDEO)
 				builder.addOverride(TrackSelectionOverride(group, videoTrack.trackIndex.coerceAtLeast(0)))
@@ -1054,7 +1086,19 @@ class ExoPlayerBackend(
 		if (audioTrack == null) {
 			builder.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
 		} else {
-			val group = audioTrack.group as? TrackGroup
+			var group = audioTrack.group as? TrackGroup
+			if (group == null && audioTrack.mediaStreamIndex != -1) {
+				val targetIndex = audioTrack.mediaStreamIndex
+				val matchedGroupInfo = exoPlayer.currentTracks.groups.firstOrNull { g ->
+					g.type == C.TRACK_TYPE_AUDIO && (
+						g.mediaTrackGroup.id.endsWith(":$targetIndex") ||
+						g.mediaTrackGroup.id == targetIndex.toString()
+					)
+				}
+				if (matchedGroupInfo != null) {
+					group = matchedGroupInfo.mediaTrackGroup
+				}
+			}
 			if (group != null) {
 				builder.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
 				builder.addOverride(TrackSelectionOverride(group, audioTrack.trackIndex.coerceAtLeast(0)))
@@ -1068,13 +1112,13 @@ class ExoPlayerBackend(
 		} else {
 			builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
 			var group = subtitleTrack.group as? TrackGroup
-			if (subtitleTrack.mediaStreamIndex != -1) {
+			if (group == null && subtitleTrack.mediaStreamIndex != -1) {
 				val targetIndex = subtitleTrack.mediaStreamIndex
 				val matchedGroupInfo = exoPlayer.currentTracks.groups.firstOrNull { g ->
 					g.type == C.TRACK_TYPE_TEXT && (
 						g.mediaTrackGroup.id.endsWith(":$targetIndex") ||
 						g.mediaTrackGroup.id == targetIndex.toString() ||
-						(g.length == 1 && g.getTrackFormat(0).id?.endsWith(":JF_EXTERNAL:$targetIndex") == true)
+						(g.length == 1 && g.getTrackFormat(0).id?.endsWith("JF_EXTERNAL:$targetIndex") == true)
 					)
 				}
 				if (matchedGroupInfo != null) {
