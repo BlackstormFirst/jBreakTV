@@ -79,50 +79,71 @@ class SdkPlaybackHelper(
 			BaseItemKind.EPISODE -> {
 				val seriesId = mainItem.seriesId
 				if (userPreferences[UserPreferences.mediaQueuingEnabled] && seriesId != null) {
-					val response by api.tvShowsApi.getEpisodes(
-						seriesId = seriesId,
-						isMissing = false,
-						sortBy = if (shuffle) ItemSortBy.RANDOM else null,
-						fields = ItemRepository.playbackFields
-					)
+					val cachedSeriesId = videoQueueManager.getFullSeriesId()
+					val cachedQueue = videoQueueManager.getFullSeriesQueue()
 
-					val allEpisodes = response.items.filter { it.canPlay() }
-					val currentIndex = allEpisodes.indexOfFirst { it.id == mainItem.id }
-
-					if (currentIndex != -1) {
-						videoQueueManager.setFullSeriesQueue(allEpisodes)
-						allEpisodes
+					if (!shuffle && cachedSeriesId == seriesId && !cachedQueue.isNullOrEmpty() && cachedQueue.any { it.id == mainItem.id }) {
+						val updatedQueue = cachedQueue.map { item ->
+							if (item.id == mainItem.id) {
+								item.copy(
+									userData = mainItem.userData ?: item.userData,
+									mediaSources = mainItem.mediaSources ?: item.mediaSources,
+								)
+							} else {
+								item
+							}
+						}
+						videoQueueManager.setFullSeriesQueue(seriesId, updatedQueue)
+						updatedQueue
 					} else {
-						videoQueueManager.setFullSeriesQueue(null)
-						if (mainItem.canPlay()) listOf(mainItem) else emptyList()
+						val response by api.tvShowsApi.getEpisodes(
+							seriesId = seriesId,
+							isMissing = false,
+							sortBy = if (shuffle) ItemSortBy.RANDOM else null,
+							fields = ItemRepository.playbackFields
+						)
+
+						val allEpisodes = response.items.filter { it.canPlay() }
+						val currentIndex = allEpisodes.indexOfFirst { it.id == mainItem.id }
+
+						if (currentIndex != -1) {
+							videoQueueManager.setFullSeriesQueue(seriesId, allEpisodes)
+							allEpisodes
+						} else {
+							videoQueueManager.setFullSeriesQueue(null, null)
+							if (mainItem.canPlay()) listOf(mainItem) else emptyList()
+						}
 					}
 				} else {
-					videoQueueManager.setFullSeriesQueue(null)
+					videoQueueManager.setFullSeriesQueue(null, null)
 					if (mainItem.canPlay()) listOf(mainItem) else emptyList()
 				}
 			}
 
 			BaseItemKind.SERIES -> {
-				videoQueueManager.setFullSeriesQueue(null)
 				val response by api.tvShowsApi.getEpisodes(
 					seriesId = mainItem.id,
 					isMissing = false,
 					sortBy = if (shuffle) ItemSortBy.RANDOM else null,
 					fields = ItemRepository.playbackFields,
 				)
-				response.items.filter { it.canPlay() }
+				val episodes = response.items.filter { it.canPlay() }
+				videoQueueManager.setFullSeriesQueue(mainItem.id, episodes)
+				episodes
 			}
 
 			BaseItemKind.SEASON -> {
-				videoQueueManager.setFullSeriesQueue(null)
+				val seriesId = requireNotNull(mainItem.seriesId)
 				val response by api.tvShowsApi.getEpisodes(
-					seriesId = requireNotNull(mainItem.seriesId),
+					seriesId = seriesId,
 					seasonId = mainItem.id,
 					isMissing = false,
 					sortBy = if (shuffle) ItemSortBy.RANDOM else null,
 					fields = ItemRepository.playbackFields,
 				)
-				response.items.filter { it.canPlay() }
+				val episodes = response.items.filter { it.canPlay() }
+				videoQueueManager.setFullSeriesQueue(seriesId, episodes)
+				episodes
 			}
 
 			BaseItemKind.FOLDER -> {

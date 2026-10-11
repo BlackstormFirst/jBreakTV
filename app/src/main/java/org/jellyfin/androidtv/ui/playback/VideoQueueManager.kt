@@ -1,11 +1,13 @@
 package org.jellyfin.androidtv.ui.playback
 
 import org.jellyfin.sdk.model.api.BaseItemDto
+import java.util.UUID
 
 class VideoQueueManager {
 	private var _currentVideoQueue: List<BaseItemDto> = emptyList()
 	private var _currentMediaPosition = -1
 	private var _fullSeriesQueue: List<BaseItemDto>? = null
+	private var _fullSeriesId: UUID? = null
 	private var _currentSeriesEpisodeId: String? = null
 	private var _selectedAudioStreamIndex: Int? = null
 	private var _selectedSubtitleStreamIndex: Int? = null
@@ -26,12 +28,20 @@ class VideoQueueManager {
 	private var _lastPlayedVideoCodec: String? = null
 	private var _lastPlayedVideoTitle: String? = null
 
-	fun setFullSeriesQueue(allEpisodes: List<BaseItemDto>?) {
+	fun setFullSeriesQueue(seriesId: UUID?, allEpisodes: List<BaseItemDto>?) {
+		_fullSeriesId = seriesId
 		_fullSeriesQueue = allEpisodes?.toList()
 		_currentSeriesEpisodeId = null
 	}
 
+	fun setFullSeriesQueue(allEpisodes: List<BaseItemDto>?) {
+		val seriesId = allEpisodes?.firstOrNull()?.seriesId
+		setFullSeriesQueue(seriesId, allEpisodes)
+	}
+
 	fun getFullSeriesQueue(): List<BaseItemDto>? = _fullSeriesQueue
+
+	fun getFullSeriesId(): UUID? = _fullSeriesId
 
 	fun updateWindowForEpisode(currentEpisode: BaseItemDto) {
 		val fullList = _fullSeriesQueue ?: return
@@ -48,6 +58,7 @@ class VideoQueueManager {
 			_currentVideoQueue = emptyList()
 			_currentMediaPosition = -1
 			_fullSeriesQueue = null
+			_fullSeriesId = null
 			_currentSeriesEpisodeId = null
 			return
 		}
@@ -209,11 +220,15 @@ class VideoQueueManager {
 	fun getSelectedVideoStreamIndex(): Int? = _selectedVideoStreamIndex
 	fun setSelectedVideoStreamIndex(index: Int?) { _selectedVideoStreamIndex = index }
 
-	fun clearVideoQueue() {
+	@JvmOverloads
+	fun clearVideoQueue(clearFullSeriesQueue: Boolean = false) {
 		_currentVideoQueue = emptyList()
 		_currentMediaPosition = -1
-		_fullSeriesQueue = null
-		_currentSeriesEpisodeId = null
+		if (clearFullSeriesQueue) {
+			_fullSeriesQueue = null
+			_fullSeriesId = null
+			_currentSeriesEpisodeId = null
+		}
 		_selectedAudioStreamIndex = null
 		_selectedSubtitleStreamIndex = null
 		_selectedVideoStreamIndex = null
