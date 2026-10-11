@@ -1,54 +1,57 @@
 package org.jellyfin.androidtv.ui.player.video
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jellyfin.androidtv.R
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import org.jellyfin.androidtv.ui.base.LocalTextStyle
 import org.jellyfin.androidtv.ui.base.Text
-import org.jellyfin.androidtv.ui.composable.rememberPlayerPositionInfo
 import org.jellyfin.androidtv.ui.player.base.PlayerHeader
+import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
-import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
+import org.koin.compose.koinInject
 
 @Composable
 @Stable
 fun VideoPlayerHeader(
 	item: BaseItemDto?,
-	playbackManager: PlaybackManager,
+	imageHelper: ImageHelper = koinInject(),
 ) {
-	val positionInfo by rememberPlayerPositionInfo(playbackManager, precision = 1.seconds)
-	val remainingDuration = (positionInfo.duration - positionInfo.active).coerceAtLeast(Duration.ZERO)
-
-	val finishText = remember(positionInfo) {
-		if (remainingDuration > Duration.ZERO) {
-			val finishTime = LocalTime.now().plusSeconds(remainingDuration.inWholeSeconds)
-			val formatter = DateTimeFormatter.ofPattern("HH:mm")
-			finishTime.format(formatter)
-		} else null
-	}
-
 	val isLocal = item?.let { LocalVideoManager.isLocalItem(it) } == true
 	val isLiveTv = LiveTvPlayerHelper.isLiveTv(item)
 	val isEpisode = item?.type == BaseItemKind.EPISODE || item?.indexNumber != null
 
-	val titleText = remember(item, isLocal, isLiveTv, isEpisode) {
+	val logoUrl = remember(item, imageHelper, isLiveTv) {
+		item?.let {
+			val logo = imageHelper.getLogoImageUrl(it, maxWidth = 440)
+			if (logo == null && isLiveTv) {
+				imageHelper.getPrimaryImageUrl(it, preferParentThumb = false)
+			} else {
+				logo
+			}
+		}
+	}
+
+	val seriesName = remember(item) {
+		item?.seriesName.orEmpty()
+	}
+
+	val episodeText = remember(item, isLocal, isEpisode) {
 		val name = item?.name.orEmpty()
-		if (item != null && isLiveTv) {
-			val channelNum = item.channelNumber ?: item.number
-			if (!channelNum.isNullOrEmpty()) "$channelNum $name" else name
-		} else if (item != null && !isLocal && isEpisode) {
+		if (item != null && !isLocal && isEpisode) {
 			val seasonNum = item.parentIndexNumber
 			val episodeNum = item.indexNumber
 			if (seasonNum != null && episodeNum != null) {
@@ -66,25 +69,56 @@ fun VideoPlayerHeader(
 		}
 	}
 
-	val subtitleText = remember(item, isLiveTv) {
+	val titleText = remember(item, isLiveTv, isEpisode, seriesName) {
+		if (item != null && isLiveTv) {
+			val channelNum = item.channelNumber ?: item.number
+			val name = item.name.orEmpty()
+			if (!channelNum.isNullOrEmpty()) "$channelNum $name" else name
+		} else if (item != null && !isLocal && isEpisode) {
+			seriesName.ifEmpty { item.name.orEmpty() }
+		} else {
+			item?.name.orEmpty()
+		}
+	}
+
+	val subtitleText = remember(item, isLiveTv, isEpisode, episodeText) {
 		if (item != null && isLiveTv) {
 			item.currentProgram?.name ?: item.overview ?: item.seriesName.orEmpty()
+		} else if (item != null && !isLocal && isEpisode) {
+			episodeText
 		} else {
-			item?.seriesName.orEmpty()
+			""
 		}
 	}
 
 	PlayerHeader {
 		if (item != null) {
-			Text(
-				text = titleText,
-				overflow = TextOverflow.Ellipsis,
-				maxLines = 1,
-				style = LocalTextStyle.current.copy(
-					color = Color.White,
-					fontSize = 22.sp
+			if (logoUrl != null) {
+				Image(
+					painter = rememberAsyncImagePainter(
+						ImageRequest.Builder(LocalContext.current)
+							.data(logoUrl)
+							.build()
+					),
+					contentDescription = titleText,
+					modifier = Modifier
+						.height(60.dp)
+						.widthIn(max = 450.dp),
+					contentScale = ContentScale.Fit,
 				)
-			)
+			} else {
+				if (titleText.isNotEmpty()) {
+					Text(
+						text = titleText,
+						overflow = TextOverflow.Ellipsis,
+						maxLines = 1,
+						style = LocalTextStyle.current.copy(
+							color = Color.White,
+							fontSize = 22.sp
+						)
+					)
+				}
+			}
 
 			if (subtitleText.isNotEmpty()) {
 				Text(
@@ -94,29 +128,6 @@ fun VideoPlayerHeader(
 					style = LocalTextStyle.current.copy(
 						color = Color.White.copy(alpha = 0.8f),
 						fontSize = 18.sp
-					)
-				)
-			}
-
-			if (isLiveTv) {
-				val programEnd = item.currentProgram?.endDate ?: item.endDate
-				if (programEnd != null) {
-					val formatter = DateTimeFormatter.ofPattern("HH:mm")
-					val endTimeStr = programEnd.format(formatter)
-					Text(
-						text = stringResource(R.string.lbl_playback_control_ends, endTimeStr),
-						style = LocalTextStyle.current.copy(
-							color = Color.White.copy(alpha = 0.7f),
-							fontSize = 14.sp
-						)
-					)
-				}
-			} else if (finishText != null) {
-				Text(
-					text = stringResource(R.string.lbl_playback_control_ends, finishText),
-					style = LocalTextStyle.current.copy(
-						color = Color.White.copy(alpha = 0.7f),
-						fontSize = 14.sp
 					)
 				)
 			}

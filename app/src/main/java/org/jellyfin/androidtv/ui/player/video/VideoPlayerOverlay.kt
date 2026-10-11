@@ -172,7 +172,6 @@ fun VideoPlayerOverlay(
 				Column {
 					VideoPlayerHeader(
 						item = item,
-						playbackManager = playbackManager,
 					)
 				}
 			},

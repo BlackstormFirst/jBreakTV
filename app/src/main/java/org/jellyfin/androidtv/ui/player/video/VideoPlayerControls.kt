@@ -51,12 +51,16 @@ import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.base.popover.Popover
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenu
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenuCheckboxItem
+import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.androidtv.ui.composable.rememberPlayerPositionInfo
 import org.jellyfin.androidtv.ui.composable.rememberQueueEntry
 import org.jellyfin.androidtv.ui.player.base.PlayerOverlayVisibilityState
 import org.jellyfin.androidtv.ui.player.base.PlayerSeekbar
 import org.jellyfin.androidtv.ui.player.base.rememberPlayerOverlayVisibility
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
+import androidx.compose.foundation.layout.width
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import org.jellyfin.androidtv.util.apiclient.chapterImages
 import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
@@ -230,16 +234,54 @@ fun VideoPlayerControls(
 		)
 
 		Row(
-			horizontalArrangement = Arrangement.spacedBy(12.dp),
 			modifier = Modifier
+				.fillMaxWidth()
 				.focusRestorer()
-				.focusGroup()
+				.focusGroup(),
+			horizontalArrangement = Arrangement.SpaceBetween,
+			verticalAlignment = Alignment.CenterVertically,
 		) {
-			Spacer(Modifier.weight(1f))
+			FinishText(playbackManager, baseItem)
 			PositionText(playbackManager, scrubbingProgress)
 		}
 	}
 }
+
+@Composable
+private fun FinishText(
+	playbackManager: PlaybackManager,
+	item: BaseItemDto?,
+) {
+	val isLiveTv = LiveTvPlayerHelper.isLiveTv(item)
+	val positionInfo by rememberPlayerPositionInfo(playbackManager, precision = 1.seconds)
+
+	val timeStr = remember(positionInfo, item, isLiveTv) {
+		if (isLiveTv) {
+			val programEnd = item?.currentProgram?.endDate ?: item?.endDate
+			programEnd?.format(DateTimeFormatter.ofPattern("HH:mm"))
+		} else {
+			val remainingDuration = (positionInfo.duration - positionInfo.active).coerceAtLeast(Duration.ZERO)
+			if (remainingDuration > Duration.ZERO && positionInfo.duration > Duration.ZERO) {
+				val finishTime = LocalTime.now().plusSeconds(remainingDuration.inWholeSeconds)
+				val formatter = DateTimeFormatter.ofPattern("HH:mm")
+				finishTime.format(formatter)
+			} else null
+		}
+	}
+
+	if (timeStr != null) {
+		Text(
+			text = stringResource(R.string.lbl_playback_control_ends, timeStr),
+			style = LocalTextStyle.current.copy(
+				color = Color.White.copy(alpha = 0.7f),
+				fontSize = 14.sp
+			)
+		)
+	} else {
+		Spacer(Modifier.width(1.dp))
+	}
+}
+
 
 @Composable
 private fun PlayPauseButton(
