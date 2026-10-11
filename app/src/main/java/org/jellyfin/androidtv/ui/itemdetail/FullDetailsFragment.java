@@ -241,51 +241,66 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
 
                 Instant lastPlaybackTime = dataRefreshService.getValue().getLastPlayback();
+                BaseItemDto lastPlayedItem = dataRefreshService.getValue().getLastPlayedItem();
                 Timber.d("current time %s last playback event time %s last refresh time %s", Instant.now().toEpochMilli(), lastPlaybackTime, mLastUpdated.toEpochMilli());
 
-                // if last playback event exists, and event time is greater than last sync or within 2 seconds of current time
-                // the third condition accounts for a situation where a sync (dataRefresh) coincides with the end of playback
-                if (lastPlaybackTime != null && (lastPlaybackTime.isAfter(mLastUpdated) || Instant.now().toEpochMilli() - lastPlaybackTime.toEpochMilli() < 2000) && mBaseItem.getType() != BaseItemKind.MUSIC_ARTIST) {
-                    BaseItemDto lastPlayedItem = dataRefreshService.getValue().getLastPlayedItem();
-                    if (mBaseItem.getType() == BaseItemKind.EPISODE && lastPlayedItem != null && !mBaseItem.getId().equals(lastPlayedItem.getId()) && lastPlayedItem.getType() == BaseItemKind.EPISODE) {
-                        Timber.i("Re-loading after new episode playback");
-                        loadItem(lastPlayedItem.getId());
-                        dataRefreshService.getValue().setLastPlayedItem(null); //blank this out so a detail screen we back up to doesn't also do this
-                    } else {
-                        Timber.i("Updating info after playback");
-                        FullDetailsFragmentHelperKt.getItem(FullDetailsFragment.this, mBaseItem.getId(), item -> {
-                            if (item == null) return null;
+                boolean isPlaybackRecent = lastPlaybackTime != null && (lastPlaybackTime.isAfter(mLastUpdated) || Instant.now().toEpochMilli() - lastPlaybackTime.toEpochMilli() < 2000);
 
-                            mBaseItem = item;
-                            if (mResumeButton != null) {
-                                boolean resumeVisible = (mBaseItem.getType() == BaseItemKind.SERIES && !mBaseItem.getUserData().getPlayed()) || JavaCompat.getCanResume(mBaseItem);
-                                mResumeButton.setVisibility(resumeVisible ? View.VISIBLE : View.GONE);
-                                if (JavaCompat.getCanResume(mBaseItem)) {
-                                    mResumeButton.setLabel(getString(R.string.lbl_resume_from, TimeUtils.formatMillis((mBaseItem.getUserData().getPlaybackPositionTicks() / 10000) - getResumePreroll())));
-                                }
-                                if (resumeVisible) {
-                                    mResumeButton.requestFocus();
-                                } else if (playButton != null && ViewKt.isVisible(playButton)) {
-                                    playButton.requestFocus();
-                                }
-                                showMoreButtonIfNeeded();
+                if (isPlaybackRecent && mBaseItem.getType() != BaseItemKind.MUSIC_ARTIST) {
+                    Timber.i("Updating info after playback");
+                    dataRefreshService.getValue().setLastPlayedItem(null); // blank this out so subsequent screens don't re-use stale item
+                    if (lastPlayedItem != null && lastPlayedItem.getUserData() != null && lastPlayedItem.getId().equals(mBaseItem.getId())) {
+                        mBaseItem = JavaCompat.copyWithUserData(mBaseItem, lastPlayedItem.getUserData());
+                        updateWatched();
+                        if (mResumeButton != null) {
+                            boolean resumeVisible = (mBaseItem.getType() == BaseItemKind.SERIES && !mBaseItem.getUserData().getPlayed()) || JavaCompat.getCanResume(mBaseItem);
+                            mResumeButton.setVisibility(resumeVisible ? View.VISIBLE : View.GONE);
+                            if (JavaCompat.getCanResume(mBaseItem)) {
+                                mResumeButton.setLabel(getString(R.string.lbl_resume_from, TimeUtils.formatMillis((mBaseItem.getUserData().getPlaybackPositionTicks() / 10000) - getResumePreroll())));
                             }
-                            updateWatched();
-                            mLastUpdated = Instant.now();
+                        }
+                    }
+                    FullDetailsFragmentHelperKt.getItem(FullDetailsFragment.this, mBaseItem.getId(), item -> {
+                        if (item == null) return null;
 
-                            if (mRowsAdapter != null) {
-                                for (int i = 0; i < mRowsAdapter.size(); i++) {
-                                    if (mRowsAdapter.get(i) instanceof ListRow) {
-                                        ListRow listRow = (ListRow) mRowsAdapter.get(i);
-                                        if (listRow != null && listRow.getAdapter() instanceof ItemRowAdapter) {
-                                            ((ItemRowAdapter) listRow.getAdapter()).ReRetrieveIfNeeded();
-                                        }
+                        if (lastPlayedItem != null && lastPlayedItem.getUserData() != null && lastPlayedItem.getId().equals(item.getId())) {
+                            Long serverTicks = item.getUserData() != null ? item.getUserData().getPlaybackPositionTicks() : 0L;
+                            Long localTicks = lastPlayedItem.getUserData().getPlaybackPositionTicks();
+                            Boolean localPlayed = lastPlayedItem.getUserData().getPlayed();
+                            if (Boolean.TRUE.equals(localPlayed) || (localTicks != null && serverTicks != null && localTicks > serverTicks)) {
+                                item = JavaCompat.copyWithUserData(item, lastPlayedItem.getUserData());
+                            }
+                        }
+
+                        mBaseItem = item;
+                        if (mResumeButton != null) {
+                            boolean resumeVisible = (mBaseItem.getType() == BaseItemKind.SERIES && !mBaseItem.getUserData().getPlayed()) || JavaCompat.getCanResume(mBaseItem);
+                            mResumeButton.setVisibility(resumeVisible ? View.VISIBLE : View.GONE);
+                            if (JavaCompat.getCanResume(mBaseItem)) {
+                                mResumeButton.setLabel(getString(R.string.lbl_resume_from, TimeUtils.formatMillis((mBaseItem.getUserData().getPlaybackPositionTicks() / 10000) - getResumePreroll())));
+                            }
+                            if (resumeVisible) {
+                                mResumeButton.requestFocus();
+                            } else if (playButton != null && ViewKt.isVisible(playButton)) {
+                                playButton.requestFocus();
+                            }
+                            showMoreButtonIfNeeded();
+                        }
+                        updateWatched();
+                        mLastUpdated = Instant.now();
+
+                        if (mRowsAdapter != null) {
+                            for (int i = 0; i < mRowsAdapter.size(); i++) {
+                                if (mRowsAdapter.get(i) instanceof ListRow) {
+                                    ListRow listRow = (ListRow) mRowsAdapter.get(i);
+                                    if (listRow != null && listRow.getAdapter() instanceof ItemRowAdapter) {
+                                        ((ItemRowAdapter) listRow.getAdapter()).ReRetrieveIfNeeded();
                                     }
                                 }
                             }
-                            return null;
-                        });
-                    }
+                        }
+                        return null;
+                    });
                 }
             }
         }, 750);

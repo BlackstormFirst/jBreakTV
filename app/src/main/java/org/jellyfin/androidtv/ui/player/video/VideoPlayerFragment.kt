@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.constant.NextUpBehavior
 import org.jellyfin.androidtv.preference.constant.StillWatchingBehavior
@@ -38,6 +39,7 @@ import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.core.ui.PlayerSurfaceView
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaProtocol
 import org.jellyfin.sdk.model.api.MediaSourceInfo
@@ -48,6 +50,7 @@ import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.koin.android.ext.android.inject
 import timber.log.Timber
 import java.io.File
+import java.time.Instant
 
 private data class TrackSelectionResult(
 	val audioIndex: Int?,
@@ -69,6 +72,7 @@ class VideoPlayerFragment : Fragment() {
 	private val api by inject<ApiClient>()
 	private val navigationRepository by inject<NavigationRepository>()
 	private val interactionTrackerViewModel by inject<InteractionTrackerViewModel>()
+	private val dataRefreshService by inject<DataRefreshService>()
 
 	private var refreshRateHelper: RefreshRateHelper? = null
 	private var playerEventListener: PlayerBackendEventListener? = null
@@ -154,6 +158,19 @@ class VideoPlayerFragment : Fragment() {
 					lastAutoSelectedEntryId = null
 					isNavigatingToNextUp = false
 
+					val rawItem = videoQueueManager.getCurrentVideoQueue().getOrNull(index)
+						?: playbackManager.queue.entry.value?.baseItem
+					if (rawItem != null) {
+						val currentItem = rawItem.withUpdatedPlaybackUserData()
+						dataRefreshService.lastPlayback = Instant.now()
+						dataRefreshService.lastPlayedItem = currentItem
+						when (currentItem.type) {
+							BaseItemKind.MOVIE -> dataRefreshService.lastMoviePlayback = Instant.now()
+							BaseItemKind.EPISODE -> dataRefreshService.lastTvPlayback = Instant.now()
+							else -> Unit
+						}
+					}
+
 					// Clear explicit stream index overrides from previous item so next item uses smart matching
 					videoQueueManager.setSelectedAudioStreamIndex(null)
 					videoQueueManager.setSelectedSubtitleStreamIndex(null)
@@ -186,8 +203,17 @@ class VideoPlayerFragment : Fragment() {
 		lifecycleScope.launch {
 			playbackManager.queue.entry.collect { entry ->
 				val item = entry?.baseItem
-				if (item != null && LiveTvPlayerHelper.isLiveTv(item)) {
-					TvManager.setLastLiveTvChannel(item.id)
+				if (item != null) {
+					dataRefreshService.lastPlayback = Instant.now()
+					dataRefreshService.lastPlayedItem = item
+					when (item.type) {
+						BaseItemKind.MOVIE -> dataRefreshService.lastMoviePlayback = Instant.now()
+						BaseItemKind.EPISODE -> dataRefreshService.lastTvPlayback = Instant.now()
+						else -> Unit
+					}
+					if (LiveTvPlayerHelper.isLiveTv(item)) {
+						TvManager.setLastLiveTvChannel(item.id)
+					}
 				}
 				val videoSize = playbackManager.state.videoSize.value
 				applyRefreshRate(videoSize)
@@ -542,6 +568,30 @@ class VideoPlayerFragment : Fragment() {
 		}
 	}
 
+	private fun BaseItemDto.withUpdatedPlaybackUserData(): BaseItemDto {
+		val positionMs = playbackManager.state.positionInfo.active.inWholeMilliseconds
+		val durationMs = playbackManager.state.positionInfo.duration.inWholeMilliseconds
+		val positionTicks = positionMs * 10000L
+		val durationTicks = durationMs * 10000L
+		val isPlayed = durationMs > 0 && positionMs >= (durationMs * 0.9)
+
+		val currentUserData = userData
+		val updatedUserData = currentUserData?.copy(
+			playbackPositionTicks = if (isPlayed) 0L else positionTicks,
+			played = isPlayed || (currentUserData.played == true),
+			playedPercentage = if (durationTicks > 0) (positionTicks.toDouble() / durationTicks * 100) else currentUserData.playedPercentage
+		) ?: UserItemDataDto(
+			itemId = id,
+			playbackPositionTicks = if (isPlayed) 0L else positionTicks,
+			played = isPlayed,
+			playCount = 1,
+			isFavorite = false,
+			key = id.toString(),
+		)
+
+		return copy(userData = updatedUserData)
+	}
+
 	override fun onDestroy() {
 		super.onDestroy()
 		val isRemoving = isRemoving || requireActivity().isFinishing
@@ -555,6 +605,18 @@ class VideoPlayerFragment : Fragment() {
 		if (isRemoving) {
 			val surfaceView = playbackManager.backendService.surfaceView?.surface
 			refreshRateHelper?.resetRefreshRate(surfaceView)
+			val rawItem = playbackManager.queue.entry.value?.baseItem
+				?: videoQueueManager.getCurrentVideoQueue().getOrNull(videoQueueManager.getCurrentMediaPosition())
+			if (rawItem != null) {
+				val currentItem = rawItem.withUpdatedPlaybackUserData()
+				dataRefreshService.lastPlayback = Instant.now()
+				dataRefreshService.lastPlayedItem = currentItem
+				when (currentItem.type) {
+					BaseItemKind.MOVIE -> dataRefreshService.lastMoviePlayback = Instant.now()
+					BaseItemKind.EPISODE -> dataRefreshService.lastTvPlayback = Instant.now()
+					else -> Unit
+				}
+			}
 			playbackManager.state.stop()
 		}
 	}
