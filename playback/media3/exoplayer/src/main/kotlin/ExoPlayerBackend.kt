@@ -350,6 +350,7 @@ class ExoPlayerBackend(
 
 		override fun onPlaybackStateChanged(playbackState: Int) {
 			checkPendingInitialSeek()
+			checkPendingTrackSelectionParameters()
 			updatePlayState()
 			updateBufferingState()
 		}
@@ -370,6 +371,7 @@ class ExoPlayerBackend(
 			if (!tracks.groups.isEmpty() && exoPlayer.currentMediaItem != null) {
 				applyPreferredTrackOverrides()
 			}
+			checkPendingTrackSelectionParameters()
 			listener?.onTracksChanged()
 		}
 
@@ -477,21 +479,17 @@ class ExoPlayerBackend(
 			AssFontManager.preloadFontsForEntry(context, item, assHandler)
 		}
 
-		exoPlayer.clearMediaItems()
+		pendingTrackSelectionParameters = null
 
-		runCatching {
-			if (exoPlayer.playbackState != Player.STATE_IDLE &&
-				exoPlayer.playbackState != Player.STATE_ENDED &&
-				!exoPlayer.currentTimeline.isEmpty &&
-				exoPlayer.currentMediaItem != null &&
-				(exoPlayer.trackSelectionParameters.overrides.isNotEmpty() || exoPlayer.trackSelectionParameters.disabledTrackTypes.isNotEmpty())) {
-				exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon()
-					.clearOverrides()
-					.setDisabledTrackTypes(emptySet())
-					.build()
-			}
+		if (exoPlayer.trackSelectionParameters.overrides.isNotEmpty() || exoPlayer.trackSelectionParameters.disabledTrackTypes.isNotEmpty()) {
+			val clearedParams = exoPlayer.trackSelectionParameters.buildUpon()
+				.clearOverrides()
+				.setDisabledTrackTypes(emptySet())
+				.build()
+			safeSetTrackSelectionParameters(clearedParams)
 		}
 
+		exoPlayer.clearMediaItems()
 		exoPlayer.setMediaItem(mediaItem)
 		exoPlayer.prepare()
 
@@ -935,17 +933,44 @@ class ExoPlayerBackend(
 
 		if (changed) {
 			val newParams = builder.build()
-			if (currentStream != null &&
-				exoPlayer.playbackState != Player.STATE_IDLE &&
-				!exoPlayer.currentTimeline.isEmpty &&
-				exoPlayer.currentMediaItem != null &&
-				!exoPlayer.currentTracks.groups.isEmpty() &&
-				exoPlayer.trackSelectionParameters != newParams) {
-				runCatching {
-					exoPlayer.trackSelectionParameters = newParams
-				}.onFailure { e ->
-					Timber.w(e, "Error applying trackSelectionParameters in applyPreferredTrackOverrides")
-				}
+			safeSetTrackSelectionParameters(newParams)
+		}
+	}
+
+	private var pendingTrackSelectionParameters: TrackSelectionParameters? = null
+
+	private fun safeSetTrackSelectionParameters(params: TrackSelectionParameters) {
+		if (exoPlayer.trackSelectionParameters == params) {
+			pendingTrackSelectionParameters = null
+			return
+		}
+
+		if (exoPlayer.playbackState == Player.STATE_READY &&
+			!exoPlayer.currentTimeline.isEmpty &&
+			exoPlayer.currentMediaItem != null &&
+			!exoPlayer.currentTracks.groups.isEmpty()) {
+			pendingTrackSelectionParameters = null
+			runCatching {
+				exoPlayer.trackSelectionParameters = params
+			}.onFailure { e ->
+				Timber.w(e, "Error applying trackSelectionParameters")
+			}
+		} else {
+			pendingTrackSelectionParameters = params
+		}
+	}
+
+	private fun checkPendingTrackSelectionParameters() {
+		val pending = pendingTrackSelectionParameters ?: return
+		if (exoPlayer.playbackState == Player.STATE_READY &&
+			!exoPlayer.currentTimeline.isEmpty &&
+			exoPlayer.currentMediaItem != null &&
+			!exoPlayer.currentTracks.groups.isEmpty()) {
+			pendingTrackSelectionParameters = null
+			runCatching {
+				exoPlayer.trackSelectionParameters = pending
+			}.onFailure { e ->
+				Timber.w(e, "Error applying pending trackSelectionParameters")
 			}
 		}
 	}
@@ -987,19 +1012,7 @@ class ExoPlayerBackend(
 			}
 		}
 		val newParams = builder.build()
-		if (currentStream != null &&
-			exoPlayer.playbackState != Player.STATE_IDLE &&
-			exoPlayer.playbackState != Player.STATE_ENDED &&
-			!exoPlayer.currentTimeline.isEmpty &&
-			exoPlayer.currentMediaItem != null &&
-			!exoPlayer.currentTracks.groups.isEmpty() &&
-			currentParams != newParams) {
-			runCatching {
-				exoPlayer.trackSelectionParameters = newParams
-			}.onFailure { e ->
-				Timber.w(e, "Error applying trackSelectionParameters in selectTrack")
-			}
-		}
+		safeSetTrackSelectionParameters(newParams)
 		listener?.onTracksChanged()
 	}
 
@@ -1067,19 +1080,7 @@ class ExoPlayerBackend(
 		}
 
 		val newParams = builder.build()
-		if (currentStream != null &&
-			exoPlayer.playbackState != Player.STATE_IDLE &&
-			exoPlayer.playbackState != Player.STATE_ENDED &&
-			!exoPlayer.currentTimeline.isEmpty &&
-			exoPlayer.currentMediaItem != null &&
-			!exoPlayer.currentTracks.groups.isEmpty() &&
-			currentParams != newParams) {
-			runCatching {
-				exoPlayer.trackSelectionParameters = newParams
-			}.onFailure { e ->
-				Timber.w(e, "Error applying trackSelectionParameters in selectTracks")
-			}
-		}
+		safeSetTrackSelectionParameters(newParams)
 		listener?.onTracksChanged()
 	}
 }
