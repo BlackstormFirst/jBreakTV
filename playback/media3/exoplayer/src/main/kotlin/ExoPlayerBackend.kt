@@ -249,6 +249,8 @@ class ExoPlayerBackend(
 	}
 
 	private var pendingInitialSeekMs: Long? = null
+	@Volatile
+	private var isPreparingItem = false
 
 	private var isBufferingState = false
 
@@ -280,6 +282,7 @@ class ExoPlayerBackend(
 
 		private fun updatePlayState() {
 			val state = when {
+				isPreparingItem && exoPlayer.playbackState == Player.STATE_IDLE -> return
 				exoPlayer.playbackState == Player.STATE_IDLE || exoPlayer.playbackState == Player.STATE_ENDED -> PlayState.STOPPED
 				exoPlayer.playWhenReady -> PlayState.PLAYING
 				else -> PlayState.PAUSED
@@ -349,6 +352,9 @@ class ExoPlayerBackend(
 		}
 
 		override fun onPlaybackStateChanged(playbackState: Int) {
+			if (playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_READY) {
+				isPreparingItem = false
+			}
 			checkPendingInitialSeek()
 			checkPendingTrackSelectionParameters()
 			updatePlayState()
@@ -489,6 +495,7 @@ class ExoPlayerBackend(
 			safeSetTrackSelectionParameters(clearedParams)
 		}
 
+		isPreparingItem = true
 		exoPlayer.clearMediaItems()
 		exoPlayer.setMediaItem(mediaItem)
 		exoPlayer.prepare()
@@ -545,6 +552,7 @@ class ExoPlayerBackend(
 	}
 
 	override fun stop() {
+		isPreparingItem = false
 		currentStream = null
 		pendingInitialSeekMs = null
 		if (exoPlayerOptions.enableLibass) {

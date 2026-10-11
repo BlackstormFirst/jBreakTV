@@ -156,10 +156,13 @@ class VideoPlayerFragment : Fragment() {
 		playbackManager.queue.clear()
 		playbackManager.queue.addSupplier(queueSupplier, currentMediaPosition)
 
+		var hasStarted = false
+
 		// Sync current media position with VideoQueueManager as playback advances in the queue
 		lifecycleScope.launch {
 			playbackManager.queue.entryIndex.collect { index ->
 				if (index >= 0) {
+					hasStarted = false
 					videoQueueManager.setCurrentMediaPosition(index)
 					lastAutoSelectedEntryId = null
 					isNavigatingToNextUp = false
@@ -228,7 +231,6 @@ class VideoPlayerFragment : Fragment() {
 
 		// Observe play state to navigate back when playback is stopped after starting
 		lifecycleScope.launch {
-			var hasStarted = false
 			playbackManager.state.playState.collect { playState ->
 				when (playState) {
 					PlayState.PLAYING, PlayState.PAUSED -> {
@@ -254,11 +256,20 @@ class VideoPlayerFragment : Fragment() {
 
 			override fun onMediaStreamEnd(mediaStream: PlayableMediaStream) {
 				lifecycleScope.launch {
-					val currentIndex = videoQueueManager.getCurrentMediaPosition()
+					val position = videoQueueManager.getCurrentMediaPosition()
 					val queueItems = videoQueueManager.getCurrentVideoQueue()
-					val currentItem = queueItems.getOrNull(currentIndex)
-					val nextIndex = currentIndex + 1
-					val nextItem = queueItems.getOrNull(nextIndex)
+					val currentItemAtPos = queueItems.getOrNull(position)
+
+					val streamItemId = mediaStream.queueEntry.baseItem?.id
+					val (currentItem, nextItem, nextIndex) = if (streamItemId != null &&
+						currentItemAtPos?.id != streamItemId &&
+						position > 0 &&
+						queueItems.getOrNull(position - 1)?.id == streamItemId
+					) {
+						Triple(queueItems.getOrNull(position - 1), currentItemAtPos, position)
+					} else {
+						Triple(currentItemAtPos, queueItems.getOrNull(position + 1), position + 1)
+					}
 
 					val stillWatchingBehavior = userPreferences[UserPreferences.stillWatchingBehavior]
 					val nextUpBehavior = userPreferences[UserPreferences.nextUpBehavior]
