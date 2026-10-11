@@ -10,6 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.preference.UserPreferences
@@ -53,14 +54,19 @@ class SdkPlaybackHelper(
 		shuffle: Boolean,
 		outerResponse: Response<List<BaseItemDto>>
 	) {
+		val loadingDialog = showLoadingDialog(context)
 		getScope(context).launch {
 			runCatching {
 				val items = getItems(mainItem, allowIntros, shuffle)
 				if (items.isEmpty() && !mainItem.mediaSources.isNullOrEmpty()) listOf(mainItem)
 				else items
 			}.fold(
-				onSuccess = { items -> outerResponse.onResponse(items) },
+				onSuccess = { items ->
+					dismissLoadingDialog(loadingDialog)
+					outerResponse.onResponse(items)
+				},
 				onFailure = { exception ->
+					dismissLoadingDialog(loadingDialog)
 					when (exception) {
 						is Exception -> outerResponse.onError(exception)
 						else -> outerResponse.onError(Exception(exception))
@@ -302,82 +308,173 @@ class SdkPlaybackHelper(
 	}
 
 	override fun retrieveAndPlay(itemId: UUID, shuffle: Boolean, context: Context) {
+		val loadingDialog = showLoadingDialog(context)
 		getScope(context).launch {
-			val resumeSubtractDuration =
-				userPreferences[UserPreferences.resumeSubtractDuration].toIntOrNull()?.seconds
-					?: Duration.ZERO
+			runCatching {
+				val resumeSubtractDuration =
+					userPreferences[UserPreferences.resumeSubtractDuration].toIntOrNull()?.seconds
+						?: Duration.ZERO
 
-			val item = withContext(Dispatchers.IO) {
-				val response by api.userLibraryApi.getItem(itemId)
-				response
-			}
+				val item = withContext(Dispatchers.IO) {
+					val response by api.userLibraryApi.getItem(itemId)
+					response
+				}
 
-			val pos = item.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration) ?: Duration.ZERO
+				val pos = item.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration) ?: Duration.ZERO
 
-			val allowIntros = pos == Duration.ZERO && item.type == BaseItemKind.MOVIE
-			var items = getItems(item, allowIntros, shuffle)
-			var targetIndex = items.indexOfFirst { it.id == item.id }
-			if (targetIndex == -1) {
-				items = if (item.canPlay()) listOf(item) + items else items
-				targetIndex = items.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
-			}
+				val allowIntros = pos == Duration.ZERO && item.type == BaseItemKind.MOVIE
+				var items = getItems(item, allowIntros, shuffle)
+				var targetIndex = items.indexOfFirst { it.id == item.id }
+				if (targetIndex == -1) {
+					items = if (item.canPlay()) listOf(item) + items else items
+					targetIndex = items.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
+				}
 
-			playbackLauncher.launch(
-				context,
-				items,
-				pos.inWholeMilliseconds.toInt(),
-				playbackControllerContainer.playbackController?.hasFragment() == true,
-				targetIndex,
-				shuffle,
+				Triple(items, pos, targetIndex)
+			}.fold(
+				onSuccess = { (items, pos, targetIndex) ->
+					dismissLoadingDialog(loadingDialog)
+					playbackLauncher.launch(
+						context,
+						items,
+						pos.inWholeMilliseconds.toInt(),
+						playbackControllerContainer.playbackController?.hasFragment() == true,
+						targetIndex,
+						shuffle,
+					)
+				},
+				onFailure = { exception ->
+					dismissLoadingDialog(loadingDialog)
+					Toast.makeText(context, exception.localizedMessage ?: "Error playing item", Toast.LENGTH_LONG).show()
+				}
 			)
 		}
 	}
 
 	override fun retrieveAndPlay(itemIds: List<UUID>, shuffle: Boolean, position: Long?, index: Int?, context: Context) {
+		val loadingDialog = showLoadingDialog(context)
 		getScope(context).launch {
-			val resumeSubtractDuration =
-				userPreferences[UserPreferences.resumeSubtractDuration].toIntOrNull()?.seconds
-					?: Duration.ZERO
+			runCatching {
+				val resumeSubtractDuration =
+					userPreferences[UserPreferences.resumeSubtractDuration].toIntOrNull()?.seconds
+						?: Duration.ZERO
 
-			val items = withContext(Dispatchers.IO) {
-				val response by api.itemsApi.getItems(
-					ids = itemIds,
-					fields = ItemRepository.itemFields,
-				)
-				response.items
-			}
+				val items = withContext(Dispatchers.IO) {
+					val response by api.itemsApi.getItems(
+						ids = itemIds,
+						fields = ItemRepository.itemFields,
+					)
+					response.items
+				}
 
-			val pos = position?.ticks ?: items[0].userData?.playbackPositionTicks?.ticks?.minus(
-				resumeSubtractDuration
-			) ?: Duration.ZERO
+				val pos = position?.ticks ?: items[0].userData?.playbackPositionTicks?.ticks?.minus(
+					resumeSubtractDuration
+				) ?: Duration.ZERO
 
-			playbackLauncher.launch(
-				context,
-				items,
-				pos.inWholeMilliseconds.toInt(),
-				playbackControllerContainer.playbackController?.hasFragment() == true,
-				index ?: 0,
-				shuffle,
+				Pair(items, pos)
+			}.fold(
+				onSuccess = { (items, pos) ->
+					dismissLoadingDialog(loadingDialog)
+					playbackLauncher.launch(
+						context,
+						items,
+						pos.inWholeMilliseconds.toInt(),
+						playbackControllerContainer.playbackController?.hasFragment() == true,
+						index ?: 0,
+						shuffle,
+					)
+				},
+				onFailure = { exception ->
+					dismissLoadingDialog(loadingDialog)
+					Toast.makeText(context, exception.localizedMessage ?: "Error playing items", Toast.LENGTH_LONG).show()
+				}
 			)
 		}
 	}
 
 	override fun playInstantMix(context: Context, item: BaseItemDto) {
+		val loadingDialog = showLoadingDialog(context)
 		getScope(context).launch {
-			val response = withContext(Dispatchers.IO) {
-				api.instantMixApi.getInstantMixFromItem(
-					itemId = item.id,
-					fields = ItemRepository.itemFields
-				).content
+			runCatching {
+				withContext(Dispatchers.IO) {
+					api.instantMixApi.getInstantMixFromItem(
+						itemId = item.id,
+						fields = ItemRepository.itemFields
+					).content
+				}
+			}.fold(
+				onSuccess = { response ->
+					dismissLoadingDialog(loadingDialog)
+					val items = response.items
+					if (items.isNotEmpty()) {
+						playbackLauncher.launch(context, items)
+					} else {
+						Toast.makeText(context, R.string.msg_no_playable_items, Toast.LENGTH_LONG).show()
+					}
+				},
+				onFailure = { exception ->
+					dismissLoadingDialog(loadingDialog)
+					Toast.makeText(context, exception.localizedMessage ?: "Error starting instant mix", Toast.LENGTH_LONG).show()
+				}
+			)
+		}
+	}
+
+	private fun showLoadingDialog(context: Context): android.app.AlertDialog? {
+		val activity = findActivity(context) ?: return null
+		if (activity.isFinishing || activity.isDestroyed) return null
+
+		var dialog: android.app.AlertDialog? = null
+		try {
+			val progressBar = android.widget.ProgressBar(activity).apply {
+				isIndeterminate = true
+				val padding = 32
+				setPadding(padding, padding, padding, padding)
+			}
+			val layout = android.widget.LinearLayout(activity).apply {
+				orientation = android.widget.LinearLayout.HORIZONTAL
+				gravity = android.view.Gravity.CENTER
+				addView(progressBar)
+				val textView = android.widget.TextView(activity).apply {
+					text = activity.getString(R.string.loading)
+					setTextColor(android.graphics.Color.WHITE)
+					setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
+					setPadding(16, 0, 16, 0)
+				}
+				addView(textView)
 			}
 
-			val items = response.items
-			if (items.isNotEmpty()) {
-				playbackLauncher.launch(context, items)
-			} else {
-				Toast.makeText(context, R.string.msg_no_playable_items, Toast.LENGTH_LONG).show()
-			}
+			dialog = android.app.AlertDialog.Builder(activity)
+				.setView(layout)
+				.setCancelable(false)
+				.create()
+
+			dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+			dialog.show()
+		} catch (e: Exception) {
+			Timber.e(e, "Failed to show loading dialog")
 		}
+		return dialog
+	}
+
+	private fun dismissLoadingDialog(dialog: android.app.AlertDialog?) {
+		if (dialog == null) return
+		try {
+			if (dialog.isShowing) {
+				dialog.dismiss()
+			}
+		} catch (e: Exception) {
+			Timber.e(e, "Failed to dismiss loading dialog")
+		}
+	}
+
+	private fun findActivity(context: Context): android.app.Activity? {
+		var ctx = context
+		while (ctx is android.content.ContextWrapper) {
+			if (ctx is android.app.Activity) return ctx
+			ctx = ctx.baseContext
+		}
+		return null
 	}
 
 	private fun getScope(context: Context? = null) = when (context) {
