@@ -22,7 +22,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import androidx.activity.compose.BackHandler
@@ -47,8 +46,6 @@ import org.jellyfin.playback.jellyfin.queue.baseItemFlow
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.compose.koinInject
 import java.io.File
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 private const val DefaultVideoAspectRatio = 16f / 9f
 
@@ -102,15 +99,9 @@ fun VideoPlayerScreen() {
 
 	LaunchedEffect(entry, baseItem, isLocalInspecting, isBackendBuffering, playState) {
 		val isMediaOrMetadataLoading = entry == null || baseItem == null || entry?.mediaStream == null || isLocalInspecting
-		val isInitialPreparing = (playState == PlayState.STOPPED || playState == PlayState.PAUSED) && (entry?.mediaStream == null || isBackendBuffering)
+		val isNotReady = isMediaOrMetadataLoading || isBackendBuffering || playState == PlayState.STOPPED
 
-		if (isMediaOrMetadataLoading || isInitialPreparing) {
-			// Phase de chargement initiale (médias, métadonnées, USB ou préparation ExoPlayer)
-			delay(300.milliseconds)
-			showSpinner = true
-		} else if (isBackendBuffering) {
-			// Phase de buffering pendant la lecture (>3 secondes)
-			delay(3.seconds)
+		if (isNotReady) {
 			showSpinner = true
 		} else {
 			showSpinner = false

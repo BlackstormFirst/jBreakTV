@@ -45,13 +45,12 @@ fun VideoPlayerHeader(
 		}
 	}
 
-	val seriesName = remember(item) {
-		item?.seriesName.orEmpty()
-	}
-
-	val episodeText = remember(item, isLocal, isEpisode) {
+	val titleText = remember(item, isLocal, isLiveTv, isEpisode) {
 		val name = item?.name.orEmpty()
-		if (item != null && !isLocal && isEpisode) {
+		if (item != null && isLiveTv) {
+			val channelNum = item.channelNumber ?: item.number
+			if (!channelNum.isNullOrEmpty()) "$channelNum $name" else name
+		} else if (item != null && !isLocal && isEpisode) {
 			val seasonNum = item.parentIndexNumber
 			val episodeNum = item.indexNumber
 			if (seasonNum != null && episodeNum != null) {
@@ -69,30 +68,40 @@ fun VideoPlayerHeader(
 		}
 	}
 
-	val titleText = remember(item, isLiveTv, isEpisode, seriesName) {
-		if (item != null && isLiveTv) {
-			val channelNum = item.channelNumber ?: item.number
-			val name = item.name.orEmpty()
-			if (!channelNum.isNullOrEmpty()) "$channelNum $name" else name
-		} else if (item != null && !isLocal && isEpisode) {
-			seriesName.ifEmpty { item.name.orEmpty() }
-		} else {
-			item?.name.orEmpty()
-		}
-	}
-
-	val subtitleText = remember(item, isLiveTv, isEpisode, episodeText) {
+	val subtitleText = remember(item, isLiveTv) {
 		if (item != null && isLiveTv) {
 			item.currentProgram?.name ?: item.overview ?: item.seriesName.orEmpty()
-		} else if (item != null && !isLocal && isEpisode) {
-			episodeText
 		} else {
-			""
+			item?.seriesName.orEmpty()
 		}
 	}
 
 	PlayerHeader {
 		if (item != null) {
+			if (titleText.isNotEmpty()) {
+				Text(
+					text = titleText,
+					overflow = TextOverflow.Ellipsis,
+					maxLines = 1,
+					style = LocalTextStyle.current.copy(
+						color = Color.White,
+						fontSize = 22.sp
+					)
+				)
+			}
+
+			if (subtitleText.isNotEmpty()) {
+				Text(
+					text = subtitleText,
+					overflow = TextOverflow.Ellipsis,
+					maxLines = 1,
+					style = LocalTextStyle.current.copy(
+						color = Color.White.copy(alpha = 0.8f),
+						fontSize = 18.sp
+					)
+				)
+			}
+
 			if (logoUrl != null) {
 				Image(
 					painter = rememberAsyncImagePainter(
@@ -105,30 +114,6 @@ fun VideoPlayerHeader(
 						.height(60.dp)
 						.widthIn(max = 450.dp),
 					contentScale = ContentScale.Fit,
-				)
-			} else {
-				if (titleText.isNotEmpty()) {
-					Text(
-						text = titleText,
-						overflow = TextOverflow.Ellipsis,
-						maxLines = 1,
-						style = LocalTextStyle.current.copy(
-							color = Color.White,
-							fontSize = 22.sp
-						)
-					)
-				}
-			}
-
-			if (subtitleText.isNotEmpty()) {
-				Text(
-					text = subtitleText,
-					overflow = TextOverflow.Ellipsis,
-					maxLines = 1,
-					style = LocalTextStyle.current.copy(
-						color = Color.White.copy(alpha = 0.8f),
-						fontSize = 18.sp
-					)
 				)
 			}
 		}
