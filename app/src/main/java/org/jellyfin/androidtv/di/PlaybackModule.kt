@@ -63,7 +63,7 @@ val playbackModule = module {
 	single { PlaybackIndexManager() }
 	single<MediaManager> { RewriteMediaManager(get(), get()) }
 
-	single { PlaybackLauncher(get(), get(), get(), get()) }
+	single { PlaybackLauncher(get(), get(), get(), get(), get()) }
 
 	single<HttpDataSource.Factory> {
 		val okHttpFactory = get<OkHttpFactory>()

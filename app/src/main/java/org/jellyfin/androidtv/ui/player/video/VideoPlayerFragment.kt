@@ -232,8 +232,10 @@ class VideoPlayerFragment : Fragment() {
 			playbackManager.state.playState.collect { playState ->
 				when (playState) {
 					PlayState.PLAYING, PlayState.PAUSED -> {
-						hasStarted = true
-						isRetrying = false
+						if (playbackManager.queue.entry.value != null) {
+							hasStarted = true
+							isRetrying = false
+						}
 					}
 					PlayState.STOPPED -> {
 						val hasNextItem = videoQueueManager.getCurrentMediaPosition() < videoQueueManager.getCurrentVideoQueue().size - 1

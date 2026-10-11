@@ -5,6 +5,7 @@ import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.navigation.ActivityDestinations
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
@@ -20,6 +21,7 @@ class PlaybackLauncher(
 	private val videoQueueManager: VideoQueueManager,
 	private val navigationRepository: NavigationRepository,
 	private val userPreferences: UserPreferences,
+	private val playbackManager: PlaybackManager,
 ) {
 	private val BaseItemDto.supportsExternalPlayer
 		get() = when (type) {
@@ -48,9 +50,11 @@ class PlaybackLauncher(
 		val isAudio = items.any { it.mediaType == MediaType.AUDIO }
 
 		if (isAudio) {
+			playbackManager.state.stop()
 			mediaManager.playNow(context, items, itemsPosition, shuffle)
 			navigationRepository.navigate(Destinations.nowPlaying)
 		} else {
+			playbackManager.state.stop()
 			val items = if (shuffle) items.shuffled() else items
 
 			val effectiveItemsPosition = if (itemsPosition == 0 && items.size > 1 && position != null && position > 0) {
