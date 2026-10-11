@@ -85,3 +85,11 @@ data class MediaStreamSubtitleTrack(
 	val isForced: Boolean,
 	val deliveryUrl: String?,
 ) : MediaStreamTrack
+
+data class MediaStreamAttachmentTrack(
+	override val codec: String,
+	val index: Int = -1,
+	val fileName: String? = null,
+	val mimeType: String? = null,
+	val deliveryUrl: String? = null,
+) : MediaStreamTrack

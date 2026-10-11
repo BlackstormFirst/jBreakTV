@@ -50,6 +50,7 @@ import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.media3.exoplayer.support.AssFontManager
 import org.jellyfin.playback.core.mediastream.MediaConversionMethod
 import org.jellyfin.playback.core.mediastream.MediaStream
+import org.jellyfin.playback.core.mediastream.MediaStreamAttachmentTrack
 import org.jellyfin.playback.core.mediastream.MediaStreamAudioTrack
 import org.jellyfin.playback.core.mediastream.MediaStreamSubtitleTrack
 import org.jellyfin.playback.core.mediastream.MediaStreamVideoTrack
@@ -452,7 +453,7 @@ class ExoPlayerBackend(
 	override fun prepareItem(item: QueueEntry) {
 		if (exoPlayerOptions.enableLibass) {
 			ensureVideoFrameMetadataListener()
-			AssFontManager.preloadFonts(context, item.mediaStream?.url, assHandler)
+			AssFontManager.preloadFontsForEntry(context, item, assHandler)
 		}
 	}
 
@@ -473,7 +474,7 @@ class ExoPlayerBackend(
 
 		if (exoPlayerOptions.enableLibass) {
 			ensureVideoFrameMetadataListener()
-			AssFontManager.preloadFonts(context, item.mediaStream?.url, assHandler)
+			AssFontManager.preloadFontsForEntry(context, item, assHandler)
 		}
 
 		exoPlayer.setMediaItem(mediaItem)
@@ -760,6 +761,7 @@ class ExoPlayerBackend(
 				is MediaStreamAudioTrack -> mediaTrack.index
 				is MediaStreamSubtitleTrack -> mediaTrack.index
 				is MediaStreamVideoTrack -> mediaTrack.index
+				is MediaStreamAttachmentTrack -> mediaTrack.index
 			}
 
 			val label = when (mediaTrack) {
@@ -782,12 +784,14 @@ class ExoPlayerBackend(
 						}
 					}.ifBlank { null }
 				}
+				is MediaStreamAttachmentTrack -> mediaTrack.fileName ?: "Attachment"
 			} ?: "Track ${indexInType + 1}"
 
 			val language = when (mediaTrack) {
 				is MediaStreamAudioTrack -> mediaTrack.language
 				is MediaStreamSubtitleTrack -> mediaTrack.language
 				is MediaStreamVideoTrack -> null
+				is MediaStreamAttachmentTrack -> null
 			}
 
 			// Find matching ExoPlayer group info for this media track

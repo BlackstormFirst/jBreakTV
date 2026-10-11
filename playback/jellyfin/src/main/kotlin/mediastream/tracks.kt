@@ -1,14 +1,13 @@
 package org.jellyfin.playback.jellyfin.mediastream
 
+import org.jellyfin.playback.core.mediastream.MediaStreamAttachmentTrack
 import org.jellyfin.playback.core.mediastream.MediaStreamAudioTrack
 import org.jellyfin.playback.core.mediastream.MediaStreamContainer
+import org.jellyfin.playback.core.mediastream.MediaStreamSubtitleTrack
 import org.jellyfin.playback.core.mediastream.MediaStreamVideoTrack
+import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.MediaStream
 import org.jellyfin.sdk.model.api.MediaStreamType
-
-import org.jellyfin.playback.core.mediastream.MediaStreamSubtitleTrack
-
-import org.jellyfin.sdk.api.client.ApiClient
 
 fun MediaInfo.getMediaStreamContainer() = MediaStreamContainer(
 	format = requireNotNull(mediaSource.container)
@@ -24,10 +23,21 @@ fun MediaStream.getMediaStreamTrack(api: ApiClient? = null) = when (type) {
 	MediaStreamType.VIDEO -> getVideoTrack(this)
 	MediaStreamType.SUBTITLE -> getSubtitleTrack(this, api)
 
-	// Ignore other track types
 	MediaStreamType.EMBEDDED_IMAGE,
 	MediaStreamType.DATA,
-	MediaStreamType.LYRIC -> null
+	MediaStreamType.LYRIC -> {
+		val codecLower = codec?.lowercase() ?: ""
+		val titleLower = title?.lowercase() ?: ""
+		val displayTitleLower = displayTitle?.lowercase() ?: ""
+		if (codecLower.contains("ttf") || codecLower.contains("otf") || codecLower.contains("font") ||
+			titleLower.endsWith(".ttf") || titleLower.endsWith(".otf") || titleLower.endsWith(".ttc") ||
+			displayTitleLower.endsWith(".ttf") || displayTitleLower.endsWith(".otf") || displayTitleLower.endsWith(".ttc")
+		) {
+			getAttachmentTrack(this, api)
+		} else {
+			null
+		}
+	}
 }
 
 private fun getAudioTrack(stream: MediaStream) = MediaStreamAudioTrack(
@@ -68,4 +78,13 @@ private fun getSubtitleTrack(stream: MediaStream, api: ApiClient? = null) = Medi
 	},
 )
 
-
+private fun getAttachmentTrack(stream: MediaStream, api: ApiClient? = null) = MediaStreamAttachmentTrack(
+	codec = stream.codec.orEmpty(),
+	index = stream.index,
+	fileName = stream.title ?: stream.displayTitle,
+	mimeType = stream.comment,
+	deliveryUrl = stream.deliveryUrl?.let { url ->
+		if (url.startsWith("http://") || url.startsWith("https://") || api == null) url
+		else api.createUrl(url, ignorePathParameters = true)
+	},
+)
