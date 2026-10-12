@@ -767,10 +767,16 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     public void startSpinner() {
         spinnerOff = false;
+        if (mFragment != null) {
+            mFragment.showBuffering(true);
+        }
     }
 
     public void stopSpinner() {
         spinnerOff = true;
+        if (mFragment != null) {
+            mFragment.showBuffering(false);
+        }
     }
 
     public int getAudioStreamIndex() {
@@ -1019,6 +1025,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     public void stop() {
+        stopSpinner();
         refreshCurrentPosition();
         Timber.i("stop called at %s", mCurrentPosition);
         stopReportLoop();
@@ -1096,7 +1103,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 mCurrentIndex = videoQueueManager.getValue().getCurrentMediaPosition();
             }
             Timber.i("Moving to index: %d out of %d total items.", mCurrentIndex, mItems.size());
-            spinnerOff = false;
+            startSpinner();
             play(0);
         }
     }
@@ -1113,7 +1120,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 mCurrentIndex = videoQueueManager.getValue().getCurrentMediaPosition();
             }
             Timber.i("Moving to index: %d out of %d total items.", mCurrentIndex, mItems.size());
-            spinnerOff = false;
+            startSpinner();
             play(0);
         }
     }
@@ -1141,6 +1148,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (!hasInitializedVideoManager()) {
             return;
         }
+
+        startSpinner();
 
         if (wasSeeking) {
             Timber.d("Previous seek has not finished - cancelling seek from %s to %d", mCurrentPosition, pos);
@@ -1232,7 +1241,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     };
 
     private void skip(int msec) {
-        if (hasInitializedVideoManager() && (isPlaying() || isPaused()) && spinnerOff && mVideoManager.getCurrentPosition() > 0) { //guard against skipping before playback has truly begun
+        if (hasInitializedVideoManager() && (isPlaying() || isPaused() || currentSkipPos != 0) && mVideoManager.getCurrentPosition() > 0) { //guard against skipping before playback has truly begun
+            startSpinner();
             mHandler.removeCallbacks(skipRunnable);
             refreshCurrentPosition();
             currentSkipPos = Utils.getSafeSeekPosition((currentSkipPos == 0 ? mCurrentPosition : currentSkipPos) + msec, getDuration());
@@ -1369,7 +1379,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if ((stillWatchingEnabled || nextUpEnabled) && curItem.getType() != BaseItemKind.TRAILER) {
             mCurrentIndex++;
             videoQueueManager.getValue().setCurrentMediaPosition(mCurrentIndex);
-            spinnerOff = false;
+            startSpinner();
 
             if (mFragment != null) {
                 if (stillWatchingEnabled && interactionTracker.getShowStillWatching()) {
@@ -1495,7 +1505,19 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     @Override
+    public void onBuffering(boolean isBuffering) {
+        if (isBuffering) {
+            startSpinner();
+        } else {
+            if (isPlaying()) {
+                stopSpinner();
+            }
+        }
+    }
+
+    @Override
     public void onError() {
+        stopSpinner();
         if (mFragment == null) {
             playerErrorEncountered();
             return;
@@ -1525,7 +1547,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 if (mStartPosition > 0) {
                     initialSeek(mStartPosition);
                     mStartPosition = 0;
-                } else {
+                } else if (currentSkipPos == 0) {
                     finishedInitialSeek = true;
                     stopSpinner();
                 }

@@ -99,7 +99,7 @@ fun VideoPlayerScreen() {
 
 	LaunchedEffect(entry, baseItem, isLocalInspecting, isBackendBuffering, playState) {
 		val isMediaOrMetadataLoading = entry == null || baseItem == null || entry?.mediaStream == null || isLocalInspecting
-		val isNotReady = isMediaOrMetadataLoading || isBackendBuffering || playState == PlayState.STOPPED
+		val isNotReady = (isMediaOrMetadataLoading || isBackendBuffering) && playState != PlayState.STOPPED
 
 		if (isNotReady) {
 			showSpinner = true

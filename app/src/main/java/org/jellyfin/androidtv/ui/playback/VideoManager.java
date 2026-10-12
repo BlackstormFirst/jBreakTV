@@ -222,6 +222,13 @@ public class VideoManager {
             public void onPlaybackStateChanged(int playbackState) {
                 if (playbackState == Player.STATE_BUFFERING) {
                     Timber.d("Player is buffering");
+                    if (mPlaybackControllerNotifiable != null) {
+                        mPlaybackControllerNotifiable.onBuffering(true);
+                    }
+                } else if (playbackState == Player.STATE_READY) {
+                    if (mPlaybackControllerNotifiable != null) {
+                        mPlaybackControllerNotifiable.onBuffering(false);
+                    }
                 }
 
                 if (playbackState == Player.STATE_ENDED) {

@@ -2,9 +2,22 @@ package org.jellyfin.androidtv.ui.playback
 
 import android.view.View
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
@@ -12,6 +25,7 @@ import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.ui.GuideChannelHeader
 import org.jellyfin.androidtv.ui.asTimerInfoDto
+import org.jellyfin.androidtv.ui.base.CircularProgressIndicator
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.livetv.TvManager
 import org.jellyfin.androidtv.ui.player.base.toast.MediaToastRegistry
@@ -229,5 +243,44 @@ fun CustomPlaybackOverlayFragment.onPlayStateChanged(isPlaying: Boolean) {
 		binding.toastOverlay.setTag(stateKey, "PLAYING")
 		registry.emit(R.drawable.ic_play)
 	}
+}
+
+fun CustomPlaybackOverlayFragment.setupBufferingOverlay() {
+	val bufferingKey = R.id.buffering_overlay
+	val stateFlow = MutableStateFlow(true)
+	binding.bufferingOverlay.setTag(bufferingKey, stateFlow)
+
+	binding.bufferingOverlay.setContent {
+		val isBuffering by stateFlow.collectAsState()
+		if (isBuffering) {
+			Box(
+				modifier = Modifier.fillMaxSize(),
+				contentAlignment = Alignment.Center,
+			) {
+				Box(
+					modifier = Modifier
+						.size(72.dp)
+						.background(
+							color = Color.Black.copy(alpha = 0.65f),
+							shape = RoundedCornerShape(36.dp)
+						)
+						.padding(16.dp),
+					contentAlignment = Alignment.Center
+				) {
+					CircularProgressIndicator(
+						modifier = Modifier.fillMaxSize(),
+						color = Color.White
+					)
+				}
+			}
+		}
+	}
+}
+
+fun CustomPlaybackOverlayFragment.showBuffering(show: Boolean) {
+	val bufferingKey = R.id.buffering_overlay
+	@Suppress("UNCHECKED_CAST")
+	val stateFlow = binding.bufferingOverlay.getTag(bufferingKey) as? MutableStateFlow<Boolean>
+	stateFlow?.value = show
 }
 

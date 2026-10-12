@@ -217,6 +217,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        CustomPlaybackOverlayFragmentHelperKt.setupBufferingOverlay(this);
         CustomPlaybackOverlayFragmentHelperKt.setupToastOverlay(this);
 
         if (mItemsToPlay == null || mItemsToPlay.isEmpty()) {
@@ -1415,6 +1416,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         navigating = true;
 
         navigationRepository.getValue().navigate(Destinations.INSTANCE.stillWatching(id), true);
+    }
+
+    public void showBuffering(boolean show) {
+        CustomPlaybackOverlayFragmentHelperKt.showBuffering(this, show);
     }
 
     @Override
