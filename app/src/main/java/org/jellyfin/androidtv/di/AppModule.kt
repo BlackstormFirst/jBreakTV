@@ -67,6 +67,7 @@ import org.jellyfin.androidtv.util.apiclient.ReportingHelper
 import org.jellyfin.androidtv.util.coil.CoilTimberLogger
 import org.jellyfin.androidtv.util.coil.createCoilConnectivityChecker
 import org.jellyfin.androidtv.util.sdk.SdkPlaybackHelper
+import okhttp3.OkHttpClient
 import org.jellyfin.sdk.android.androidDevice
 import org.jellyfin.sdk.api.client.HttpClientOptions
 import org.jellyfin.sdk.api.okhttp.OkHttpFactory
@@ -77,6 +78,7 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import java.util.concurrent.TimeUnit
 import org.jellyfin.sdk.Jellyfin as JellyfinSdk
 import org.jellyfin.androidtv.preference.UserPreferences
 
@@ -85,7 +87,13 @@ val defaultDeviceInfo = named("defaultDeviceInfo")
 val appModule = module {
 	// SDK
 	single(defaultDeviceInfo) { androidDevice(get()) }
-	single { OkHttpFactory() }
+	single {
+		OkHttpFactory(
+			OkHttpClient.Builder()
+				.pingInterval(15, TimeUnit.SECONDS)
+				.build()
+		)
+	}
 	single { HttpClientOptions() }
 	single {
 		createJellyfin {
