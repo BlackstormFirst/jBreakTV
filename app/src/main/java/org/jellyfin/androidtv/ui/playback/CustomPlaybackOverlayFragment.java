@@ -427,9 +427,11 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
                 leanbackOverlayFragment.hideOverlay();
 
                 // also close this if live tv
-                if (playbackControllerContainer.getValue().getPlaybackController().isLiveTv()) hide();
+                if (playbackControllerContainer.getValue().getPlaybackController() != null && playbackControllerContainer.getValue().getPlaybackController().isLiveTv()) hide();
             } else if (mGuideVisible) {
                 hideGuide();
+            } else if (mIsVisible) {
+                hide();
             } else {
                 closePlayer();
             }
@@ -525,6 +527,9 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
                         return true;
                     } else if (mIsVisible) {
                         hide();
+                        return true;
+                    } else {
+                        closePlayer();
                         return true;
                     }
                 }
@@ -1374,7 +1379,19 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         if (navigating) return;
         navigating = true;
 
-        if (navigationRepository.getValue().getCanGoBack()) {
+        PlaybackController playbackController = playbackControllerContainer.getValue().getPlaybackController();
+        BaseItemDto lastPlayedItem = playbackController != null ? playbackController.getCurrentlyPlayingItem() : null;
+        if (lastPlayedItem == null) {
+            List<BaseItemDto> queue = videoQueueManager.getValue().getCurrentVideoQueue();
+            int pos = videoQueueManager.getValue().getCurrentMediaPosition();
+            if (pos >= 0 && pos < queue.size()) {
+                lastPlayedItem = queue.get(pos);
+            }
+        }
+
+        if (lastPlayedItem != null && lastPlayedItem.getType() != BaseItemKind.TRAILER) {
+            navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(lastPlayedItem.getId()), true);
+        } else if (navigationRepository.getValue().getCanGoBack()) {
             navigationRepository.getValue().goBack();
         } else {
             navigationRepository.getValue().reset(Destinations.INSTANCE.getHome());
