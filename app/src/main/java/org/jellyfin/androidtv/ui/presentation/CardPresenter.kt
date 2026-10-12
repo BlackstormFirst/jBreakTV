@@ -79,7 +79,7 @@ class CardPresenter(
 	constructor(showInfo: Boolean) : this(showInfo, 150)
 	constructor() : this(true)
 
-	fun prewarm(parent: ViewGroup, pool: RecyclerView.RecycledViewPool, count: Int = 12, viewType: Int = 0) {
+	fun prewarm(parent: ViewGroup, pool: RecyclerView.RecycledViewPool, count: Int = 20, viewType: Int = 0) {
 		runCatching {
 			val adapter = ArrayObjectAdapter(this@CardPresenter).apply {
 				add("dummy")

@@ -334,7 +334,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				if (isAdded && !isDetached) {
 					runCatching {
 						val cardPresenter = CardPresenter()
-						cardPresenter.prewarm(gridView, sharedRecycledViewPool, count = 8)
+						cardPresenter.prewarm(gridView, sharedRecycledViewPool, count = 20)
 					}
 				}
 				false
