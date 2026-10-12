@@ -502,14 +502,14 @@ class ExoPlayerBackend(
 			AssFontManager.preloadFontsForEntry(context, item, assHandler)
 		}
 
-		pendingTrackSelectionParameters = null
-
 		if (exoPlayer.trackSelectionParameters.overrides.isNotEmpty() || exoPlayer.trackSelectionParameters.disabledTrackTypes.isNotEmpty()) {
 			val clearedParams = exoPlayer.trackSelectionParameters.buildUpon()
 				.clearOverrides()
 				.setDisabledTrackTypes(emptySet())
 				.build()
-			safeSetTrackSelectionParameters(clearedParams)
+			pendingTrackSelectionParameters = clearedParams
+		} else {
+			pendingTrackSelectionParameters = null
 		}
 
 		isPreparingItem = true
@@ -995,7 +995,8 @@ class ExoPlayerBackend(
 
 		if (!exoPlayer.currentTimeline.isEmpty &&
 			exoPlayer.currentMediaItem != null &&
-			!exoPlayer.currentTracks.groups.isEmpty()) {
+			!exoPlayer.currentTracks.groups.isEmpty() &&
+			exoPlayer.playbackState != Player.STATE_IDLE) {
 			pendingTrackSelectionParameters = null
 			runCatching {
 				exoPlayer.trackSelectionParameters = params
@@ -1011,7 +1012,8 @@ class ExoPlayerBackend(
 		val pending = pendingTrackSelectionParameters ?: return
 		if (!exoPlayer.currentTimeline.isEmpty &&
 			exoPlayer.currentMediaItem != null &&
-			!exoPlayer.currentTracks.groups.isEmpty()) {
+			!exoPlayer.currentTracks.groups.isEmpty() &&
+			exoPlayer.playbackState != Player.STATE_IDLE) {
 			pendingTrackSelectionParameters = null
 			runCatching {
 				exoPlayer.trackSelectionParameters = pending
