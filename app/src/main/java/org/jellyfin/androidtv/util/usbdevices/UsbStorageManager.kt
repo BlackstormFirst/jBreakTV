@@ -12,6 +12,7 @@ import android.os.storage.StorageVolume
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,8 +57,19 @@ object UsbStorageManager {
             }
         }
 
-        // Register broadcast receiver for media mounted/unmounted intents
-        val filter = IntentFilter().apply {
+        // Register broadcast receiver for media mounted/unmounted intents (both with and without scheme)
+        val filterNoScheme = IntentFilter().apply {
+            addAction(Intent.ACTION_MEDIA_MOUNTED)
+            addAction(Intent.ACTION_MEDIA_UNMOUNTED)
+            addAction(Intent.ACTION_MEDIA_REMOVED)
+            addAction(Intent.ACTION_MEDIA_EJECT)
+            addAction(Intent.ACTION_MEDIA_BAD_REMOVAL)
+            addAction(Intent.ACTION_MEDIA_CHECKING)
+            addAction("android.hardware.usb.action.USB_DEVICE_ATTACHED")
+            addAction("android.hardware.usb.action.USB_DEVICE_DETACHED")
+        }
+
+        val filterFileScheme = IntentFilter().apply {
             addAction(Intent.ACTION_MEDIA_MOUNTED)
             addAction(Intent.ACTION_MEDIA_UNMOUNTED)
             addAction(Intent.ACTION_MEDIA_REMOVED)
@@ -68,12 +80,9 @@ object UsbStorageManager {
         }
 
         try {
-            ContextCompat.registerReceiver(
-                appContext,
-                UsbStorageReceiver(),
-                filter,
-                ContextCompat.RECEIVER_EXPORTED
-            )
+            val receiver = UsbStorageReceiver()
+            ContextCompat.registerReceiver(appContext, receiver, filterNoScheme, ContextCompat.RECEIVER_EXPORTED)
+            ContextCompat.registerReceiver(appContext, receiver, filterFileScheme, ContextCompat.RECEIVER_EXPORTED)
         } catch (e: Exception) {
             Timber.w(e, "UsbDebug: Could not register UsbStorageReceiver dynamically")
         }
@@ -89,7 +98,7 @@ object UsbStorageManager {
     fun getMountedVolumes(context: Context? = null): List<UsbVolumeInfo> {
         val current = _mountedVolumes.value
         if (current.isNotEmpty()) {
-            val validCurrent = current.filter { it.path.exists() && it.path.canRead() }
+            val validCurrent = current.filter { it.path.exists() }
             if (validCurrent.isNotEmpty()) return validCurrent
         }
 
@@ -117,7 +126,7 @@ object UsbStorageManager {
 
                 for (volume in usbVolumes) {
                     val path = getVolumeDirectory(volume) ?: continue
-                    if (!path.exists() || !path.canRead()) continue
+                    if (!path.exists()) continue
 
                     val absPath = path.absolutePath.lowercase(Locale.ROOT)
                     if (absPath.contains("/emulated") ||
@@ -148,7 +157,6 @@ object UsbStorageManager {
                 for (dir in subDirs) {
                     val name = dir.name.lowercase(Locale.ROOT)
                     if (dir.isDirectory &&
-                        dir.canRead() &&
                         name != "emulated" &&
                         name != "self" &&
                         name != "0" &&
@@ -165,9 +173,7 @@ object UsbStorageManager {
 
         // Tier 3: Persistence Safeguard
         if (list.isEmpty() && _mountedVolumes.value.isNotEmpty()) {
-            val validPrevious = _mountedVolumes.value.filter { vol ->
-                vol.path.exists() && vol.path.canRead()
-            }
+            val validPrevious = _mountedVolumes.value.filter { vol -> vol.path.exists() }
             if (validPrevious.isNotEmpty()) {
                 return validPrevious
             }
@@ -178,9 +184,20 @@ object UsbStorageManager {
 
     fun updateVolumes(context: Context) {
         scope.launch {
-            val list = scanVolumesSync(context)
-            if (list != _mountedVolumes.value) {
-                _mountedVolumes.value = list
+            val initial = scanVolumesSync(context)
+            if (initial != _mountedVolumes.value) {
+                _mountedVolumes.value = initial
+            }
+
+            // Retry scans with delay to catch USB devices as OS mount completes
+            val delays = listOf(300L, 800L, 1500L, 3000L)
+            for (d in delays) {
+                delay(d)
+                val updated = scanVolumesSync(context)
+                if (updated != _mountedVolumes.value) {
+                    _mountedVolumes.value = updated
+                    break
+                }
             }
         }
     }

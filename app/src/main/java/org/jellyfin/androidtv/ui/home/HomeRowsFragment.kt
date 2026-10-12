@@ -69,6 +69,7 @@ import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
 import org.jellyfin.androidtv.util.usbdevices.UsbGridButton
 import org.jellyfin.androidtv.util.usbdevices.UsbHomeDecorator
+import org.jellyfin.androidtv.util.usbdevices.UsbStorageManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.sockets.subscribe
@@ -340,6 +341,27 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				false
 			}
 		}
+
+		// Dynamically update USB tile presence when USB drive is attached or removed
+		viewLifecycleOwner.lifecycleScope.launch {
+			viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+				UsbStorageManager.mountedVolumes.collect { volumes ->
+					val currentAdapter = rowsAdapter ?: return@collect
+					var foundViewsRow = false
+					for (i in 0 until currentAdapter.size()) {
+						val listRow = (currentAdapter[i] as? ListRow) ?: continue
+						val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
+						if (itemAdapter.queryType == QueryType.Views) {
+							foundViewsRow = true
+							itemAdapter.ensureUsbTilePresent()
+						}
+					}
+					if (!foundViewsRow && volumes.isNotEmpty()) {
+						refreshRows(force = true, delayed = false)
+					}
+				}
+			}
+		}
 	}
 
 	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
@@ -358,36 +380,14 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			dataRefreshService.lastDeletedItemId = null
 		}
 
-		// Re-evaluate USB storage state & force reinjection on return to home
-		val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
+		// Re-evaluate USB storage state on return to home
 		val currentRowsAdapter = rowsAdapter
-		if (isLocalPlayerUsbEnabled) {
-			currentRowsAdapter?.let { adapter ->
-				for (i in 0 until adapter.size()) {
-					val listRow = (adapter[i] as? ListRow) ?: continue
-					val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
-					if (itemAdapter.queryType == QueryType.Views) {
-						itemAdapter.ensureUsbTilePresent()
-					}
-				}
-			}
-		} else {
-			// Remove USB tile if disabled
-			currentRowsAdapter?.let { adapter ->
-				for (i in 0 until adapter.size()) {
-					val listRow = (adapter[i] as? ListRow) ?: continue
-					val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
-					if (itemAdapter.queryType == QueryType.Views) {
-						var j = 0
-						while (j < itemAdapter.size()) {
-							val item = itemAdapter[j]
-							if ((item is UsbBaseRowItem) || ((item is BaseRowItem) && (item.baseItem?.id == USB_TILE_UUID))) {
-								itemAdapter.remove(item)
-							} else {
-								j++
-							}
-						}
-					}
+		currentRowsAdapter?.let { adapter ->
+			for (i in 0 until adapter.size()) {
+				val listRow = (adapter[i] as? ListRow) ?: continue
+				val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
+				if (itemAdapter.queryType == QueryType.Views) {
+					itemAdapter.ensureUsbTilePresent()
 				}
 			}
 		}

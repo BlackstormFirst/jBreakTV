@@ -335,25 +335,8 @@ fun ItemRowAdapter.ensureUsbTilePresent() {
 	val userPreferences = get<UserPreferences>(UserPreferences::class.java)
 	val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
 
-	if (!isLocalPlayerUsbEnabled) {
-		var i = 0
-		while (i < size()) {
-			val item = get(i)
-			if (item is UsbBaseRowItem || (item is BaseRowItem && item.baseItem?.id == USB_TILE_UUID)) {
-				remove(item)
-			} else {
-				i++
-			}
-		}
-		return
-	}
-
-	val alreadyHasUsb = (0 until size()).any { i ->
-		val item = get(i)
-		item is UsbBaseRowItem || (item is BaseRowItem && item.baseItem?.id == USB_TILE_UUID)
-	}
 	val usbVolumes = UsbStorageManager.getMountedVolumes(context)
-	val hasUsb = usbVolumes.isNotEmpty() || alreadyHasUsb || UsbStorageManager.hasMountedUsbVolumes(context)
+	val hasUsb = isLocalPlayerUsbEnabled && usbVolumes.isNotEmpty()
 
 	if (hasUsb) {
 		var presentAtIndex0 = false
@@ -364,8 +347,28 @@ fun ItemRowAdapter.ensureUsbTilePresent() {
 			}
 		}
 		if (!presentAtIndex0) {
+			var i = 0
+			while (i < size()) {
+				val item = get(i)
+				if (item is UsbBaseRowItem || (item is BaseRowItem && item.baseItem?.id == USB_TILE_UUID)) {
+					remove(item)
+				} else {
+					i++
+				}
+			}
 			add(0, UsbBaseRowItem())
 			Timber.d("USB_DEBUG: ensureUsbTilePresent force-added UsbBaseRowItem at index 0")
+		}
+	} else {
+		var i = 0
+		while (i < size()) {
+			val item = get(i)
+			if (item is UsbBaseRowItem || (item is BaseRowItem && item.baseItem?.id == USB_TILE_UUID)) {
+				remove(item)
+				Timber.d("USB_DEBUG: ensureUsbTilePresent removed UsbBaseRowItem")
+			} else {
+				i++
+			}
 		}
 	}
 }
@@ -384,14 +387,10 @@ fun ItemRowAdapter.retrieveUserViews(api: ApiClient, userViewsRepository: UserVi
 			val userPreferences = get<UserPreferences>(UserPreferences::class.java)
 			val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
 
-			val isUsbCurrentlyDisplayed = (0 until size()).any { i ->
-				val itm = get(i)
-				itm is UsbBaseRowItem || (itm is BaseRowItem && itm.baseItem?.id == USB_TILE_UUID)
-			}
 			val usbVolumes = UsbStorageManager.getMountedVolumes(context)
-			val hasUsb = isLocalPlayerUsbEnabled && (usbVolumes.isNotEmpty() || isUsbCurrentlyDisplayed)
+			val hasUsb = isLocalPlayerUsbEnabled && usbVolumes.isNotEmpty()
 
-			Timber.d("USB_DEBUG: 2. retrieveUserViews hasUsb=$hasUsb (volumesCount=${usbVolumes.size}, isUsbCurrentlyDisplayed=$isUsbCurrentlyDisplayed)")
+			Timber.d("USB_DEBUG: 2. retrieveUserViews hasUsb=$hasUsb (volumesCount=${usbVolumes.size})")
 
 			itemsLoaded = 0
 

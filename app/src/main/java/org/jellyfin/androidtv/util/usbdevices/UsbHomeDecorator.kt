@@ -30,6 +30,7 @@ object UsbHomeDecorator {
             Timber.d("UsbDebug: handleUsbTileClick mountedVolumes count=${volumes.size}")
             if (volumes.isEmpty()) {
                 Toast.makeText(context, "No USB drive detected", Toast.LENGTH_SHORT).show()
+                UsbStorageManager.updateVolumes(context)
                 return
             }
 
