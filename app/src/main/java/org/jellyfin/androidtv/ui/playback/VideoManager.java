@@ -11,6 +11,7 @@ import android.media.audiofx.Equalizer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.TypedValue;
 import android.view.SurfaceView;
 import android.view.View;
@@ -323,6 +324,7 @@ public class VideoManager {
 
     private ExoPlayer.Builder configureExoplayerBuilder(Context context, AssHandler assHandler, boolean isLocal) {
         ExoPlayer.Builder exoPlayerBuilder = new ExoPlayer.Builder(context);
+        exoPlayerBuilder.setLooper(Looper.getMainLooper());
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // 2 = Surface.CHANGE_FRAME_RATE_ALWAYS on Android 11+ (API 30+)
             exoPlayerBuilder.setVideoChangeFrameRateStrategy(2);
@@ -824,13 +826,14 @@ public class VideoManager {
                 mExoPlayer.clearVideoFrameMetadataListener(mVideoFrameMetadataListener);
                 mVideoFrameMetadataListener = null;
             }
-            if (mExoPlayerView != null) {
-                mExoPlayerView.setPlayer(null);
-            }
             try {
                 mExoPlayer.stop();
+                mExoPlayer.clearMediaItems();
             } catch (Exception e) {
                 Timber.w(e, "Error stopping ExoPlayer");
+            }
+            if (mExoPlayerView != null) {
+                mExoPlayerView.setPlayer(null);
             }
             mExoPlayer.release();
             mExoPlayer = null;

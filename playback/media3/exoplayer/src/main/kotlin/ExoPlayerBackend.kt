@@ -175,6 +175,7 @@ class ExoPlayerBackend(
 			.build()
 
 		ExoPlayer.Builder(context)
+			.setLooper(Looper.getMainLooper())
 			.apply {
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
 					setVideoChangeFrameRateStrategy(2)

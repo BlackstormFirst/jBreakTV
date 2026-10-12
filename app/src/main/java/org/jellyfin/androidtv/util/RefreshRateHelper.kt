@@ -98,6 +98,10 @@ class RefreshRateHelper(
 
 	fun resetRefreshRate(surfaceView: SurfaceView? = null) {
 		try {
+			if (activity.isFinishing || activity.isDestroyed) {
+				return
+			}
+
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && surfaceView != null) {
 				try {
 					val surface = surfaceView.holder.surface
@@ -115,7 +119,15 @@ class RefreshRateHelper(
 			if (params.preferredDisplayModeId != 0) {
 				Timber.i("Resetting preferredDisplayModeId to default (0)")
 				params.preferredDisplayModeId = 0
-				window.attributes = params
+				window.decorView.post {
+					try {
+						if (!activity.isFinishing && !activity.isDestroyed) {
+							window.attributes = params
+						}
+					} catch (e: Exception) {
+						Timber.w(e, "Error applying reset window attributes")
+					}
+				}
 			}
 		} catch (e: Exception) {
 			Timber.w(e, "Error resetting refresh rate")
