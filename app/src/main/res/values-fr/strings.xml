@@ -656,6 +656,7 @@
     <string name="pref_burn_subtitles_when_transcoding">Incrustation des sous-titres lors du transcodage</string>
     <string name="pref_burn_subtitles_when_transcoding_description">Toujours incorporer les sous-titres à la vidéo lors du transcodage. Cela peut résoudre les problèmes de synchronisation, mais désactive la personnalisation des sous-titres.</string>
     <string name="playback_info">Information de lecture</string>
+    <string name="playback_info_libass">Libass : %1$s</string>
     <string name="playback_info_play_method">Méthode de lecture : %1$s</string>
     <string name="playback_info_direct_play">Lecture directe</string>
     <string name="playback_info_direct_stream">Flux direct</string>
@@ -663,10 +664,18 @@
     <string name="playback_info_video_title">Vidéo</string>
     <string name="playback_info_transcoding">Transcodage</string>
     <string name="playback_info_audio_title">Audio</string>
+    <string name="playback_info_subtitle_title">Sous-titres</string>
     <string name="playback_info_codec">Codec : %1$s</string>
+    <string name="playback_info_title">Titre : %1$s</string>
+    <string name="playback_info_language">Langue : %1$s</string>
     <string name="playback_info_resolution">Resolution : %1$dx%2$d</string>
     <string name="playback_info_bitrate">Bitrate : %1$s</string>
     <string name="playback_info_channels">Chaînes : %1$d</string>
+    <string name="playback_info_sample_rate">Taux d\'échantillonnage : %1$s</string>
+    <string name="playback_info_default">Par défaut : %1$s</string>
+    <string name="playback_info_forced">Forcé : %1$s</string>
+    <string name="playback_info_external">Externe : %1$s</string>
+    <string name="playback_info_none">Aucun</string>
     <string name="playback_info_video_range">Plage vidéo : %1$s</string>
     <string name="playback_info_transcoding_note">Le serveur est en train de transcoder ce fichier</string>
     <string name="playback_buffer_length">Taille de la mémoire tampon</string>
