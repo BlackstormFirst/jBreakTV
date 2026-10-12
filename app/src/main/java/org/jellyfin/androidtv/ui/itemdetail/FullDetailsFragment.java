@@ -1044,7 +1044,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 @Override
                 public void onClick(View v) {
                     if (mPrevItemId != null) {
-                        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(mPrevItemId));
+                        navigationRepository.getValue().navigate(Destinations.INSTANCE.itemDetails(mPrevItemId), true);
                     }
                 }
             });

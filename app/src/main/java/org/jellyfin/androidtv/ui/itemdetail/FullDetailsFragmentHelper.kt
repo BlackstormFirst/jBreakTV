@@ -217,22 +217,34 @@ fun FullDetailsFragment.populatePreviousButton() {
 	val api by inject<ApiClient>()
 
 	lifecycleScope.launch {
-		val siblings = withContext(Dispatchers.IO) {
-			api.tvShowsApi.getEpisodes(
-				seriesId = requireNotNull(mBaseItem.seriesId),
-				adjacentTo = mBaseItem.id,
-			).content
-		}
+		runCatching {
+			withContext(Dispatchers.IO) {
+				api.tvShowsApi.getEpisodes(
+					seriesId = requireNotNull(mBaseItem.seriesId),
+					adjacentTo = mBaseItem.id,
+				).content
+			}
+		}.fold(
+			onSuccess = { siblings ->
+				val currentIndex = siblings.items.indexOfFirst { it.id == mBaseItem.id }
+				val previousItem = if (currentIndex > 0) {
+					siblings.items.getOrNull(currentIndex - 1)?.id
+				} else {
+					null
+				}
 
-		val previousItem = siblings.items
-			.filterNot { it.id == mBaseItem.id }
-			.firstOrNull()
-			?.id
+				mPrevItemId = previousItem
+				mPrevButton.isVisible = previousItem != null
 
-		mPrevItemId = previousItem
-		mPrevButton.isVisible = previousItem != null
-
-		showMoreButtonIfNeeded()
+				showMoreButtonIfNeeded()
+			},
+			onFailure = { error ->
+				Timber.e(error, "Failed to populate previous episode button")
+				mPrevItemId = null
+				mPrevButton.isVisible = false
+				showMoreButtonIfNeeded()
+			}
+		)
 	}
 }
 
