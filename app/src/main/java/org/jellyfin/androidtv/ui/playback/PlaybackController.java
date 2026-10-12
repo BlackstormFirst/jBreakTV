@@ -197,24 +197,35 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     public MediaSourceInfo getCurrentMediaSource() {
-        if (mCurrentStreamInfo != null && mCurrentStreamInfo.getMediaSource() != null) {
-            return mCurrentStreamInfo.getMediaSource();
-        } else {
-            BaseItemDto item = getCurrentlyPlayingItem();
-            List<MediaSourceInfo> mediaSources = item.getMediaSources();
+        BaseItemDto item = getCurrentlyPlayingItem();
+        if (item == null) {
+            return mCurrentStreamInfo != null ? mCurrentStreamInfo.getMediaSource() : null;
+        }
 
-            if (mediaSources == null || mediaSources.isEmpty()) {
-                return null;
-            } else {
-                // Prefer the media source with the same id as the item
-                for (MediaSourceInfo mediaSource : mediaSources) {
-                    if (mediaSource.getId() != null && item.getId().equals(UUIDSerializerKt.toUUIDOrNull(mediaSource.getId()))) {
-                        return mediaSource;
-                    }
-                }
-                // Or fallback to the first media source if none match
-                return mediaSources.get(0);
+        if (mCurrentStreamInfo != null && mCurrentStreamInfo.getMediaSource() != null) {
+            MediaSourceInfo streamMediaSource = mCurrentStreamInfo.getMediaSource();
+            String streamSourceId = streamMediaSource.getId();
+            if (streamSourceId != null && (
+                streamSourceId.equals(item.getId().toString()) ||
+                (item.getName() != null && streamSourceId.contains(String.valueOf(item.getName().hashCode()))) ||
+                (item.getMediaSources() != null && item.getMediaSources().stream().anyMatch(ms -> streamSourceId.equals(ms.getId())))
+            )) {
+                return streamMediaSource;
             }
+        }
+
+        List<MediaSourceInfo> mediaSources = item.getMediaSources();
+        if (mediaSources == null || mediaSources.isEmpty()) {
+            return null;
+        } else {
+            // Prefer the media source with the same id as the item
+            for (MediaSourceInfo mediaSource : mediaSources) {
+                if (mediaSource.getId() != null && item.getId().equals(UUIDSerializerKt.toUUIDOrNull(mediaSource.getId()))) {
+                    return mediaSource;
+                }
+            }
+            // Or fallback to the first media source if none match
+            return mediaSources.get(0);
         }
     }
 

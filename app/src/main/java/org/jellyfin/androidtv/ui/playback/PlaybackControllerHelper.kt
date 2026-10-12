@@ -60,6 +60,16 @@ fun PlaybackController.prepareLocalItemAndPlay(
 		try {
 			val localStreamInfo = LocalVideoManager.buildLocalStreamInfo(activeItem)
 			mCurrentStreamInfo = localStreamInfo
+
+			val currentMediaSource = localStreamInfo.mediaSource
+			if (currentMediaSource != null) {
+				val playbackIndexManager by fragment.inject<PlaybackIndexManager>()
+				val bestSubIndex = playbackIndexManager.getBestSubtitleIndex(currentMediaSource, targetFragment.requireContext())
+				if (bestSubIndex != null) {
+					internalOptions.subtitleStreamIndex = bestSubIndex
+				}
+			}
+
 			mCurrentOptions = internalOptions
 			startItem(activeItem, position, localStreamInfo)
 		} catch (e: Exception) {
