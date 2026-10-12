@@ -482,6 +482,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                     return;
                 }
 
+                if (mFragment != null) {
+                    mFragment.resetPlayStateToast();
+                }
+
                 isLiveTv = item.getType() == BaseItemKind.TV_CHANNEL;
                 startSpinner();
 

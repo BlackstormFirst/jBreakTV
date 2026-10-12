@@ -205,16 +205,29 @@ fun CustomPlaybackOverlayFragment.setupToastOverlay() {
 	binding.toastOverlay.setTag(R.id.toast_overlay, registry)
 }
 
+fun CustomPlaybackOverlayFragment.resetPlayStateToast() {
+	val stateKey = R.id.toast_overlay + 1
+	binding.toastOverlay.setTag(stateKey, null)
+}
+
 fun CustomPlaybackOverlayFragment.onPlayStateChanged(isPlaying: Boolean) {
 	val registry = binding.toastOverlay.getTag(R.id.toast_overlay) as? MediaToastRegistry ?: return
-	val isInitializedKey = R.id.toast_overlay + 1
-	val isInitialized = binding.toastOverlay.getTag(isInitializedKey) as? Boolean ?: false
-	if (!isInitialized) {
-		binding.toastOverlay.setTag(isInitializedKey, true)
+	val stateKey = R.id.toast_overlay + 1
+	val previousState = binding.toastOverlay.getTag(stateKey) as? String
+
+	if (previousState == null) {
 		if (isPlaying) {
-			return
+			binding.toastOverlay.setTag(stateKey, "PLAYING")
 		}
+		return
 	}
-	registry.emit(if (isPlaying) R.drawable.ic_play else R.drawable.ic_pause)
+
+	if (previousState == "PLAYING" && !isPlaying) {
+		binding.toastOverlay.setTag(stateKey, "PAUSED")
+		registry.emit(R.drawable.ic_pause)
+	} else if (previousState == "PAUSED" && isPlaying) {
+		binding.toastOverlay.setTag(stateKey, "PLAYING")
+		registry.emit(R.drawable.ic_play)
+	}
 }
 

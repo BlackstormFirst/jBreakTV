@@ -1275,6 +1275,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         }
     }
 
+    public void resetPlayStateToast() {
+        CustomPlaybackOverlayFragmentHelperKt.resetPlayStateToast(this);
+    }
+
     public void setPlayPauseActionState(final int state) {
         leanbackOverlayFragment.updatePlayState();
         PlaybackController pc = playbackControllerContainer.getValue().getPlaybackController();
