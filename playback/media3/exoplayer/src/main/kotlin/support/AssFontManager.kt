@@ -242,7 +242,11 @@ object AssFontManager {
 						val fontBytes = fontFile.readBytes()
 						synchronized(assHandler) {
 							if (coroutineContext.isActive) {
-								assHandler.addFont(fontFile.name, fontBytes)
+								runCatching {
+									assHandler.addFont(fontFile.name, fontBytes)
+								}.onFailure { error ->
+									Timber.w(error, "AssFontManager: AssHandler was released or failed while adding font ${fontFile.name}")
+								}
 							}
 						}
 						fontFile.setLastModified(System.currentTimeMillis())

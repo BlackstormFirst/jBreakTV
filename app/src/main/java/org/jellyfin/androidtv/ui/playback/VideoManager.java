@@ -794,26 +794,29 @@ public class VideoManager {
 
     public void destroy() {
         mPlaybackControllerNotifiable = null;
-        stopPlayback();
         releasePlayer();
     }
 
     private void releasePlayer() {
         _helper.setScreensaverLock(false);
         AssFontManager.cancelPreload();
+        stopProgressLoop();
         if (mHandler != null) {
             mHandler.removeCallbacksAndMessages(null);
         }
-        if (mAssHandler != null) {
+        if (mExoPlayerView != null && mExoPlayerView.getSubtitleView() != null) {
+            mExoPlayerView.getSubtitleView().removeAllViews();
+        }
+        AssHandler assHandler = mAssHandler;
+        if (assHandler != null) {
             try {
-                mAssHandler.release();
+                synchronized (assHandler) {
+                    assHandler.release();
+                }
             } catch (Exception e) {
                 Timber.w(e, "Error releasing AssHandler");
             }
             mAssHandler = null;
-        }
-        if (mExoPlayerView != null && mExoPlayerView.getSubtitleView() != null) {
-            mExoPlayerView.getSubtitleView().removeAllViews();
         }
         if (mExoPlayer != null) {
             if (mVideoFrameMetadataListener != null) {
@@ -822,6 +825,11 @@ public class VideoManager {
             }
             if (mExoPlayerView != null) {
                 mExoPlayerView.setPlayer(null);
+            }
+            try {
+                mExoPlayer.stop();
+            } catch (Exception e) {
+                Timber.w(e, "Error stopping ExoPlayer");
             }
             mExoPlayer.release();
             mExoPlayer = null;

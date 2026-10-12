@@ -415,24 +415,34 @@ class ExoPlayerBackend(
 	}
 
 	override fun setSubtitleView(surfaceView: PlayerSubtitleView?) {
-		val subView = subtitleView ?: if (surfaceView != null) {
+		if (surfaceView == null) {
+			subtitleView?.let { sub ->
+				sub.removeAllViews()
+				(sub.parent as? ViewGroup)?.removeView(sub)
+			}
+			subtitleView = null
+			return
+		}
+
+		val existingSubView = subtitleView
+		val subView = if (existingSubView != null && existingSubView.context == surfaceView.context) {
+			existingSubView
+		} else {
+			existingSubView?.let { oldSub ->
+				oldSub.removeAllViews()
+				(oldSub.parent as? ViewGroup)?.removeView(oldSub)
+			}
 			SubtitleView(surfaceView.context).apply {
 				if (exoPlayerOptions.enableLibass) {
 					addView(AssSubtitleView(surfaceView.context, assHandler))
 				}
 				exoPlayerOptions.configureSubtitleView?.invoke(this)
 			}.also { subtitleView = it }
-		} else null
+		}
 
-		if (surfaceView != null && subView != null) {
-			if (subView.parent != surfaceView) {
-				(subView.parent as? ViewGroup)?.removeView(subView)
-				surfaceView.addView(subView)
-			}
-		} else if (subView != null) {
-			subView.removeAllViews()
+		if (subView.parent != surfaceView) {
 			(subView.parent as? ViewGroup)?.removeView(subView)
-			subtitleView = null
+			surfaceView.addView(subView)
 		}
 	}
 
@@ -562,6 +572,7 @@ class ExoPlayerBackend(
 		isPreparingItem = false
 		currentStream = null
 		pendingInitialSeekMs = null
+		setSubtitleView(null)
 		if (exoPlayerOptions.enableLibass) {
 			AssFontManager.cancelPreload()
 		}
@@ -581,12 +592,12 @@ class ExoPlayerBackend(
 	override fun release() {
 		stop()
 		if (exoPlayerOptions.enableLibass && assHandlerDelegate.isInitialized()) {
-			runCatching { assHandler.release() }
+			synchronized(assHandler) {
+				runCatching { assHandler.release() }
+			}
 		}
 		if (exoPlayerDelegate.isInitialized()) {
 			runCatching {
-				videoFrameMetadataListener?.let { exoPlayer.clearVideoFrameMetadataListener(it) }
-				videoFrameMetadataListener = null
 				exoPlayer.release()
 			}
 		}
