@@ -46,7 +46,16 @@ fun VideoPlayerHeader(
 	}
 
 	val titleText = remember(item, isLocal, isLiveTv, isEpisode) {
-		val name = item?.name.orEmpty()
+		var name = item?.name.orEmpty()
+		if (isLocal && name.isNotEmpty()) {
+			val lastDot = name.lastIndexOf('.')
+			if (lastDot > 0) {
+				val ext = name.substring(lastDot + 1).lowercase()
+				if (ext in listOf("mkv", "mp4", "avi", "mov", "wmv", "flv", "webm", "ts", "m2ts", "m4v")) {
+					name = name.substring(0, lastDot)
+				}
+			}
+		}
 		if (item != null && isLiveTv) {
 			val channelNum = item.channelNumber ?: item.number
 			if (!channelNum.isNullOrEmpty()) "$channelNum $name" else name

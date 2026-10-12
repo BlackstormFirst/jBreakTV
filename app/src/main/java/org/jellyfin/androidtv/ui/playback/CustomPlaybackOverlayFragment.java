@@ -9,6 +9,7 @@ import android.media.AudioManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -37,6 +38,8 @@ import androidx.leanback.widget.Row;
 import androidx.leanback.widget.RowPresenter;
 import androidx.lifecycle.Lifecycle;
 
+import java.util.Locale;
+
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.constant.CustomMessage;
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository;
@@ -58,6 +61,7 @@ import org.jellyfin.androidtv.ui.livetv.LiveTvGuideFragment;
 import org.jellyfin.androidtv.ui.livetv.LiveTvGuideFragmentHelperKt;
 import org.jellyfin.androidtv.ui.livetv.TvManager;
 import org.jellyfin.androidtv.ui.navigation.Destinations;
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager;
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository;
 import org.jellyfin.androidtv.ui.playback.overlay.LeanbackOverlayFragment;
 import org.jellyfin.androidtv.ui.presentation.CardPresenter;
@@ -1285,11 +1289,33 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
             tvGuideBinding.guideCurrentTitle.setText(current.getName());
 
             // Update the title and subtitle
-            if (current.getType() == BaseItemKind.EPISODE) {
+            boolean isLocal = LocalVideoManager.isLocalItem(current);
+            String titleName = current.getName();
+            if (titleName != null) {
+                int lastDot = titleName.lastIndexOf('.');
+                if (lastDot > 0) {
+                    String ext = titleName.substring(lastDot + 1).toLowerCase(Locale.ROOT);
+                    if (ext.equals("mkv") || ext.equals("mp4") || ext.equals("avi") || ext.equals("mov") || ext.equals("wmv") || ext.equals("flv") || ext.equals("webm") || ext.equals("ts") || ext.equals("m2ts") || ext.equals("m4v")) {
+                        titleName = titleName.substring(0, lastDot);
+                    }
+                }
+            }
+
+            if (isLocal) {
+                binding.itemTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f);
+                binding.itemTitle.setText(titleName);
+                binding.itemSubtitle.setText("");
+                binding.itemSubtitle.setVisibility(View.GONE);
+            } else if (current.getType() == BaseItemKind.EPISODE) {
+                binding.itemTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f);
                 binding.itemTitle.setText(current.getSeriesName());
                 binding.itemSubtitle.setText(BaseItemExtensionsKt.getDisplayName(current, requireContext()));
+                binding.itemSubtitle.setVisibility(View.VISIBLE);
             } else {
-                binding.itemTitle.setText(current.getName());
+                binding.itemTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f);
+                binding.itemTitle.setText(titleName);
+                binding.itemSubtitle.setText("");
+                binding.itemSubtitle.setVisibility(View.GONE);
             }
             // Update the logo
             String imageUrl = imageHelper.getValue().getLogoImageUrl(current, 440);
