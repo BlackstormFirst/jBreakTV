@@ -382,8 +382,15 @@ class ExoPlayerBackend(
 		}
 
 		override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-			val queueEntry = mediaItem?.localConfiguration?.tag as? QueueEntry
-			audioPipeline.normalizationGain = queueEntry?.normalizationGain
+			val oldStream = currentStream
+			val newQueueEntry = mediaItem?.localConfiguration?.tag as? QueueEntry
+			if (newQueueEntry != null) {
+				currentStream = newQueueEntry.mediaStream
+				audioPipeline.normalizationGain = newQueueEntry.normalizationGain
+			}
+			if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && oldStream != null && oldStream != currentStream) {
+				listener?.onMediaStreamEnd(oldStream)
+			}
 		}
 
 		override fun onTimelineChanged(timeline: Timeline, reason: Int) {
