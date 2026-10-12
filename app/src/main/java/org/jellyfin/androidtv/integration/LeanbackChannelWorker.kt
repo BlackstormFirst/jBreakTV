@@ -5,6 +5,7 @@ import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.content.edit
 import androidx.core.content.res.ResourcesCompat
@@ -76,6 +77,14 @@ class LeanbackChannelWorker(
 ) : CoroutineWorker(context, workerParams), KoinComponent {
 	companion object {
 		private const val PERIODIC_UPDATE_REQUEST_NAME = "LeanbackChannelPeriodicUpdateRequest"
+		private const val CHANNEL_STORE_NAME = "leanback_channels"
+
+		/**
+		 * Check if the app can use Android TV home screen channels on this device.
+		 */
+		fun isAvailable(context: Context) = AndroidVersion.isAtLeastO &&
+			context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) &&
+			context.packageManager.resolveContentProvider(TvContractCompat.AUTHORITY, 0) != null
 
 		suspend fun enqueue(workManager: WorkManager) {
 			workManager.enqueueUniquePeriodicWork(
@@ -108,8 +117,13 @@ class LeanbackChannelWorker(
 	 * Update all channels for the currently authenticated user.
 	 */
 	override suspend fun doWork(): Result = when {
-		// Fail when not supported
-		!isSupported -> Result.failure()
+		// Succeed immediatly when not available
+		!isAvailable(context) -> Result.success()
+		// Clear all integration data when disabled
+		!userPreferences[UserPreferences.tvProviderEnabled] -> {
+			clearChannels()
+			Result.success()
+		}
 		// Retry later if no authenticated user is found
 		!api.isUsable -> Result.retry()
 		else -> try {
@@ -227,6 +241,21 @@ class LeanbackChannelWorker(
 
 			Result.retry()
 		}
+	}
+
+	/**
+	 * Remove all channels and programs managed by the Android TV home screen integration.
+	 */
+	private fun clearChannels() {
+		context.contentResolver.delete(TvContractCompat.PreviewPrograms.CONTENT_URI, null, null)
+		context.contentResolver.delete(WatchNextPrograms.CONTENT_URI, null, null)
+
+		val store = context.getSharedPreferences(CHANNEL_STORE_NAME, Context.MODE_PRIVATE)
+		store.all.values
+			.filterIsInstance<String>()
+			.map(Uri::parse)
+			.forEach { uri -> context.contentResolver.delete(uri, null, null) }
+		store.edit { clear() }
 	}
 
 	/**
