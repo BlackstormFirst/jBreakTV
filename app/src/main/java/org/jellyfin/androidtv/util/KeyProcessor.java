@@ -348,20 +348,23 @@ public class KeyProcessor {
     };
 
     private void togglePlayed(LifecycleOwner lifecycleOwner, UUID itemId, boolean played) {
-
-        CoroutineUtils.runOnLifecycle(lifecycleOwner.getLifecycle(), (scope, continuation) ->
-                itemMutationRepository.getValue().setPlayed(itemId, played, continuation)
+        KeyProcessorHelperKt.togglePlayed(
+                lifecycleOwner,
+                itemMutationRepository.getValue(),
+                customMessageRepository.getValue(),
+                itemId,
+                played
         );
-
-        customMessageRepository.getValue().pushMessage(CustomMessage.RefreshCurrentItem.INSTANCE);
     }
 
     private void toggleFavorite(LifecycleOwner lifecycleOwner, UUID itemId, boolean favorite) {
-        CoroutineUtils.runOnLifecycle(lifecycleOwner.getLifecycle(), (scope, continuation) ->
-                itemMutationRepository.getValue().setFavorite(itemId, favorite, continuation)
+        KeyProcessorHelperKt.toggleFavorite(
+                lifecycleOwner,
+                itemMutationRepository.getValue(),
+                customMessageRepository.getValue(),
+                itemId,
+                favorite
         );
-
-        customMessageRepository.getValue().pushMessage(CustomMessage.RefreshCurrentItem.INSTANCE);
     }
 }
 

@@ -2,11 +2,15 @@ package org.jellyfin.androidtv.util
 
 import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.constant.CustomMessage
+import org.jellyfin.androidtv.data.repository.CustomMessageRepository
+import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.model.api.ItemFilter
@@ -58,3 +62,40 @@ fun FragmentActivity.playFirstUnwatchedItem(parentId: UUID) {
 		)
 	}
 }
+
+fun togglePlayed(
+	lifecycleOwner: LifecycleOwner,
+	itemMutationRepository: ItemMutationRepository,
+	customMessageRepository: CustomMessageRepository,
+	itemId: UUID,
+	played: Boolean,
+) {
+	lifecycleOwner.lifecycleScope.launch {
+		runCatching {
+			itemMutationRepository.setPlayed(itemId, played)
+		}.onSuccess {
+			customMessageRepository.pushMessage(CustomMessage.RefreshCurrentItem)
+		}.onFailure { e ->
+			Timber.e(e, "Failed to toggle played state for item $itemId")
+		}
+	}
+}
+
+fun toggleFavorite(
+	lifecycleOwner: LifecycleOwner,
+	itemMutationRepository: ItemMutationRepository,
+	customMessageRepository: CustomMessageRepository,
+	itemId: UUID,
+	favorite: Boolean,
+) {
+	lifecycleOwner.lifecycleScope.launch {
+		runCatching {
+			itemMutationRepository.setFavorite(itemId, favorite)
+		}.onSuccess {
+			customMessageRepository.pushMessage(CustomMessage.RefreshCurrentItem)
+		}.onFailure { e ->
+			Timber.e(e, "Failed to toggle favorite state for item $itemId")
+		}
+	}
+}
+

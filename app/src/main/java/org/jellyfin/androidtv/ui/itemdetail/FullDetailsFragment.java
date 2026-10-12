@@ -35,6 +35,7 @@ import androidx.lifecycle.Lifecycle;
 
 import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.auth.repository.UserRepository;
+import org.jellyfin.androidtv.constant.ChangeTriggerType;
 import org.jellyfin.androidtv.constant.CustomMessage;
 import org.jellyfin.androidtv.constant.QueryType;
 import org.jellyfin.androidtv.data.model.ChapterItemInfo;
@@ -57,6 +58,7 @@ import org.jellyfin.androidtv.ui.browsing.BrowsingUtils;
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
+import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapterHelperKt;
 import org.jellyfin.androidtv.ui.livetv.TvManager;
 import org.jellyfin.androidtv.ui.navigation.Destinations;
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository;
@@ -125,6 +127,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     protected UUID mItemId;
     protected UUID mChannelId;
     protected BaseRowItem mCurrentItem;
+    private Row mCurrentRow;
     private Instant mLastUpdated;
     public UUID mPrevItemId;
 
@@ -207,6 +210,8 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
                     }
                 }, 1500);
+            } else if (message.equals(CustomMessage.RefreshCurrentItem.INSTANCE)) {
+                refreshCurrentItem();
             }
             return null;
         });
@@ -214,6 +219,39 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         loadItem(mItemId);
 
         return binding.getRoot();
+    }
+
+    private void refreshCurrentItem() {
+        if (mCurrentRow != null && mCurrentItem != null && mCurrentRow instanceof ListRow && ((ListRow) mCurrentRow).getAdapter() instanceof ItemRowAdapter) {
+            ItemRowAdapter adapter = (ItemRowAdapter) ((ListRow) mCurrentRow).getAdapter();
+            ItemRowAdapterHelperKt.refreshItem(adapter, api.getValue(), this, mCurrentItem, () -> {
+                refreshBaseItemAndRows();
+                return null;
+            });
+        } else {
+            refreshBaseItemAndRows();
+        }
+    }
+
+    private void refreshBaseItemAndRows() {
+        if (mBaseItem == null) return;
+        FullDetailsFragmentHelperKt.getItem(FullDetailsFragment.this, mBaseItem.getId(), item -> {
+            if (item != null) {
+                mBaseItem = item;
+                updateWatched();
+            }
+            if (mRowsAdapter != null) {
+                for (int i = 0; i < mRowsAdapter.size(); i++) {
+                    if (mRowsAdapter.get(i) instanceof ListRow) {
+                        ListRow listRow = (ListRow) mRowsAdapter.get(i);
+                        if (listRow != null && listRow.getAdapter() instanceof ItemRowAdapter) {
+                            ((ItemRowAdapter) listRow.getAdapter()).ReRetrieveIfNeeded();
+                        }
+                    }
+                }
+            }
+            return null;
+        });
     }
 
     int getResumePreroll() {
@@ -608,17 +646,22 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 break;
             case SERIES:
                 ItemRowAdapter nextUpAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSeriesGetNextUpRequest(mBaseItem.getId()), false, new CardPresenter(true, 130), adapter);
+                nextUpAdapter.setReRetrieveTriggers(new ChangeTriggerType[]{ChangeTriggerType.TvPlayback, ChangeTriggerType.FavoriteUpdate, ChangeTriggerType.LibraryUpdated});
                 addItemRow(adapter, nextUpAdapter, 0, getString(R.string.lbl_next_up));
 
                 ItemRowAdapter seasonsAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSeasonsRequest(mBaseItem.getId()), new CardPresenter(), adapter);
+                seasonsAdapter.setReRetrieveTriggers(new ChangeTriggerType[]{ChangeTriggerType.TvPlayback, ChangeTriggerType.FavoriteUpdate, ChangeTriggerType.LibraryUpdated});
                 addItemRow(adapter, seasonsAdapter, 1, getString(R.string.lbl_seasons));
 
                 //Specials
                 if (mBaseItem.getSpecialFeatureCount() != null && mBaseItem.getSpecialFeatureCount() > 0) {
-                    addItemRow(adapter, new ItemRowAdapter(requireContext(), new GetSpecialsRequest(mBaseItem.getId()), new CardPresenter(), adapter), 3, getString(R.string.lbl_specials));
+                    ItemRowAdapter specialsAdapter = new ItemRowAdapter(requireContext(), new GetSpecialsRequest(mBaseItem.getId()), new CardPresenter(), adapter);
+                    specialsAdapter.setReRetrieveTriggers(new ChangeTriggerType[]{ChangeTriggerType.TvPlayback, ChangeTriggerType.FavoriteUpdate, ChangeTriggerType.LibraryUpdated});
+                    addItemRow(adapter, specialsAdapter, 3, getString(R.string.lbl_specials));
                 }
 
                 ItemRowAdapter upcomingAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createUpcomingEpisodesRequest(mBaseItem.getId()), new CardPresenter(), adapter);
+                upcomingAdapter.setReRetrieveTriggers(new ChangeTriggerType[]{ChangeTriggerType.TvPlayback, ChangeTriggerType.FavoriteUpdate, ChangeTriggerType.LibraryUpdated});
                 addItemRow(adapter, upcomingAdapter, 2, getString(R.string.lbl_upcoming));
 
                 if (mBaseItem.getPeople() != null && !mBaseItem.getPeople().isEmpty()) {
@@ -1216,6 +1259,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         @Override
         public void onItemSelected(Presenter.ViewHolder itemViewHolder, Object item,
                                    RowPresenter.ViewHolder rowViewHolder, Row row) {
+            mCurrentRow = row;
             if (!(item instanceof BaseRowItem)) {
                 mCurrentItem = null;
             } else {
