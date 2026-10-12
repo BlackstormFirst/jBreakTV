@@ -14,6 +14,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ChapterInfo
 import org.jellyfin.sdk.model.api.MediaSegmentDto
 import org.jellyfin.sdk.model.api.MediaSegmentType
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import java.util.UUID
@@ -116,6 +117,8 @@ class MediaSegmentRepositoryImpl(
 		val itemPath = item.path
 		var effectiveItem = item
 
+		// For local media files: do NOT fetch remote segments directly; create segments locally from chapters
+		// using keywords retrieved from the server.
 		if (isLocalPath(itemPath) && itemPath != null) {
 			if (effectiveItem.chapters.isNullOrEmpty()) {
 				val file = File(itemPath)
@@ -142,6 +145,7 @@ class MediaSegmentRepositoryImpl(
 			}
 		}
 
+		// For remote media files: try fetching server segments via API first
 		val remoteSegments = runCatching {
 			withContext(Dispatchers.IO) {
 				api.mediaSegmentsApi.getItemSegments(
@@ -171,21 +175,88 @@ private suspend fun fetchServerSegmentKeywords(api: ApiClient): Map<MediaSegment
 	val keywordsMap = mutableMapOf<MediaSegmentType, MutableSet<String>>()
 	runCatching {
 		val plugins = api.pluginsApi.getPlugins().content
-		val skipperPlugin = plugins.firstOrNull {
+		val skipperPlugins = plugins.filter {
 			val n = it.name.lowercase(Locale.ROOT)
 			n.contains("intro") || n.contains("segment") || n.contains("skipper")
 		}
-		if (skipperPlugin?.id != null) {
-			api.pluginsApi.getPluginConfiguration(skipperPlugin.id)
+		for (plugin in skipperPlugins) {
+			runCatching {
+				val rawResponse = api.request(
+					pathTemplate = "/Plugins/{pluginId}/Configuration",
+					pathParameters = mapOf("pluginId" to plugin.id),
+				)
+				val jsonString = rawResponse.body.decodeToString()
+				parsePluginConfigurationJson(jsonString, keywordsMap)
+			}
 		}
 	}
 	return keywordsMap
 }
 
+private fun parsePluginConfigurationJson(
+	jsonString: String,
+	keywordsMap: MutableMap<MediaSegmentType, MutableSet<String>>,
+) {
+	runCatching {
+		val jsonObject = JSONObject(jsonString)
+		val keys = jsonObject.keys()
+		while (keys.hasNext()) {
+			val key = keys.next()
+			val keyLower = key.lowercase(Locale.ROOT)
+			val targetType = when {
+				keyLower.contains("intro") -> MediaSegmentType.INTRO
+				keyLower.contains("outro") || keyLower.contains("ending") -> MediaSegmentType.OUTRO
+				keyLower.contains("recap") -> MediaSegmentType.RECAP
+				keyLower.contains("preview") -> MediaSegmentType.PREVIEW
+				keyLower.contains("commercial") || keyLower.contains("pub") || keyLower.contains("sponsor") -> MediaSegmentType.COMMERCIAL
+				else -> null
+			} ?: continue
+
+			val keywordsSet = keywordsMap.getOrPut(targetType) { mutableSetOf() }
+
+			when {
+				jsonObject.isNull(key) -> continue
+
+				jsonObject.optJSONArray(key) != null -> {
+					val array = jsonObject.getJSONArray(key)
+					for (i in 0 until array.length()) {
+						val item = array.optString(i, "").lowercase(Locale.ROOT).trim()
+						if (item.isNotBlank()) {
+							keywordsSet.add(item)
+						}
+					}
+				}
+
+				jsonObject.optJSONObject(key) != null -> {
+					val nested = jsonObject.getJSONObject(key)
+					val nestedKeys = nested.keys()
+					while (nestedKeys.hasNext()) {
+						val nk = nestedKeys.next()
+						val item = nested.optString(nk, "").lowercase(Locale.ROOT).trim()
+						if (item.isNotBlank()) {
+							keywordsSet.add(item)
+						}
+					}
+				}
+
+				else -> {
+					val strValue = jsonObject.optString(key, "")
+					strValue.split(',', ';', '\n').forEach { raw ->
+						val item = raw.lowercase(Locale.ROOT).trim()
+						if (item.isNotBlank()) {
+							keywordsSet.add(item)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 private fun buildSegmentsFromChapters(
 	item: BaseItemDto,
 	chapters: List<ChapterInfo>,
-	serverKeywords: Map<MediaSegmentType, Set<String>>
+	serverKeywords: Map<MediaSegmentType, Set<String>>,
 ): List<MediaSegmentDto> {
 	val segments = mutableListOf<MediaSegmentDto>()
 	val defaultIntro = setOf("intro", "opening", "op", "générique", "générique de début", "introduction")
@@ -194,11 +265,11 @@ private fun buildSegmentsFromChapters(
 	val defaultPreview = setOf("preview", "teaser", "prochainement", "next episode", "au prochain épisode")
 	val defaultCommercial = setOf("commercial", "pub", "publicité", "sponsor")
 
-	val introKeywords = (serverKeywords[MediaSegmentType.INTRO].orEmpty() + defaultIntro)
-	val outroKeywords = (serverKeywords[MediaSegmentType.OUTRO].orEmpty() + defaultOutro)
-	val recapKeywords = (serverKeywords[MediaSegmentType.RECAP].orEmpty() + defaultRecap)
-	val previewKeywords = (serverKeywords[MediaSegmentType.PREVIEW].orEmpty() + defaultPreview)
-	val commercialKeywords = (serverKeywords[MediaSegmentType.COMMERCIAL].orEmpty() + defaultCommercial)
+	val introKeywords = serverKeywords[MediaSegmentType.INTRO]?.takeIf { it.isNotEmpty() } ?: defaultIntro
+	val outroKeywords = serverKeywords[MediaSegmentType.OUTRO]?.takeIf { it.isNotEmpty() } ?: defaultOutro
+	val recapKeywords = serverKeywords[MediaSegmentType.RECAP]?.takeIf { it.isNotEmpty() } ?: defaultRecap
+	val previewKeywords = serverKeywords[MediaSegmentType.PREVIEW]?.takeIf { it.isNotEmpty() } ?: defaultPreview
+	val commercialKeywords = serverKeywords[MediaSegmentType.COMMERCIAL]?.takeIf { it.isNotEmpty() } ?: defaultCommercial
 
 	for (i in chapters.indices) {
 		val chapter = chapters[i]
@@ -231,7 +302,7 @@ private fun buildSegmentsFromChapters(
 					itemId = item.id,
 					type = type,
 					startTicks = startTicks,
-					endTicks = endTicks
+					endTicks = endTicks,
 				)
 			)
 		}
