@@ -280,7 +280,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     public boolean isPlaying() {
         // since playbackController is so closely tied to videoManager, check if it is playing too since they can fall out of sync
-        return mPlaybackState == PlaybackState.PLAYING && hasInitializedVideoManager() && mVideoManager.isPlaying();
+        return (mPlaybackState == PlaybackState.PLAYING || mPlaybackState == PlaybackState.BUFFERING)
+                && hasInitializedVideoManager() && mVideoManager.isPlaying();
     }
 
     public void playerErrorEncountered() {

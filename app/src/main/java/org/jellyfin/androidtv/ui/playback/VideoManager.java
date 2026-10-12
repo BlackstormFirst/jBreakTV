@@ -493,7 +493,8 @@ public class VideoManager {
     }
 
     public boolean isPlaying() {
-        return mExoPlayer.isPlaying();
+        if (mExoPlayer == null) return false;
+        return mExoPlayer.isPlaying() || (mExoPlayer.getPlayWhenReady() && mExoPlayer.getPlaybackState() == Player.STATE_BUFFERING);
     }
 
     public void start() {
