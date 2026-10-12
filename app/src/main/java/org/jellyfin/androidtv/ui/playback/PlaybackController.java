@@ -1570,6 +1570,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         return duration > 0 ? duration : 0;
     }
 
+    public PlaybackState getPlaybackState() {
+        return mPlaybackState;
+    }
+
     public long getBufferedPosition() {
         long bufferedPosition = -1;
 

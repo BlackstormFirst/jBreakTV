@@ -60,6 +60,7 @@ fun VideoPlayerScreen() {
 	val baseItem = entry?.run { baseItemFlow.collectAsState(baseItem) }?.value
 
 	BackHandler {
+		playbackManager.state.stop()
 		val lastPlayedItem = entry?.baseItem
 			?: videoQueueManager.getCurrentVideoQueue().getOrNull(videoQueueManager.getCurrentMediaPosition())
 		if (lastPlayedItem != null && lastPlayedItem.type != BaseItemKind.TRAILER) {

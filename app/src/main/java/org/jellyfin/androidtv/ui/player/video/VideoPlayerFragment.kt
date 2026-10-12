@@ -608,7 +608,10 @@ class VideoPlayerFragment : Fragment() {
 		Timber.d("PlayerDebug [VideoPlayerFragment.onPause]: Pausing fragment hash=${this.hashCode()}")
 
 		if (activeInstanceHash == this.hashCode()) {
-			playbackManager.state.pause()
+			val isExiting = isRemoving || requireActivity().isFinishing || playbackManager.state.playState.value == PlayState.STOPPED
+			if (!isExiting) {
+				playbackManager.state.pause()
+			}
 		}
 	}
 

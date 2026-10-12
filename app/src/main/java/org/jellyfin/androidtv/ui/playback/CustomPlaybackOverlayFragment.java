@@ -717,8 +717,11 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         super.onPause();
         if (mItemsToPlay == null || mItemsToPlay.isEmpty()) return;
 
-        if (playbackControllerContainer.getValue().getPlaybackController() != null) {
-            playbackControllerContainer.getValue().getPlaybackController().pause();
+        PlaybackController pc = playbackControllerContainer.getValue().getPlaybackController();
+        boolean isExiting = isRemoving() || (getActivity() != null && getActivity().isFinishing()) || (pc != null && (pc.getPlaybackState() == PlaybackController.PlaybackState.IDLE || pc.getPlaybackState() == PlaybackController.PlaybackState.UNDEFINED));
+
+        if (pc != null && !isExiting) {
+            pc.pause();
         }
 
         setPlayPauseActionState(0);
@@ -1386,6 +1389,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         navigating = true;
 
         PlaybackController playbackController = playbackControllerContainer.getValue().getPlaybackController();
+        if (playbackController != null) {
+            playbackController.stop();
+        }
+
         BaseItemDto lastPlayedItem = playbackController != null ? playbackController.getCurrentlyPlayingItem() : null;
         if (lastPlayedItem == null) {
             List<BaseItemDto> queue = videoQueueManager.getValue().getCurrentVideoQueue();
