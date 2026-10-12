@@ -48,7 +48,7 @@ class JellyfinMediaStreamResolver(
 			val filePath = baseItem.path.orEmpty()
 			val file = File(filePath)
 
-			val itemToUse = if (baseItem.mediaStreams.isNullOrEmpty() || baseItem.runTimeTicks == null) {
+			val itemToUse = if (baseItem.mediaStreams.isNullOrEmpty() || baseItem.runTimeTicks == null || baseItem.chapters.isNullOrEmpty()) {
 				localItemInspector?.let { inspector -> runCatching { inspector.invoke(file) }.getOrNull() } ?: baseItem
 			} else {
 				baseItem

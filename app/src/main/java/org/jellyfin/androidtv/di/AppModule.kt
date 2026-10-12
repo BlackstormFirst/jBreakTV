@@ -188,7 +188,7 @@ val appModule = module {
 	single<CustomMessageRepository> { CustomMessageRepositoryImpl() }
 	single<NavigationRepository> { NavigationRepositoryImpl(Destinations.home) }
 	single<SearchRepository> { SearchRepositoryImpl(get()) }
-	single<MediaSegmentRepository> { MediaSegmentRepositoryImpl(get(), get()) }
+	single<MediaSegmentRepository> { MediaSegmentRepositoryImpl(get(), get(), androidContext()) }
 	single<ExternalAppRepository> { ExternalAppRepository(get(), getAll(), get<DefaultExternalPlayerApi>()) }
 
 	// External player APIs

@@ -1,9 +1,12 @@
 package org.jellyfin.androidtv.ui.playback.segment
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.util.sdk.duration
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
+import org.jellyfin.playback.core.util.isLocalPath
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.mediaSegmentsApi
 import org.jellyfin.sdk.api.client.extensions.pluginsApi
@@ -11,6 +14,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ChapterInfo
 import org.jellyfin.sdk.model.api.MediaSegmentDto
 import org.jellyfin.sdk.model.api.MediaSegmentType
+import java.io.File
 import java.util.Locale
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
@@ -58,6 +62,7 @@ fun Map<MediaSegmentType, MediaSegmentAction>.toMediaSegmentActionsString() =
 class MediaSegmentRepositoryImpl(
 	private val userPreferences: UserPreferences,
 	private val api: ApiClient,
+	private val context: Context,
 ) : MediaSegmentRepository {
 	private val mediaTypeActions = mutableMapOf<MediaSegmentType, MediaSegmentAction>()
 
@@ -108,6 +113,35 @@ class MediaSegmentRepositoryImpl(
 	}
 
 	override suspend fun getSegmentsForItem(item: BaseItemDto): List<MediaSegmentDto> {
+		val itemPath = item.path
+		var effectiveItem = item
+
+		if (isLocalPath(itemPath) && itemPath != null) {
+			if (effectiveItem.chapters.isNullOrEmpty()) {
+				val file = File(itemPath)
+				if (file.exists() && file.canRead()) {
+					val inspected = runCatching {
+						withContext(Dispatchers.IO) {
+							LocalVideoManager.inspectAndBuildBaseItemDto(context, file)
+						}
+					}.getOrNull()
+					if (inspected != null) {
+						effectiveItem = inspected
+					}
+				}
+			}
+
+			val chapters = effectiveItem.chapters.orEmpty()
+			if (chapters.isEmpty()) {
+				return emptyList()
+			}
+
+			return withContext(Dispatchers.IO) {
+				val serverKeywords = fetchServerSegmentKeywords(api)
+				buildSegmentsFromChapters(effectiveItem, chapters, serverKeywords)
+			}
+		}
+
 		val remoteSegments = runCatching {
 			withContext(Dispatchers.IO) {
 				api.mediaSegmentsApi.getItemSegments(
@@ -121,14 +155,14 @@ class MediaSegmentRepositoryImpl(
 			return remoteSegments
 		}
 
-		val chapters = item.chapters.orEmpty()
+		val chapters = effectiveItem.chapters.orEmpty()
 		if (chapters.isEmpty()) {
 			return emptyList()
 		}
 
 		return withContext(Dispatchers.IO) {
 			val serverKeywords = fetchServerSegmentKeywords(api)
-			buildSegmentsFromChapters(item, chapters, serverKeywords)
+			buildSegmentsFromChapters(effectiveItem, chapters, serverKeywords)
 		}
 	}
 }
