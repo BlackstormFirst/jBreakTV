@@ -1288,6 +1288,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     }
 
     public void updateDisplay() {
+        if (getContext() == null || !isAdded()) return;
         BaseItemDto current = playbackControllerContainer.getValue().getPlaybackController().getCurrentlyPlayingItem();
         if (current != null && getContext() != null) {
             leanbackOverlayFragment.mediaInfoChanged();

@@ -96,6 +96,7 @@ public class LeanbackOverlayFragment extends PlaybackSupportFragment {
     }
 
     public void mediaInfoChanged() {
+        if (getContext() == null || !isAdded()) return;
         org.jellyfin.sdk.model.api.BaseItemDto currentlyPlayingItem = playbackControllerContainer.getValue().getPlaybackController().getCurrentlyPlayingItem();
         if (currentlyPlayingItem == null) return;
 

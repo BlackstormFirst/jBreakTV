@@ -198,7 +198,7 @@ public class VideoManager {
             }
         }
 
-        mExoPlayer.addListener(new Player.Listener() {
+        mPlayerListener = new Player.Listener() {
             @Override
             public void onPlayerError(@NonNull PlaybackException error) {
                 Timber.e(error, "***** Got error from player");
@@ -266,7 +266,8 @@ public class VideoManager {
                     mExoPlayerView.getSubtitleView().setCues(Collections.emptyList());
                 }
             }
-        });
+        };
+        mExoPlayer.addListener(mPlayerListener);
     }
 
     private boolean isCurrentTextTrackAss() {
@@ -822,13 +823,16 @@ public class VideoManager {
             mAssHandler = null;
         }
         if (mExoPlayer != null) {
+            if (mPlayerListener != null) {
+                mExoPlayer.removeListener(mPlayerListener);
+                mPlayerListener = null;
+            }
             if (mVideoFrameMetadataListener != null) {
                 mExoPlayer.clearVideoFrameMetadataListener(mVideoFrameMetadataListener);
                 mVideoFrameMetadataListener = null;
             }
             try {
                 mExoPlayer.stop();
-                mExoPlayer.clearMediaItems();
             } catch (Exception e) {
                 Timber.w(e, "Error stopping ExoPlayer");
             }
