@@ -112,66 +112,102 @@ object UsbStorageManager {
 
     fun scanVolumesSync(context: Context): List<UsbVolumeInfo> {
         val list = mutableListOf<UsbVolumeInfo>()
+        val processedPaths = mutableSetOf<String>()
+        val systemExcludedNames = setOf(
+            "emulated", "self", "0", "sdcard0", "knox", "asec", "secure", "obb",
+            "appfuse", "user", "runtime", "expand", "pass_through"
+        )
+
+        fun addVolumeIfValid(id: String, label: String, dir: File) {
+            val canonicalOrAbsPath = try { dir.canonicalPath } catch (_: Exception) { dir.absolutePath }
+            val lower = canonicalOrAbsPath.lowercase(Locale.ROOT)
+            val nameLower = dir.name.lowercase(Locale.ROOT)
+
+            if (lower.contains("/emulated") ||
+                lower.contains("/self") ||
+                lower.contains("/appfuse") ||
+                lower.contains("/runtime") ||
+                lower.contains("/user") ||
+                lower.contains("/expand") ||
+                lower.contains("/pass_through") ||
+                lower == "/storage/0" ||
+                lower == "/storage" ||
+                lower == "/mnt" ||
+                lower == "/mnt/media_rw" ||
+                nameLower in systemExcludedNames
+            ) {
+                return
+            }
+
+            if (!processedPaths.add(canonicalOrAbsPath)) return
+
+            if (dir.exists()) {
+                val (total, free) = getStorageStats(dir)
+                list.add(UsbVolumeInfo(id, label, dir, total, free))
+            }
+        }
 
         // Tier 1: StorageManager API
         try {
             val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
             if (storageManager != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 val usbVolumes = storageManager.storageVolumes.filter { volume ->
-                    !volume.isPrimary &&
-                    !volume.isEmulated &&
-                    volume.isRemovable &&
-                    volume.state == Environment.MEDIA_MOUNTED
+                    val isSecondary = !volume.isPrimary && (!volume.isEmulated || volume.isRemovable || volume.uuid != null)
+                    val isMounted = volume.state == Environment.MEDIA_MOUNTED || volume.state == "mounted"
+                    isSecondary && (volume.isRemovable || volume.uuid != null || isMounted)
                 }
 
                 for (volume in usbVolumes) {
                     val path = getVolumeDirectory(volume) ?: continue
-                    if (!path.exists()) continue
-
-                    val absPath = path.absolutePath.lowercase(Locale.ROOT)
-                    if (absPath.contains("/emulated") ||
-                        absPath.contains("/self") ||
-                        absPath == "/storage/0" ||
-                        absPath == "/storage"
-                    ) {
-                        continue
-                    }
-
-                    val (total, free) = getStorageStats(path)
-
                     val label = getVolumeLabel(context, volume, path)
                     val id = volume.uuid ?: path.name
-
-                    list.add(UsbVolumeInfo(id, label, path, total, free))
+                    addVolumeIfValid(id, label, path)
                 }
             }
         } catch (e: Exception) {
             Timber.e(e, "UsbDebug: Error scanning volumes via StorageManager")
         }
 
-        // Tier 2: Direct /storage/ filesystem scan for removable volume mounts
-        if (list.isEmpty()) {
-            val storageDir = File("/storage")
+        // Tier 2: Framework app-specific dirs API (context.getExternalFilesDirs(null))
+        // Works on API 19+ (Android 4.4/6.0+) across all Android TV boxes including Android 10 (Freebox)
+        try {
+            val externalDirs = context.getExternalFilesDirs(null)
+            for (appDir in externalDirs) {
+                if (appDir == null) continue
+                var current: File? = appDir
+                while (current != null) {
+                    val parent = current.parentFile ?: break
+                    val parentName = parent.name.lowercase(Locale.ROOT)
+                    if (parentName == "storage" || parentName == "media_rw" || parentName == "mnt" || parentName == "usb") {
+                        val label = "USB Drive (${current.name})"
+                        addVolumeIfValid(current.name, label, current)
+                        break
+                    }
+                    current = parent
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "UsbDebug: Error scanning via getExternalFilesDirs")
+        }
+
+        // Tier 3: Direct filesystem scan (/storage, /mnt/media_rw, /mnt/usb)
+        val scanRoots = listOf("/storage", "/mnt/media_rw", "/mnt/usb")
+        for (rootPath in scanRoots) {
+            val storageDir = File(rootPath)
             if (storageDir.exists() && storageDir.isDirectory) {
                 val subDirs = storageDir.listFiles() ?: emptyArray()
                 for (dir in subDirs) {
                     val name = dir.name.lowercase(Locale.ROOT)
-                    if (dir.isDirectory &&
-                        name != "emulated" &&
-                        name != "self" &&
-                        name != "0" &&
-                        name != "sdcard0"
-                    ) {
-                        val (total, free) = getStorageStats(dir)
+                    if (dir.isDirectory && name !in systemExcludedNames) {
                         val id = dir.name
                         val label = "USB Drive ($id)"
-                        list.add(UsbVolumeInfo(id, label, dir, total, free))
+                        addVolumeIfValid(id, label, dir)
                     }
                 }
             }
         }
 
-        // Tier 3: Persistence Safeguard
+        // Tier 4: Persistence Safeguard
         if (list.isEmpty() && _mountedVolumes.value.isNotEmpty()) {
             val validPrevious = _mountedVolumes.value.filter { vol -> vol.path.exists() }
             if (validPrevious.isNotEmpty()) {
@@ -204,17 +240,29 @@ object UsbStorageManager {
 
     @SuppressLint("NewApi")
     private fun getVolumeDirectory(volume: StorageVolume): File? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            volume.directory
-        } else {
-            try {
-                val getPathMethod = volume.javaClass.getMethod("getPath")
-                val pathString = getPathMethod.invoke(volume) as? String
-                pathString?.let { File(it) }
-            } catch (e: Exception) {
-                null
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            volume.directory?.let { return it }
         }
+
+        try {
+            val getPathFileMethod = volume.javaClass.getMethod("getPathFile")
+            val file = getPathFileMethod.invoke(volume) as? File
+            if (file != null) return file
+        } catch (_: Exception) { }
+
+        try {
+            val getPathMethod = volume.javaClass.getMethod("getPath")
+            val pathString = getPathMethod.invoke(volume) as? String
+            if (!pathString.isNullOrEmpty()) return File(pathString)
+        } catch (_: Exception) { }
+
+        try {
+            val getDirMethod = volume.javaClass.getMethod("getDirectory")
+            val file = getDirMethod.invoke(volume) as? File
+            if (file != null) return file
+        } catch (_: Exception) { }
+
+        return null
     }
 
     @SuppressLint("NewApi")
@@ -222,7 +270,7 @@ object UsbStorageManager {
         return try {
             val userLabel = volume.getDescription(context)
             if (!userLabel.isNullOrEmpty()) userLabel else "USB Drive (${path.name})"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "USB Drive (${path.name})"
         }
     }
@@ -233,7 +281,7 @@ object UsbStorageManager {
             val totalBytes = stat.totalBytes
             val freeBytes = stat.availableBytes
             Pair(totalBytes, freeBytes)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Pair(0L, 0L)
         }
     }

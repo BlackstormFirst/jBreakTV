@@ -27,8 +27,19 @@ object UsbEnvironmentInspector {
 
     fun getManageStorageIntent(context: Context): Intent {
         return if (isAndroid11OrHigher) {
-            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                data = Uri.parse("package:${context.packageName}")
+            try {
+                val appSpecificIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                }
+                if (appSpecificIntent.resolveActivity(context.packageManager) != null) {
+                    appSpecificIntent
+                } else {
+                    Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                }
+            } catch (_: Exception) {
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                }
             }
         } else {
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
