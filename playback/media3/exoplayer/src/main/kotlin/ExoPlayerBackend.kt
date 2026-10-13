@@ -49,6 +49,7 @@ import org.jellyfin.playback.core.backend.BackendTrack
 import org.jellyfin.playback.core.backend.BasePlayerBackend
 import org.jellyfin.playback.core.backend.PlayerBackendEventListener
 import org.jellyfin.playback.media3.exoplayer.support.AssFontManager
+import org.jellyfin.playback.media3.exoplayer.support.AssVsyncScheduler
 import org.jellyfin.playback.core.mediastream.MediaConversionMethod
 import org.jellyfin.playback.core.mediastream.MediaStream
 import org.jellyfin.playback.core.mediastream.MediaStreamAttachmentTrack
@@ -214,33 +215,29 @@ class ExoPlayerBackend(
 			}
 	}
 	private var activeStreamOffsetUs: Long = 0L
-	private var lastRenderedTimeUs: Long = 0L
+	private val vsyncScheduler = AssVsyncScheduler()
 	private var videoFrameMetadataListener: VideoFrameMetadataListener? = null
 	private val exoPlayer by exoPlayerDelegate
 
 	private fun ensureVideoFrameMetadataListener() {
 		if (exoPlayerOptions.enableLibass && exoPlayerOptions.libassRenderMode == LibassRenderMode.FRAME_ACCURATE) {
 			if (videoFrameMetadataListener == null) {
-				val metadataListener = VideoFrameMetadataListener { presentationTimeUs, _, _, _ ->
+				val metadataListener = VideoFrameMetadataListener { presentationTimeUs, releaseTimeNs, _, _ ->
 					if (presentationTimeUs >= 0) {
 						val currentMediaPosUs = runCatching { exoPlayer.currentPosition * 1000L }.getOrDefault(presentationTimeUs)
 						val expectedPosUs = presentationTimeUs - activeStreamOffsetUs
 						if (abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
 							activeStreamOffsetUs = presentationTimeUs - currentMediaPosUs
-							lastRenderedTimeUs = 0L
+							vsyncScheduler.reset()
 						}
-
-						val ptsTimeUs = (presentationTimeUs - activeStreamOffsetUs).coerceAtLeast(0L)
-
-						val correctedTimeUs = if (ptsTimeUs < lastRenderedTimeUs) {
-							if (lastRenderedTimeUs - ptsTimeUs > 1_000_000L) ptsTimeUs else lastRenderedTimeUs
-						} else {
-							ptsTimeUs
-						}
-						lastRenderedTimeUs = correctedTimeUs
 
 						runCatching {
-							assHandler.videoTimeCallback?.invoke(correctedTimeUs)
+							vsyncScheduler.onVideoFrameAboutToBeRendered(
+								presentationTimeUs = presentationTimeUs,
+								releaseTimeNs = releaseTimeNs,
+								activeStreamOffsetUs = activeStreamOffsetUs,
+								timeCallback = assHandler.videoTimeCallback
+							)
 						}
 					}
 				}
@@ -311,6 +308,9 @@ class ExoPlayerBackend(
 		override fun onVideoSizeChanged(size: VideoSize) {
 			if (size != VideoSize.UNKNOWN) {
 				val frameRate = exoPlayer.videoFormat?.frameRate?.takeIf { it > 0f } ?: 0f
+				if (frameRate > 0f) {
+					vsyncScheduler.setRefreshRate(frameRate.toDouble())
+				}
 				listener?.onVideoSizeChange(size.width, size.height, frameRate)
 			}
 		}
@@ -321,6 +321,9 @@ class ExoPlayerBackend(
 				val size = player.videoSize
 				if (size != VideoSize.UNKNOWN) {
 					val frameRate = exoPlayer.videoFormat?.frameRate?.takeIf { it > 0f } ?: 0f
+					if (frameRate > 0f) {
+						vsyncScheduler.setRefreshRate(frameRate.toDouble())
+					}
 					listener?.onVideoSizeChange(size.width, size.height, frameRate)
 				}
 			}
@@ -367,6 +370,11 @@ class ExoPlayerBackend(
 			if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
 				listener?.onMediaStreamEnd(requireNotNull(currentStream))
 			}
+			if (playWhenReady) {
+				vsyncScheduler.startVsyncLoop()
+			} else {
+				vsyncScheduler.stopVsyncLoop()
+			}
 			updatePlayState()
 			updateBufferingState()
 		}
@@ -410,6 +418,7 @@ class ExoPlayerBackend(
 		}
 
 		override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+			vsyncScheduler.reset()
 			timedEventState.onSeek(oldPosition.positionMs.milliseconds, newPosition.positionMs.milliseconds, lastKnownDuration ?: Duration.ZERO)
 		}
 	}
@@ -500,7 +509,7 @@ class ExoPlayerBackend(
 		if (!needsReload) return
 
 		activeStreamOffsetUs = 0L
-		lastRenderedTimeUs = 0L
+		vsyncScheduler.reset()
 		currentStream = stream
 
 		val mediaItem = buildMediaItem(item)
@@ -582,6 +591,7 @@ class ExoPlayerBackend(
 		currentStream = null
 		pendingInitialSeekMs = null
 		setSubtitleView(null)
+		vsyncScheduler.reset()
 		if (exoPlayerOptions.enableLibass) {
 			AssFontManager.cancelPreload()
 		}
@@ -600,6 +610,7 @@ class ExoPlayerBackend(
 
 	override fun release() {
 		stop()
+		vsyncScheduler.release()
 		if (exoPlayerOptions.enableLibass && assHandlerDelegate.isInitialized()) {
 			synchronized(assHandler) {
 				runCatching { assHandler.release() }

@@ -32,6 +32,7 @@ import androidx.media3.common.TrackGroup;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.VideoSize;
 import androidx.media3.common.text.CueGroup;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
@@ -83,6 +84,7 @@ import io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory;
 import io.github.peerless2012.ass.media.type.AssRenderType;
 import io.github.peerless2012.ass.media.widget.AssSubtitleView;
 import org.jellyfin.playback.media3.exoplayer.support.AssFontManager;
+import org.jellyfin.playback.media3.exoplayer.support.AssVsyncScheduler;
 import timber.log.Timber;
 
 @OptIn(markerClass = UnstableApi.class)
@@ -108,7 +110,7 @@ public class VideoManager {
     public boolean isContracted = false;
     public AssHandler mAssHandler;
     private long mActiveStreamOffsetUs = 0L;
-    private long mLastRenderedTimeUs = 0L;
+    private final AssVsyncScheduler mVsyncScheduler = new AssVsyncScheduler();
     private VideoFrameMetadataListener mVideoFrameMetadataListener = null;
 
     private final UserPreferences userPreferences = KoinJavaComponent.get(UserPreferences.class);
@@ -162,33 +164,21 @@ public class VideoManager {
                 mVideoFrameMetadataListener = (presentationTimeUs, releaseTimeNs, format, mediaFormat) -> {
                     AssHandler handler = mAssHandler;
                     if (handler == null || presentationTimeUs < 0) return;
-                    Function1<Long, Unit> callback = handler.getVideoTimeCallback();
-                    if (callback != null) {
-                        try {
-                            long currentMediaPosUs = (mExoPlayer != null) ? mExoPlayer.getCurrentPosition() * 1000L : presentationTimeUs;
-                            long expectedPosUs = presentationTimeUs - mActiveStreamOffsetUs;
-                            if (Math.abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
-                                mActiveStreamOffsetUs = presentationTimeUs - currentMediaPosUs;
-                                mLastRenderedTimeUs = 0L;
-                            }
+                    try {
+                        long currentMediaPosUs = (mExoPlayer != null) ? mExoPlayer.getCurrentPosition() * 1000L : presentationTimeUs;
+                        long expectedPosUs = presentationTimeUs - mActiveStreamOffsetUs;
+                        if (Math.abs(expectedPosUs - currentMediaPosUs) > 1_500_000L) {
+                            mActiveStreamOffsetUs = presentationTimeUs - currentMediaPosUs;
+                            mVsyncScheduler.reset();
+                        }
 
-                            long ptsTimeUs = Math.max(0L, presentationTimeUs - mActiveStreamOffsetUs);
-
-                            long correctedTimeUs;
-                            if (ptsTimeUs < mLastRenderedTimeUs) {
-                                if (mLastRenderedTimeUs - ptsTimeUs > 1_000_000L) {
-                                    correctedTimeUs = ptsTimeUs;
-                                } else {
-                                    correctedTimeUs = mLastRenderedTimeUs;
-                                }
-                            } else {
-                                correctedTimeUs = ptsTimeUs;
-                            }
-                            mLastRenderedTimeUs = correctedTimeUs;
-
-                            callback.invoke(correctedTimeUs);
-                        } catch (Exception ignored) {}
-                    }
+                        mVsyncScheduler.onVideoFrameAboutToBeRendered(
+                                presentationTimeUs,
+                                releaseTimeNs,
+                                mActiveStreamOffsetUs,
+                                handler.getVideoTimeCallback()
+                        );
+                    } catch (Exception ignored) {}
                 };
                 mExoPlayer.setVideoFrameMetadataListener(mVideoFrameMetadataListener);
             }
@@ -215,6 +205,37 @@ public class VideoManager {
                 } else {
                     stopProgressLoop();
                     _helper.setScreensaverLock(false);
+                }
+            }
+
+            @Override
+            public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+                if (playWhenReady) {
+                    mVsyncScheduler.startVsyncLoop();
+                } else {
+                    mVsyncScheduler.stopVsyncLoop();
+                }
+            }
+
+            @Override
+            public void onVideoSizeChanged(@NonNull VideoSize videoSize) {
+                if (videoSize != VideoSize.UNKNOWN && mExoPlayer != null) {
+                    Format format = mExoPlayer.getVideoFormat();
+                    if (format != null && format.frameRate > 0f) {
+                        mVsyncScheduler.setRefreshRate(format.frameRate);
+                    }
+                }
+            }
+
+            @Override
+            public void onEvents(@NonNull Player player, @NonNull Player.Events events) {
+                if (events.contains(Player.EVENT_VIDEO_SIZE_CHANGED) || events.contains(Player.EVENT_TRACKS_CHANGED)) {
+                    if (mExoPlayer != null && player.getVideoSize() != VideoSize.UNKNOWN) {
+                        Format format = mExoPlayer.getVideoFormat();
+                        if (format != null && format.frameRate > 0f) {
+                            mVsyncScheduler.setRefreshRate(format.frameRate);
+                        }
+                    }
                 }
             }
 
@@ -246,7 +267,7 @@ public class VideoManager {
 
             @Override
             public void onPositionDiscontinuity(@NonNull Player.PositionInfo oldPosition, @NonNull Player.PositionInfo newPosition, int reason) {
-                // discontinuity for reason internal usually indicates an error, and that the player will reset to its default timestamp
+                mVsyncScheduler.reset();
                 if (reason == Player.DISCONTINUITY_REASON_INTERNAL) {
                     Timber.i("Caught player discontinuity (reason internal) - oldPos: %s newPos: %s", oldPosition.positionMs, newPosition.positionMs);
                 }
@@ -532,6 +553,7 @@ public class VideoManager {
 
     public void stopPlayback() {
         hasNotifiedPrepared = false;
+        mVsyncScheduler.reset();
         if (mExoPlayer != null) {
             mExoPlayer.stop();
         }
@@ -553,6 +575,7 @@ public class VideoManager {
             return -1;
 
         Timber.i("Exo length in seek is: %d", getDuration());
+        mVsyncScheduler.reset();
         mExoPlayer.seekTo(pos);
         return pos;
     }
@@ -575,6 +598,9 @@ public class VideoManager {
             return;
         }
         Timber.i("Video path set to: %s, startPositionMs: %d", path, startPositionMs);
+
+        mActiveStreamOffsetUs = 0L;
+        mVsyncScheduler.reset();
 
         try {
             // Add external subtitles
@@ -815,6 +841,7 @@ public class VideoManager {
         _helper.setScreensaverLock(false);
         AssFontManager.cancelPreload();
         stopProgressLoop();
+        mVsyncScheduler.release();
         if (mHandler != null) {
             mHandler.removeCallbacksAndMessages(null);
         }
