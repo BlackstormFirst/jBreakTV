@@ -700,6 +700,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         final StreamInfo finalResponse = response;
         final BaseItemDto finalItem = item;
         final Long finalMbPos = mbPos;
+        final long finalPosition = position;
 
         Runnable prepareAndStartPlayer = new Runnable() {
             @OptIn(markerClass = UnstableApi.class)
@@ -709,10 +710,12 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
                 if (mVideoManager != null) {
                     if (isLocal) {
-                        LocalVideoManager.INSTANCE.configureAndPlayLocal(mVideoManager, finalResponse);
+                        LocalVideoManager.INSTANCE.configureAndPlayLocal(mVideoManager, finalResponse, finalPosition);
                     } else {
-                        mVideoManager.setMediaStreamInfo(api.getValue(), finalResponse);
+                        mVideoManager.setMediaStreamInfo(api.getValue(), finalResponse, finalPosition);
                     }
+                    mStartPosition = 0;
+                    finishedInitialSeek = true;
                 }
 
                 Runnable startAction = () -> {

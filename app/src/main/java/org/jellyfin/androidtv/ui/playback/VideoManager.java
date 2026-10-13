@@ -565,12 +565,16 @@ public class VideoManager {
     }
 
     public void setMediaStreamInfo(ApiClient api, StreamInfo streamInfo) {
+        setMediaStreamInfo(api, streamInfo, 0);
+    }
+
+    public void setMediaStreamInfo(ApiClient api, StreamInfo streamInfo, long startPositionMs) {
         String path = streamInfo.getMediaUrl();
         if (path == null) {
             Timber.w("Video path is null cannot continue");
             return;
         }
-        Timber.i("Video path set to: %s", path);
+        Timber.i("Video path set to: %s, startPositionMs: %d", path, startPositionMs);
 
         try {
             // Add external subtitles
@@ -601,7 +605,7 @@ public class VideoManager {
                 AssFontManager.preloadFonts(mActivity, path, mAssHandler);
             }
 
-            mExoPlayer.setMediaItem(mediaItem);
+            mExoPlayer.setMediaItem(mediaItem, Math.max(0, startPositionMs));
             mExoPlayer.prepare();
         } catch (IllegalStateException e) {
             Timber.e(e, "Unable to set video path.  Probably backing out.");

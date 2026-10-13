@@ -108,10 +108,11 @@ object LocalVideoManager {
      * Legacy helper used exclusively by PlaybackController (standard player)
      * to configure ExoPlayer directly for local USB playback.
      */
+    @JvmOverloads
     @UnstableApi
-    fun configureAndPlayLocal(videoManager: VideoManager, streamInfo: StreamInfo) {
+    fun configureAndPlayLocal(videoManager: VideoManager, streamInfo: StreamInfo, startPositionMs: Long = 0L) {
         val tStart = System.currentTimeMillis()
-        Timber.d("Benchmark: configureAndPlayLocal started (0ms)")
+        Timber.d("Benchmark: configureAndPlayLocal started (0ms) at $startPositionMs ms")
         val path = streamInfo.mediaUrl ?: return
 
         val player = videoManager.mExoPlayer ?: return
@@ -156,7 +157,7 @@ object LocalVideoManager {
                 .build()
             player.setAudioAttributes(audioAttributes, false)
 
-            player.setMediaItem(mediaItem)
+            player.setMediaItem(mediaItem, startPositionMs.coerceAtLeast(0L))
             player.prepare()
             player.playWhenReady = true
             Timber.d("Benchmark: player.setMediaItem and prepare() triggered in ${System.currentTimeMillis() - tStart}ms")
