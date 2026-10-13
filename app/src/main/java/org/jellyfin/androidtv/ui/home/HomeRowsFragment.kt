@@ -437,7 +437,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		lifecycleScope.launch(Dispatchers.IO) {
 			if (delayed) delay(1.5.seconds)
 
-			val minInterval = Instant.now().minusSeconds(15)
+			// 5-minute interval threshold to avoid wiping/re-fetching all rows on short home visits
+			val minInterval = Instant.now().minusSeconds(300)
 
 			repeat(adapter.size()) { i ->
 				val rowAdapter = ((adapter[i] as? ListRow)?.adapter as? ItemRowAdapter) ?: return@repeat

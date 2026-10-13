@@ -124,6 +124,10 @@ class CardPresenter(
 		viewHolder.unbind()
 	}
 
+	private val displayCirclePersonCardsPref by lazy {
+		userPreferences[UserPreferences.displayCirclePersonCards]
+	}
+
 	private inner class CardViewHolder(composeView: ComposeView) : ViewHolder(composeView) {
 		private val _item = MutableStateFlow<BaseRowItem?>(null)
 		private val _focused = MutableStateFlow(false)
@@ -152,13 +156,22 @@ class CardPresenter(
 		}
 
 		fun bind(item: BaseRowItem) {
-			_displayCirclePersonCards.value = userPreferences[UserPreferences.displayCirclePersonCards]
-			_item.value = item
-			_focused.value = view.isFocused
+			val circleSetting = displayCirclePersonCardsPref
+			if (_displayCirclePersonCards.value != circleSetting) {
+				_displayCirclePersonCards.value = circleSetting
+			}
+			if (_item.value != item) {
+				_item.value = item
+			}
+			val isFocused = view.isFocused
+			if (_focused.value != isFocused) {
+				_focused.value = isFocused
+			}
 		}
 
 		fun unbind() {
-			_item.value = null
+			// Avoid setting _item.value = null to prevent destroying composition nodes
+			// during Leanback view recycling/rebinding.
 			_focused.value = false
 		}
 	}
