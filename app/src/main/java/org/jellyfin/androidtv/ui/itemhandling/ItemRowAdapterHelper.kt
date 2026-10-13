@@ -61,6 +61,7 @@ fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 10) {
 	val api = runCatching { get<ApiClient>(ApiClient::class.java) }.getOrNull() ?: return
 	val imageLoader = runCatching { get<ImageLoader>(ImageLoader::class.java) }.getOrNull() ?: return
 	val density = context.resources.displayMetrics.density
+	val cardStaticHeight = (items.firstOrNull()?.let { getPresenter(it) } as? org.jellyfin.androidtv.ui.presentation.CardPresenter)?.staticHeight ?: 150
 
 	ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
 		val baseItems = items.filterIsInstance<BaseRowItem>().take(maxCount)
@@ -71,7 +72,11 @@ fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 10) {
 				?: continue
 
 			val aspectRatio = (item.baseItem?.primaryImageAspectRatio?.toFloat() ?: 0.667f).coerceAtLeast(0.1f)
-			val heightDp = 150f
+			val heightDp = when {
+				item.staticHeight -> cardStaticHeight.toFloat()
+				aspectRatio > 1f -> 130f
+				else -> 150f
+			}
 			val widthDp = heightDp * aspectRatio
 			val maxWidthPx = (widthDp * density).toInt().coerceAtLeast(1)
 			val maxHeightPx = (heightDp * density).toInt().coerceAtLeast(1)

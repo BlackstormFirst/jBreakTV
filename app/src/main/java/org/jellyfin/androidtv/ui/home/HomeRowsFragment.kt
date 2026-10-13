@@ -566,9 +566,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				val itemRowAdapter = row.adapter as? ItemRowAdapter
 				itemRowAdapter?.loadMoreItemsIfNeeded(itemRowAdapter.indexOf(item))
 
-				// Delay background update to avoid jank during navigation
+				// Delay background update (250ms debounce) to avoid jank during fast navigation
 				backgroundJob?.cancel()
 				backgroundJob = lifecycleScope.launch {
+					delay(250)
 					backgroundService.setBackground(item.baseItem)
 				}
 			}
