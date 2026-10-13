@@ -294,9 +294,9 @@ public class EnhancedBrowseFragment extends Fragment implements RowLoader, View.
 
         switch (itemType) {
             case MOVIE:
-                gridRowAdapter.add(new GridButton(SUGGESTED, getString(R.string.lbl_suggested)));
                 addStandardViewButtons(gridRowAdapter);
                 gridRowAdapter.add(new GridButton(RANDOM, getString(R.string.random)));
+                gridRowAdapter.add(new GridButton(SUGGESTED, getString(R.string.lbl_suggested)));
                 break;
 
             case MUSIC_ALBUM:
