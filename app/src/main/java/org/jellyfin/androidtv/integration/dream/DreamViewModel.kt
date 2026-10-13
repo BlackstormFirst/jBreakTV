@@ -30,7 +30,6 @@ import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
-import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -75,7 +74,7 @@ class DreamViewModel(
 				batchSize = 60,
 				emitDelay = 30.seconds,
 				noItemsDelay = 2.minutes,
-				errorDelay = 3.seconds,
+				errorDelay = 15.seconds,
 			)
 		)
 	}
@@ -112,8 +111,8 @@ class DreamViewModel(
 					)
 					response.items
 				}
-			} catch (err: ApiClientException) {
-				Timber.e(err)
+			} catch (err: Exception) {
+				Timber.w("DreamViewModel: Failed to fetch library showcase items (${err.javaClass.simpleName}: ${err.message})")
 				null
 			}
 
@@ -144,15 +143,19 @@ class DreamViewModel(
 		// Only attempt to load logo if there is one, wrap in async {} to load it parallel with the backdrop
 		val logo = logoUrl?.let { url ->
 			async {
-				imageLoader.execute(
-					request = ImageRequest.Builder(context).data(url).build()
-				).image?.toBitmap()
+				runCatching {
+					imageLoader.execute(
+						request = ImageRequest.Builder(context).data(url).build()
+					).image?.toBitmap()
+				}.getOrNull()
 			}
 		}
 
-		val backdrop = imageLoader.execute(
-			request = ImageRequest.Builder(context).data(backdropUrl).build()
-		).image?.toBitmap()
+		val backdrop = runCatching {
+			imageLoader.execute(
+				request = ImageRequest.Builder(context).data(backdropUrl).build()
+			).image?.toBitmap()
+		}.getOrNull()
 
 		if (backdrop == null) null
 		else DreamContent.LibraryShowcase(this@asLibraryShowcase, backdrop, logo?.await())
