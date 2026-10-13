@@ -86,7 +86,8 @@ class BackgroundService(
 	/**
 	 * Use all available backdrops from [baseItem] as background.
 	 */
-	fun setBackground(baseItem: BaseItemDto?) {
+	@JvmOverloads
+	fun setBackground(baseItem: BaseItemDto?, debounceMs: Long = 200L) {
 		val backdropBehavior = userPreferences[UserPreferences.backdropBehavior]
 
 		// Check if item is set and backgrounds are enabled
@@ -101,7 +102,7 @@ class BackgroundService(
 			.map { it.getUrl(api) }
 			.toSet()
 
-		loadBackgrounds(backdropUrls)
+		loadBackgrounds(backdropUrls, debounceMs)
 	}
 
 	/**

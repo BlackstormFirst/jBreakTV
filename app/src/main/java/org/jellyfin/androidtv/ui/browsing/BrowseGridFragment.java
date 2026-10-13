@@ -143,7 +143,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     private final int MIN_NUM_CARDS = 5; // minimum number of visible cards we allow, this results in more empty space
     private final double CARD_SPACING_PCT = 1.0; // 100% expressed as relative to the padding_left/top, which depends on the mCardFocusScale and AspectRatio
     private final double CARD_SPACING_HORIZONTAL_BANNER_PCT = 0.5; // 50% allow horizontal card overlapping for banners, otherwise spacing is too large
-    private final int VIEW_SELECT_UPDATE_DELAY = 250; // delay in ms until we update the top-row info for a selected item
+    private final int VIEW_SELECT_UPDATE_DELAY = 600; // delay in ms until we update the top-row info and backdrop for a selected item
 
     private boolean mDirty = true; // CardHeight, RowDef or GridSize changed
 
@@ -1375,7 +1375,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         public void run() {
             if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
 
-            backgroundService.getValue().setBackground(mCurrentItem.getBaseItem());
+            backgroundService.getValue().setBackground(mCurrentItem.getBaseItem(), 0L);
             setItem(mCurrentItem);
         }
     };
