@@ -1,6 +1,7 @@
 package org.jellyfin.playback.jellyfin.playsession
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
@@ -15,9 +16,9 @@ import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.RepeatMode
 import org.jellyfin.playback.core.plugin.PlayerService
 import org.jellyfin.playback.core.queue.QueueEntry
-import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.core.queue.preferredAudioIndex
 import org.jellyfin.playback.core.queue.preferredSubtitleIndex
+import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.core.util.isLocalPath
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.mediaSourceId
@@ -31,6 +32,7 @@ import org.jellyfin.sdk.model.api.PlaybackStartInfo
 import org.jellyfin.sdk.model.api.PlaybackStopInfo
 import org.jellyfin.sdk.model.api.QueueItem
 import timber.log.Timber
+import java.util.UUID
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 import org.jellyfin.sdk.model.api.RepeatMode as SdkRepeatMode
@@ -39,14 +41,24 @@ class PlaySessionService(
 	private val api: ApiClient,
 	private val onPlaybackStop: ((BaseItemDto) -> Unit)? = null,
 ) : PlayerService() {
+	private data class ActiveSessionInfo(
+		val itemId: UUID,
+		val mediaSourceId: String?,
+		val playSessionId: String,
+		val playlistItemId: String?,
+		val itemName: String?,
+		val isLocal: Boolean,
+	)
+
 	private var isSessionStarted = false
+	private var activeSession: ActiveSessionInfo? = null
 	private var lastActivePositionMs: Long = 0L
 	private var activeEntry: QueueEntry? = null
 	private var activeItem: BaseItemDto? = null
 	private var hasLastPlaybackFailed = false
+	private var activeUpdateJob: Job? = null
 
 	private fun isLocalMedia(item: BaseItemDto): Boolean {
-		//if (item.mediaSources?.firstOrNull()?.eTag != null || !item.serverId.isNullOrEmpty()) return false
 		return isLocalPath(item.path)
 	}
 
@@ -135,7 +147,7 @@ class PlaySessionService(
 
 	private suspend fun getReportPositionMs(playableStream: PlayableMediaStream?): Long {
 		val activeMs = withContext(Dispatchers.Main) {
-			state.positionInfo.active.inWholeMilliseconds
+			runCatching { state.positionInfo.active.inWholeMilliseconds }.getOrDefault(0L)
 		}
 		if (activeMs > 0) {
 			lastActivePositionMs = activeMs
@@ -165,6 +177,16 @@ class PlaySessionService(
 			?: entry.mediaSourceId
 
 		val reportMs = getReportPositionMs(playableStream)
+
+		val sessionInfo = ActiveSessionInfo(
+			itemId = item.id,
+			mediaSourceId = mediaSourceId,
+			playSessionId = stream.identifier,
+			playlistItemId = item.playlistItemId,
+			itemName = item.name,
+			isLocal = false,
+		)
+		activeSession = sessionInfo
 
 		withContext(Dispatchers.IO) {
 			runCatching {
@@ -218,7 +240,17 @@ class PlaySessionService(
 
 		val reportMs = getReportPositionMs(playableStream)
 
-		withContext(Dispatchers.IO) {
+		val sessionInfo = ActiveSessionInfo(
+			itemId = item.id,
+			mediaSourceId = mediaSourceId,
+			playSessionId = stream.identifier,
+			playlistItemId = item.playlistItemId,
+			itemName = item.name,
+			isLocal = false,
+		)
+		activeSession = sessionInfo
+
+		val updateJob = coroutineScope.launch(Dispatchers.IO) {
 			runCatching {
 				api.playStateApi.reportPlaybackProgress(
 					PlaybackProgressInfo(
@@ -247,6 +279,7 @@ class PlaySessionService(
 				Timber.d("Reported playback progress for ${item.name} at reportMs=$reportMs")
 			}.onFailure { error -> Timber.w(error, "Failed to send playback update event") }
 		}
+		activeUpdateJob = updateJob
 	}
 
 	private suspend fun sendStreamStop(failed: Boolean = false) {
@@ -256,42 +289,61 @@ class PlaySessionService(
 			onPlaybackStop?.invoke(item)
 		}
 
-		if (entry == null || item == null || isLocalMedia(item)) return
-		val stream = entry.mediaStream ?: activeEntry?.mediaStream ?: return
+		// Cancel any pending progress update job so a late progress report doesn't override the stop report
+		runCatching { activeUpdateJob?.cancel() }
+		activeUpdateJob = null
 
-		val playableStream = stream
-		val mediaSourceId = playableStream.mediaSourceId
-			?: item.mediaSources?.firstOrNull { it.id == entry.mediaSourceId }?.id
-			?: item.mediaSources?.firstOrNull()?.id
-			?: entry.mediaSourceId
-
-		val activeMs = withContext(Dispatchers.Main) {
-			state.positionInfo.active.inWholeMilliseconds
+		// Retrieve session info from cache or active entry/stream
+		val sessionInfo = activeSession ?: run {
+			val stream = entry?.mediaStream ?: activeEntry?.mediaStream ?: return@run null
+			val currentItem = item ?: return@run null
+			if (isLocalMedia(currentItem)) return@run null
+			ActiveSessionInfo(
+				itemId = currentItem.id,
+				mediaSourceId = stream.mediaSourceId ?: currentItem.mediaSources?.firstOrNull()?.id,
+				playSessionId = stream.identifier,
+				playlistItemId = currentItem.playlistItemId,
+				itemName = currentItem.name,
+				isLocal = false,
+			)
 		}
-		if (activeMs > 0) lastActivePositionMs = activeMs
-		val reportMs = if (activeMs > 0) activeMs else lastActivePositionMs
 
-		if (isSessionStarted) {
-			withContext(Dispatchers.IO + NonCancellable) {
-				runCatching {
-					api.playStateApi.reportPlaybackStopped(
-						PlaybackStopInfo(
-							itemId = item.id,
-							mediaSourceId = mediaSourceId,
-							playSessionId = stream.identifier,
-							playlistItemId = item.playlistItemId,
-							positionTicks = reportMs * 10000L,
-							failed = failed,
-							nowPlayingQueue = getQueue(),
-						)
+		if (sessionInfo == null || sessionInfo.isLocal) {
+			isSessionStarted = false
+			activeSession = null
+			activeEntry = null
+			activeItem = null
+			lastActivePositionMs = 0L
+			return
+		}
+
+		// Try to fetch latest live position before backend is stopped, fallback to last known
+		val livePositionMs = withContext(Dispatchers.Main) {
+			runCatching { state.positionInfo.active.inWholeMilliseconds }.getOrDefault(0L)
+		}
+		val reportMs = if (livePositionMs > 0) livePositionMs else lastActivePositionMs
+
+		withContext(Dispatchers.IO + NonCancellable) {
+			runCatching {
+				api.playStateApi.reportPlaybackStopped(
+					PlaybackStopInfo(
+						itemId = sessionInfo.itemId,
+						mediaSourceId = sessionInfo.mediaSourceId,
+						playSessionId = sessionInfo.playSessionId,
+						playlistItemId = sessionInfo.playlistItemId,
+						positionTicks = reportMs * 10000L,
+						failed = failed,
+						nowPlayingQueue = getQueue(),
 					)
-					Timber.i("Reported playback stop for ${item.name} at reportMs=$reportMs")
-				}.onFailure { error -> Timber.w(error, "Failed to send playback stop event") }
-				isSessionStarted = false
-				activeEntry = null
-				activeItem = null
-				lastActivePositionMs = 0L
-			}
+				)
+				Timber.i("Reported playback stop for ${sessionInfo.itemName} at reportMs=$reportMs (playSessionId=${sessionInfo.playSessionId})")
+			}.onFailure { error -> Timber.w(error, "Failed to send playback stop event") }
+
+			isSessionStarted = false
+			activeSession = null
+			activeEntry = null
+			activeItem = null
+			lastActivePositionMs = 0L
 		}
 	}
 }
