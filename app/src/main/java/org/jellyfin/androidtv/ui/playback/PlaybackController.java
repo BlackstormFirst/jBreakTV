@@ -1509,7 +1509,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (isBuffering) {
             startSpinner();
         } else {
-            if (isPlaying()) {
+            if (isPlaying() && mStartPosition == 0 && finishedInitialSeek) {
                 stopSpinner();
             }
         }
@@ -1543,14 +1543,15 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     public void onProgress() {
         refreshCurrentPosition();
         if (isPlaying()) {
-            if (!spinnerOff) {
-                if (mStartPosition > 0) {
-                    initialSeek(mStartPosition);
-                    mStartPosition = 0;
-                } else if (currentSkipPos == 0) {
-                    finishedInitialSeek = true;
-                    stopSpinner();
-                }
+            if (mStartPosition > 0) {
+                long posToSeek = mStartPosition;
+                mStartPosition = 0;
+                initialSeek(posToSeek);
+            } else if (!finishedInitialSeek && currentSkipPos == 0) {
+                finishedInitialSeek = true;
+                stopSpinner();
+            } else if (!spinnerOff && currentSkipPos == 0) {
+                stopSpinner();
             }
         }
         if (mFragment != null)
