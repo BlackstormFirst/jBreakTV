@@ -130,7 +130,7 @@ class BackgroundService(
 		}
 	}
 
-	private fun loadBackgrounds(backdropUrls: Set<String>, debounceMs: Long = 150L) {
+	private fun loadBackgrounds(backdropUrls: Set<String>, debounceMs: Long = 200L) {
 		if (backdropUrls.isEmpty()) return clearBackgrounds()
 
 		// Re-enable backgrounds if disabled
@@ -143,7 +143,7 @@ class BackgroundService(
 				if (debounceMs > 0) {
 					delay(debounceMs.milliseconds)
 				}
-				_backgrounds = backdropUrls.mapNotNull { url ->
+				val loaded = backdropUrls.mapNotNull { url ->
 					try {
 						val request = ImageRequest.Builder(context)
 							.data(url)
@@ -163,13 +163,24 @@ class BackgroundService(
 					}
 				}
 
-				// Go to first background
-				_currentIndex = 0
-				update()
+				if (loaded.isNotEmpty()) {
+					_backgrounds = loaded
+					_currentIndex = 0
+					showImmediateBackground()
+				}
 			} catch (_: Exception) {
-				clearBackgrounds()
+				// Coroutine cancelled; keep existing background visible until new selection completes
 			}
 		}
+	}
+
+	private fun showImmediateBackground() {
+		lastBackgroundTimerUpdate = Instant.now().toEpochMilli()
+		if (_currentIndex >= _backgrounds.size) _currentIndex = 0
+		_currentBackground.value = _backgrounds.getOrNull(_currentIndex)
+
+		if (_backgrounds.size > 1) setTimer()
+		else updateBackgroundTimerJob?.cancel()
 	}
 
 	fun clearBackgrounds() {

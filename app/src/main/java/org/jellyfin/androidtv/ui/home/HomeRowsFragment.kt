@@ -547,8 +547,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	private inner class ItemViewSelectedListener : OnItemViewSelectedListener {
-		private var backgroundJob: Job? = null
-
 		override fun onItemSelected(
 			itemViewHolder: Presenter.ViewHolder?,
 			item: Any?,
@@ -557,7 +555,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		) {
 			if (item !is BaseRowItem) {
 				currentItem = null
-				backgroundJob?.cancel()
 				backgroundService.clearBackgrounds()
 			} else {
 				currentItem = item
@@ -566,12 +563,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				val itemRowAdapter = row.adapter as? ItemRowAdapter
 				itemRowAdapter?.loadMoreItemsIfNeeded(itemRowAdapter.indexOf(item))
 
-				// Delay background update (250ms debounce) to avoid jank during fast navigation
-				backgroundJob?.cancel()
-				backgroundJob = lifecycleScope.launch {
-					delay(250)
-					backgroundService.setBackground(item.baseItem)
-				}
+				backgroundService.setBackground(item.baseItem)
 			}
 		}
 	}
