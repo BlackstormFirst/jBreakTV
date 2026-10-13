@@ -111,24 +111,12 @@ class VideoPlayerFragment : Fragment() {
 			}
 
 			val targetItem = items[currentMediaPosition]
-			val resumeSubtractSeconds = userPreferences[UserPreferences.resumeSubtractDuration].toLongOrNull() ?: 0L
-			val resumeSubtractTicks = resumeSubtractSeconds * 10000000L
 
 			val targetTicks = if (arguments?.containsKey(EXTRA_POSITION) == true) {
 				val startPositionMs = arguments?.getInt(EXTRA_POSITION, 0) ?: 0
-				val startPositionTicks = startPositionMs.toLong() * 10000L
-				if (startPositionTicks > 0L) {
-					(startPositionTicks - resumeSubtractTicks).coerceAtLeast(0L)
-				} else {
-					0L
-				}
+				(startPositionMs.toLong() * 10000L).coerceAtLeast(0L)
 			} else {
-				val serverTicks = targetItem.userData?.playbackPositionTicks ?: 0L
-				if (serverTicks > 0L) {
-					(serverTicks - resumeSubtractTicks).coerceAtLeast(0L)
-				} else {
-					0L
-				}
+				(targetItem.userData?.playbackPositionTicks ?: 0L).coerceAtLeast(0L)
 			}
 
 			val updatedUserData = targetItem.userData?.copy(playbackPositionTicks = targetTicks)

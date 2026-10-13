@@ -62,7 +62,11 @@ class PlaySessionService(
 			when (playState) {
 				PlayState.PLAYING -> {
 					hasLastPlaybackFailed = false
-					sendStreamStart()
+					if (!isSessionStarted) {
+						sendStreamStart()
+					} else {
+						sendStreamUpdate()
+					}
 				}
 				PlayState.PAUSED -> sendStreamUpdate()
 				PlayState.ERROR -> {
@@ -79,10 +83,24 @@ class PlaySessionService(
 		}.launchIn(coroutineScope)
 
 		coroutineScope.launch {
+			var pauseTimerMs = 0L
 			while (isActive) {
 				delay(3.seconds)
-				if (state.playState.value == PlayState.PLAYING) {
-					sendStreamUpdate()
+				when (state.playState.value) {
+					PlayState.PLAYING -> {
+						pauseTimerMs = 0L
+						sendStreamUpdate()
+					}
+					PlayState.PAUSED -> {
+						pauseTimerMs += 3000L
+						if (pauseTimerMs >= 15000L) {
+							pauseTimerMs = 0L
+							sendStreamUpdate()
+						}
+					}
+					else -> {
+						pauseTimerMs = 0L
+					}
 				}
 			}
 		}
