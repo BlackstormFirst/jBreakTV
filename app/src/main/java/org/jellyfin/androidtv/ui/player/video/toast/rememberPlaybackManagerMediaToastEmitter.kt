@@ -3,7 +3,6 @@ package org.jellyfin.androidtv.ui.player.video.toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.jellyfin.androidtv.R
@@ -20,22 +19,46 @@ fun rememberPlaybackManagerMediaToastEmitter(
 
 	LaunchedEffect(playbackManager) {
 		var active = false
+		var wasBuffering = false
+		var previousState: PlayState? = null
 
-		playbackManager.state.playState
-			.filter { playState ->
-				// Wait until we received our first "playing" state before emitting play/pause events
-				// this avoids an immediate toast from showing when the video player is opened
-				if (!active) {
-					active = playState == PlayState.PLAYING
-					false
-				} else {
-					active
+		// Track buffering state
+		playbackManager.state.isBuffering
+			.onEach { buffering ->
+				if (buffering) {
+					wasBuffering = true
 				}
 			}
-			.onEach { playState ->
-				when (playState) {
-					PlayState.PLAYING -> mediaToastRegistry.emit(R.drawable.ic_play)
-					PlayState.PAUSED -> mediaToastRegistry.emit(R.drawable.ic_pause)
+			.launchIn(coroutineScope)
+
+		// Track play state
+		playbackManager.state.playState
+			.onEach { currentState ->
+				val lastState = previousState
+				previousState = currentState
+
+				if (!active) {
+					if (currentState == PlayState.PLAYING) {
+						active = true
+						wasBuffering = false
+					}
+					return@onEach
+				}
+
+				when (currentState) {
+					PlayState.PLAYING -> {
+						if (wasBuffering && (lastState != PlayState.PAUSED)) {
+							// Ignore showing play toast if resuming from buffering
+							wasBuffering = false
+						} else {
+							wasBuffering = false
+							mediaToastRegistry.emit(R.drawable.ic_play)
+						}
+					}
+					PlayState.PAUSED -> {
+						wasBuffering = false
+						mediaToastRegistry.emit(R.drawable.ic_pause)
+					}
 					else -> Unit
 				}
 			}
