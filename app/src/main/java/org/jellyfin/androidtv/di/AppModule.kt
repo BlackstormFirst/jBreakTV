@@ -213,7 +213,7 @@ val appModule = module {
 	viewModel { StillWatchingViewModel(get(), get(), get(), get()) }
 	viewModel { PhotoPlayerViewModel(get(), get()) }
 	viewModel { SearchViewModel(get()) }
-	viewModel { DreamViewModel(get(), get(), get(), get(), get()) }
+	viewModel { DreamViewModel(get(), get(), get(), get(), get(), get()) }
 	viewModel { SettingsViewModel() }
 	viewModel { SettingsLibrariesScreenViewModel(get()) }
 

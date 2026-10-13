@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import coil3.ImageLoader
 import coil3.request.ImageRequest
 import coil3.toBitmap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.integration.dream.model.DreamContent
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.util.apiclient.getUrl
@@ -47,6 +49,7 @@ class DreamViewModel(
 	private val context: Context,
 	playbackManager: PlaybackManager,
 	private val userPreferences: UserPreferences,
+	private val userRepository: UserRepository,
 ) : ViewModel() {
 	@OptIn(ExperimentalCoroutinesApi::class)
 	private val _mediaContent = playbackManager.queue.entry
@@ -98,6 +101,12 @@ class DreamViewModel(
 		errorDelay: Duration,
 	): Flow<DreamContent.LibraryShowcase?> = flow {
 		while (true) {
+			if (userRepository.currentUser.value == null) {
+				emit(null)
+				delay(noItemsDelay)
+				continue
+			}
+
 			val items = try {
 				withContext(Dispatchers.IO) {
 					val response by api.itemsApi.getItems(
@@ -111,6 +120,8 @@ class DreamViewModel(
 					)
 					response.items
 				}
+			} catch (err: CancellationException) {
+				throw err
 			} catch (err: Exception) {
 				Timber.w("DreamViewModel: Failed to fetch library showcase items (${err.javaClass.simpleName}: ${err.message})")
 				null
