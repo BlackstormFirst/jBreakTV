@@ -173,99 +173,92 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			val homesections = userSettingPreferences.activeHomesections
 
-			homesections.forEachIndexed { sIndex, section ->
+			val primarySections = homesections.take(3)
+			val secondarySections = homesections.drop(3)
+
+			suspend fun loadSectionRows(section: HomeSectionType, sIndex: Int): List<Pair<ListRow, Int>> {
 				val baseSectionIndex = sIndex * 100
+				val rowsList = mutableListOf<Pair<ListRow, Int>>()
 
 				when (section) {
-					HomeSectionType.LIBRARY_TILES_SMALL -> launch {
+					HomeSectionType.LIBRARY_TILES_SMALL -> {
 						val r = HomeFragmentViewsRow(small = false)
 						val listRow = r.createListRow(requireContext(), userViewsRepository)
-						if (listRow != null && isActive) {
-							withContext(Dispatchers.Main) {
-								addRowInOrder(listRow, baseSectionIndex)
-							}
-						}
+						if (listRow != null) rowsList.add(listRow to baseSectionIndex)
 					}
-					HomeSectionType.LIBRARY_BUTTONS -> launch {
+					HomeSectionType.LIBRARY_BUTTONS -> {
 						val r = HomeFragmentViewsRow(small = true)
 						val listRow = r.createListRow(requireContext(), userViewsRepository)
-						if (listRow != null && isActive) {
-							withContext(Dispatchers.Main) {
-								addRowInOrder(listRow, baseSectionIndex)
-							}
-						}
+						if (listRow != null) rowsList.add(listRow to baseSectionIndex)
 					}
-					HomeSectionType.RESUME -> launch {
+					HomeSectionType.RESUME -> {
 						val r = helper.loadResumeVideo() as HomeFragmentBrowseRowDefRow
 						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
-						if (listRow != null && isActive) {
-							withContext(Dispatchers.Main) {
-								addRowInOrder(listRow, baseSectionIndex)
-							}
-						}
+						if (listRow != null) rowsList.add(listRow to baseSectionIndex)
 					}
-					HomeSectionType.RESUME_AUDIO -> launch {
+					HomeSectionType.RESUME_AUDIO -> {
 						val r = helper.loadResumeAudio() as HomeFragmentBrowseRowDefRow
 						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
-						if (listRow != null && isActive) {
-							withContext(Dispatchers.Main) {
-								addRowInOrder(listRow, baseSectionIndex)
-							}
-						}
+						if (listRow != null) rowsList.add(listRow to baseSectionIndex)
 					}
-					HomeSectionType.ACTIVE_RECORDINGS -> launch {
+					HomeSectionType.ACTIVE_RECORDINGS -> {
 						val r = helper.loadLatestLiveTvRecordings() as HomeFragmentBrowseRowDefRow
 						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
-						if (listRow != null && isActive) {
-							withContext(Dispatchers.Main) {
-								addRowInOrder(listRow, baseSectionIndex)
-							}
-						}
+						if (listRow != null) rowsList.add(listRow to baseSectionIndex)
 					}
-					HomeSectionType.NEXT_UP -> launch {
+					HomeSectionType.NEXT_UP -> {
 						val r = helper.loadNextUp() as HomeFragmentBrowseRowDefRow
 						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
-						if (listRow != null && isActive) {
-							withContext(Dispatchers.Main) {
-								addRowInOrder(listRow, baseSectionIndex)
-							}
-						}
+						if (listRow != null) rowsList.add(listRow to baseSectionIndex)
 					}
 					HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
-						launch {
-							val liveTvRow = HomeFragmentLiveTVRow(requireActivity(), userRepository)
-							val tempAdapter = MutableObjectAdapter<Row>()
-							liveTvRow.addToRowsAdapter(requireContext(), cardPresenter, tempAdapter)
-							val rows = (0 until tempAdapter.size()).mapNotNull { tempAdapter[it] as? ListRow }
-							if (isActive) {
-								withContext(Dispatchers.Main) {
-									rows.forEachIndexed { idx, row ->
-										addRowInOrder(row, baseSectionIndex + idx)
-									}
-								}
-							}
+						val liveTvRow = HomeFragmentLiveTVRow(requireActivity(), userRepository)
+						val tempAdapter = MutableObjectAdapter<Row>()
+						liveTvRow.addToRowsAdapter(requireContext(), cardPresenter, tempAdapter)
+						(0 until tempAdapter.size()).mapNotNull { tempAdapter[it] as? ListRow }.forEachIndexed { idx, row ->
+							rowsList.add(row to (baseSectionIndex + idx))
 						}
-						launch {
-							val r = helper.loadOnNow() as HomeFragmentBrowseRowDefRow
-							val listRow = r.prepareRow(requireContext(), cardPresenter, api)
-							if (listRow != null && isActive) {
-								withContext(Dispatchers.Main) {
-									addRowInOrder(listRow, baseSectionIndex + 10)
-								}
-							}
-						}
+						val r = helper.loadOnNow() as HomeFragmentBrowseRowDefRow
+						val listRow = r.prepareRow(requireContext(), cardPresenter, api)
+						if (listRow != null) rowsList.add(listRow to (baseSectionIndex + 10))
 					}
-					HomeSectionType.LATEST_MEDIA -> launch {
+					HomeSectionType.LATEST_MEDIA -> {
 						val latestRow = helper.loadRecentlyAdded(userViews) as HomeFragmentLatestRow
 						latestRow.prepareRows(requireContext(), cardPresenter, api).forEachIndexed { vIdx, listRow ->
-							if (isActive) {
-								withContext(Dispatchers.Main) {
-									addRowInOrder(listRow, baseSectionIndex + vIdx)
-								}
-							}
+							rowsList.add(listRow to (baseSectionIndex + vIdx))
 						}
 					}
 					HomeSectionType.NONE, HomeSectionType.RESUME_BOOK -> Unit
+				}
+
+				return rowsList
+			}
+
+			// Phase 1: Load primary top visible sections concurrently
+			val primaryRows = primarySections.mapIndexed { idx, section ->
+				async { loadSectionRows(section, idx) }
+			}.awaitAll().flatten()
+
+			if (primaryRows.isNotEmpty() && isActive) {
+				withContext(Dispatchers.Main) {
+					primaryRows.sortedBy { it.second }.forEach { (row, sectionIndex) ->
+						addRowInOrder(row, sectionIndex)
+					}
+				}
+			}
+
+			// Phase 2: Load secondary sections below the fold
+			if (secondarySections.isNotEmpty() && isActive) {
+				val secondaryRows = secondarySections.mapIndexed { idx, section ->
+					async { loadSectionRows(section, idx + primarySections.size) }
+				}.awaitAll().flatten()
+
+				if (secondaryRows.isNotEmpty() && isActive) {
+					withContext(Dispatchers.Main) {
+						secondaryRows.sortedBy { it.second }.forEach { (row, sectionIndex) ->
+							addRowInOrder(row, sectionIndex)
+						}
+					}
 				}
 			}
 		}
