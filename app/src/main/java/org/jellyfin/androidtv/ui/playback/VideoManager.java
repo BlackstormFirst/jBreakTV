@@ -351,7 +351,7 @@ public class VideoManager {
                         .setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
                         .build()
                 )
-                .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
+                .setAllowInvalidateSelectionsOnRendererCapabilitiesChange(false)
                 .build()
         );
         exoPlayerBuilder.setTrackSelector(trackSelector);

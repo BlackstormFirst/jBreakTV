@@ -206,51 +206,56 @@ fun CustomPlaybackOverlayFragment.recordProgram(program: BaseItemDto, isSeries: 
 }
 
 fun CustomPlaybackOverlayFragment.askToSkip(position: Duration) {
-	binding.skipOverlay.targetPosition = position
+	val b = binding ?: return
+	b.skipOverlay.targetPosition = position
 }
 
 fun CustomPlaybackOverlayFragment.setupToastOverlay() {
+	val b = binding ?: return
 	val registry = MediaToastRegistry(viewLifecycleOwner.lifecycleScope)
-	binding.toastOverlay.setContent {
+	b.toastOverlay.setContent {
 		JellyfinTheme {
 			MediaToasts(registry)
 		}
 	}
-	binding.toastOverlay.setTag(R.id.toast_overlay, registry)
+	b.toastOverlay.setTag(R.id.toast_overlay, registry)
 }
 
 fun CustomPlaybackOverlayFragment.resetPlayStateToast() {
+	val b = binding ?: return
 	val stateKey = R.id.toast_overlay + 1
-	binding.toastOverlay.setTag(stateKey, null)
+	b.toastOverlay.setTag(stateKey, null)
 }
 
 fun CustomPlaybackOverlayFragment.onPlayStateChanged(isPlaying: Boolean) {
-	val registry = binding.toastOverlay.getTag(R.id.toast_overlay) as? MediaToastRegistry ?: return
+	val b = binding ?: return
+	val registry = b.toastOverlay.getTag(R.id.toast_overlay) as? MediaToastRegistry ?: return
 	val stateKey = R.id.toast_overlay + 1
-	val previousState = binding.toastOverlay.getTag(stateKey) as? String
+	val previousState = b.toastOverlay.getTag(stateKey) as? String
 
 	if (previousState == null) {
 		if (isPlaying) {
-			binding.toastOverlay.setTag(stateKey, "PLAYING")
+			b.toastOverlay.setTag(stateKey, "PLAYING")
 		}
 		return
 	}
 
 	if (previousState == "PLAYING" && !isPlaying) {
-		binding.toastOverlay.setTag(stateKey, "PAUSED")
+		b.toastOverlay.setTag(stateKey, "PAUSED")
 		registry.emit(R.drawable.ic_pause)
 	} else if (previousState == "PAUSED" && isPlaying) {
-		binding.toastOverlay.setTag(stateKey, "PLAYING")
+		b.toastOverlay.setTag(stateKey, "PLAYING")
 		registry.emit(R.drawable.ic_play)
 	}
 }
 
 fun CustomPlaybackOverlayFragment.setupBufferingOverlay() {
+	val b = binding ?: return
 	val bufferingKey = R.id.buffering_overlay
 	val stateFlow = MutableStateFlow(true)
-	binding.bufferingOverlay.setTag(bufferingKey, stateFlow)
+	b.bufferingOverlay.setTag(bufferingKey, stateFlow)
 
-	binding.bufferingOverlay.setContent {
+	b.bufferingOverlay.setContent {
 		val isBuffering by stateFlow.collectAsState()
 		if (isBuffering) {
 			Box(
@@ -278,9 +283,10 @@ fun CustomPlaybackOverlayFragment.setupBufferingOverlay() {
 }
 
 fun CustomPlaybackOverlayFragment.showBuffering(show: Boolean) {
+	val b = binding ?: return
 	val bufferingKey = R.id.buffering_overlay
 	@Suppress("UNCHECKED_CAST")
-	val stateFlow = binding.bufferingOverlay.getTag(bufferingKey) as? MutableStateFlow<Boolean>
+	val stateFlow = b.bufferingOverlay.getTag(bufferingKey) as? MutableStateFlow<Boolean>
 	stateFlow?.value = show
 }
 

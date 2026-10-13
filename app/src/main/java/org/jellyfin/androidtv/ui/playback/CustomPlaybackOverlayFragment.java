@@ -1426,6 +1426,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     }
 
     public void showBuffering(boolean show) {
+        if (binding == null) return;
         CustomPlaybackOverlayFragmentHelperKt.showBuffering(this, show);
     }
 

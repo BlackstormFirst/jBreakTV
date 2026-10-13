@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
 import org.jellyfin.playback.media3.exoplayer.mapping.getFfmpegSubtitleMimeType
@@ -193,7 +194,7 @@ class ExoPlayerBackend(
 							setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
 						}.build()
 					)
-					setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true)
+					setAllowInvalidateSelectionsOnRendererCapabilitiesChange(false)
 				})
 			})
 			.setMediaSourceFactory(mediaSourceFactory)
@@ -375,10 +376,16 @@ class ExoPlayerBackend(
 		}
 
 		override fun onTracksChanged(tracks: Tracks) {
-			if (!tracks.groups.isEmpty() && exoPlayer.currentMediaItem != null) {
-				applyPreferredTrackOverrides()
+			if (isApplyingTrackOverrides) return
+			isApplyingTrackOverrides = true
+			try {
+				if (!tracks.groups.isEmpty() && exoPlayer.currentMediaItem != null) {
+					applyPreferredTrackOverrides()
+				}
+				checkPendingTrackSelectionParameters()
+			} finally {
+				isApplyingTrackOverrides = false
 			}
-			checkPendingTrackSelectionParameters()
 			listener?.onTracksChanged()
 		}
 
@@ -987,6 +994,8 @@ class ExoPlayerBackend(
 		}
 	}
 
+	private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+	private var isApplyingTrackOverrides = false
 	private var pendingTrackSelectionParameters: TrackSelectionParameters? = null
 
 	private fun canSafelySetTrackSelectionParameters(): Boolean {
@@ -1005,10 +1014,16 @@ class ExoPlayerBackend(
 
 		if (canSafelySetTrackSelectionParameters()) {
 			pendingTrackSelectionParameters = null
-			runCatching {
-				exoPlayer.trackSelectionParameters = params
-			}.onFailure { e ->
-				Timber.w(e, "Error applying trackSelectionParameters")
+			mainHandler.post {
+				if (canSafelySetTrackSelectionParameters() && exoPlayer.trackSelectionParameters != params) {
+					runCatching {
+						exoPlayer.trackSelectionParameters = params
+					}.onFailure { e ->
+						Timber.w(e, "Error applying trackSelectionParameters")
+					}
+				} else if (exoPlayer.trackSelectionParameters != params) {
+					pendingTrackSelectionParameters = params
+				}
 			}
 		} else {
 			pendingTrackSelectionParameters = params
@@ -1019,10 +1034,16 @@ class ExoPlayerBackend(
 		val pending = pendingTrackSelectionParameters ?: return
 		if (canSafelySetTrackSelectionParameters()) {
 			pendingTrackSelectionParameters = null
-			runCatching {
-				exoPlayer.trackSelectionParameters = pending
-			}.onFailure { e ->
-				Timber.w(e, "Error applying pending trackSelectionParameters")
+			mainHandler.post {
+				if (canSafelySetTrackSelectionParameters() && exoPlayer.trackSelectionParameters != pending) {
+					runCatching {
+						exoPlayer.trackSelectionParameters = pending
+					}.onFailure { e ->
+						Timber.w(e, "Error applying pending trackSelectionParameters")
+					}
+				} else if (exoPlayer.trackSelectionParameters != pending) {
+					pendingTrackSelectionParameters = pending
+				}
 			}
 		}
 	}
