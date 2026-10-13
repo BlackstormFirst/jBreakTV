@@ -102,8 +102,7 @@ fun PlaybackController.disableDefaultSubtitles() {
 	val exoPlayer = mVideoManager?.mExoPlayer
 	val selector = exoPlayer?.trackSelector
 	if (exoPlayer != null && selector != null &&
-		exoPlayer.playbackState != Player.STATE_IDLE &&
-		exoPlayer.playbackState != Player.STATE_ENDED &&
+		exoPlayer.playbackState == Player.STATE_READY &&
 		!exoPlayer.currentTimeline.isEmpty
 	) {
 		selector.parameters = selector.parameters.buildUpon()
@@ -224,8 +223,7 @@ fun PlaybackController.setSubtitleIndex(index: Int, force: Boolean = false) {
 				val exoPlayer = mVideoManager?.mExoPlayer
 				val selector = exoPlayer?.trackSelector
 				if (exoPlayer != null && selector != null &&
-					exoPlayer.playbackState != Player.STATE_IDLE &&
-					exoPlayer.playbackState != Player.STATE_ENDED &&
+					exoPlayer.playbackState == Player.STATE_READY &&
 					!exoPlayer.currentTimeline.isEmpty
 				) {
 					selector.parameters = selector.parameters.buildUpon()

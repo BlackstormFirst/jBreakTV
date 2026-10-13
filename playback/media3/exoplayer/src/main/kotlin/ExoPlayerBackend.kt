@@ -353,7 +353,7 @@ class ExoPlayerBackend(
 		}
 
 		override fun onPlaybackStateChanged(playbackState: Int) {
-			if (playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_READY) {
+			if (playbackState == Player.STATE_READY) {
 				isPreparingItem = false
 			}
 			checkPendingInitialSeek()
@@ -571,6 +571,7 @@ class ExoPlayerBackend(
 
 	override fun stop() {
 		isPreparingItem = false
+		pendingTrackSelectionParameters = null
 		currentStream = null
 		pendingInitialSeekMs = null
 		setSubtitleView(null)
@@ -988,16 +989,21 @@ class ExoPlayerBackend(
 
 	private var pendingTrackSelectionParameters: TrackSelectionParameters? = null
 
+	private fun canSafelySetTrackSelectionParameters(): Boolean {
+		return !isPreparingItem &&
+			!exoPlayer.currentTimeline.isEmpty &&
+			exoPlayer.currentMediaItem != null &&
+			!exoPlayer.currentTracks.groups.isEmpty() &&
+			exoPlayer.playbackState == Player.STATE_READY
+	}
+
 	private fun safeSetTrackSelectionParameters(params: TrackSelectionParameters) {
 		if (exoPlayer.trackSelectionParameters == params) {
 			pendingTrackSelectionParameters = null
 			return
 		}
 
-		if (!exoPlayer.currentTimeline.isEmpty &&
-			exoPlayer.currentMediaItem != null &&
-			!exoPlayer.currentTracks.groups.isEmpty() &&
-			exoPlayer.playbackState != Player.STATE_IDLE) {
+		if (canSafelySetTrackSelectionParameters()) {
 			pendingTrackSelectionParameters = null
 			runCatching {
 				exoPlayer.trackSelectionParameters = params
@@ -1011,10 +1017,7 @@ class ExoPlayerBackend(
 
 	private fun checkPendingTrackSelectionParameters() {
 		val pending = pendingTrackSelectionParameters ?: return
-		if (!exoPlayer.currentTimeline.isEmpty &&
-			exoPlayer.currentMediaItem != null &&
-			!exoPlayer.currentTracks.groups.isEmpty() &&
-			exoPlayer.playbackState != Player.STATE_IDLE) {
+		if (canSafelySetTrackSelectionParameters()) {
 			pendingTrackSelectionParameters = null
 			runCatching {
 				exoPlayer.trackSelectionParameters = pending

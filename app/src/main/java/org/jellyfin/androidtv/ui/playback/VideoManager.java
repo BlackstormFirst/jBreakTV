@@ -769,8 +769,7 @@ public class VideoManager {
         }
 
         if (matchedGroup == null || mExoPlayer == null ||
-                mExoPlayer.getPlaybackState() == Player.STATE_IDLE ||
-                mExoPlayer.getPlaybackState() == Player.STATE_ENDED ||
+                mExoPlayer.getPlaybackState() != Player.STATE_READY ||
                 mExoPlayer.getCurrentTimeline().isEmpty())
             return false;
 
