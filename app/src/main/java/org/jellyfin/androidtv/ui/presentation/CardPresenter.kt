@@ -88,7 +88,9 @@ class CardPresenter(
 				setAdapter(adapter)
 			}
 			val computedViewType = if (adapter.size() > 0) itemBridgeAdapter.getItemViewType(0) else viewType
-			repeat(count) {
+			val currentCount = pool.getRecycledViewCount(computedViewType)
+			if (currentCount >= count) return
+			repeat(count - currentCount) {
 				val rvh = itemBridgeAdapter.onCreateViewHolder(parent, computedViewType)
 				pool.putRecycledView(rvh)
 			}

@@ -1,7 +1,6 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.os.Bundle
-import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Toast
@@ -241,6 +240,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			if (primaryRows.isNotEmpty() && isActive) {
 				withContext(Dispatchers.Main) {
+					verticalGridView?.let { gridView ->
+						runCatching {
+							CardPresenter().prewarm(gridView, sharedRecycledViewPool, count = 10)
+						}
+					}
 					primaryRows.sortedBy { it.second }.forEach { (row, sectionIndex) ->
 						addRowInOrder(row, sectionIndex)
 					}
@@ -322,16 +326,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		// Optimization for vertical scrolling: prevent rows from being unloaded immediately
 		verticalGridView?.setItemViewCacheSize(10)
 
-		// Pre-warm Compose card views into sharedRecycledViewPool during idle time
+		// Pre-warm Compose card views into sharedRecycledViewPool immediately on view creation
 		verticalGridView?.let { gridView ->
-			Looper.myQueue().addIdleHandler {
-				if (isAdded && !isDetached) {
-					runCatching {
-						val cardPresenter = CardPresenter()
-						cardPresenter.prewarm(gridView, sharedRecycledViewPool, count = 10)
-					}
-				}
-				false
+			runCatching {
+				CardPresenter().prewarm(gridView, sharedRecycledViewPool, count = 10)
 			}
 		}
 
