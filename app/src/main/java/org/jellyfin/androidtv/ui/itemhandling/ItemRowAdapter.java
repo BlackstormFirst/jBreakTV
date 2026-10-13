@@ -481,6 +481,18 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         }
     }
 
+    @Override
+    public boolean remove(Object element) {
+        boolean removed = super.remove(element);
+        if (removed) {
+            setItemsLoaded(size());
+            if (size() == 0) {
+                removeRow();
+            }
+        }
+        return removed;
+    }
+
     protected void removeRow() {
         if (mParent == null) {
             // just clear us

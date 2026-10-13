@@ -109,6 +109,11 @@ fun <T : Any> ItemRowAdapter.setItems(
 	items: Collection<T>,
 	transform: (T, Int) -> BaseRowItem?,
 ) {
+	if (itemsLoaded == 0) {
+		setInitialItems(items, transform)
+		return
+	}
+
 	Timber.i("Creating items from $itemsLoaded existing and ${items.size} new, adapter size is ${size()}")
 
 	val allItems = buildList {
@@ -143,7 +148,7 @@ fun ItemRowAdapter.retrieveResumeItems(api: ApiClient, query: GetResumeItemsRequ
 
 			val filteredItems = response.items.filter { it.isRealAvailableMedia() }
 
-			setItems(
+			setInitialItems(
 				items = filteredItems,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
@@ -192,7 +197,7 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 					addAll(episodesResponse.items.dropWhile { it.id == firstNextUp.id }.filter { it.isRealAvailableMedia() })
 				}
 
-				setItems(
+				setInitialItems(
 					items = items,
 					transform = { item, _ ->
 						BaseItemDtoBaseRowItem(
@@ -205,7 +210,7 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 
 				if (items.isEmpty()) removeRow()
 			} else {
-				setItems(
+				setInitialItems(
 					items = nextUpItems,
 					transform = { item, _ ->
 						BaseItemDtoBaseRowItem(
@@ -234,7 +239,7 @@ fun ItemRowAdapter.retrieveLatestMedia(api: ApiClient, query: GetLatestMediaRequ
 
 			val filteredItems = response.filter { it.isRealAvailableMedia() }
 
-			setItems(
+			setInitialItems(
 				items = filteredItems,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
@@ -265,7 +270,7 @@ fun ItemRowAdapter.retrieveSpecialFeatures(api: ApiClient, query: GetSpecialsReq
 				api.userLibraryApi.getSpecialFeatures(query.itemId).content
 			}
 
-			setItems(
+			setInitialItems(
 				items = response,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(item, preferParentThumb, false)
@@ -287,7 +292,7 @@ fun ItemRowAdapter.retrieveAdditionalParts(api: ApiClient, query: GetAdditionalP
 				api.videosApi.getAdditionalPart(query.itemId).content
 			}
 
-			setItems(
+			setInitialItems(
 				items = response.items,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
@@ -318,7 +323,7 @@ fun ItemRowAdapter.retrieveNextEpisodes(api: ApiClient, query: GetNextEpisodesRe
 			// Let's filter out the startItemId itself just in case.
 			val nextEpisodes = response.items.dropWhile { it.id == query.startItemId }
 
-			setItems(
+			setInitialItems(
 				items = nextEpisodes,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
@@ -439,7 +444,7 @@ fun ItemRowAdapter.retrieveSeasons(api: ApiClient, query: GetSeasonsRequest) {
 				api.tvShowsApi.getSeasons(query).content
 			}
 
-			setItems(
+			setInitialItems(
 				items = response.items,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
@@ -459,7 +464,7 @@ fun ItemRowAdapter.retrieveUpcomingEpisodes(api: ApiClient, query: GetUpcomingEp
 				api.tvShowsApi.getUpcomingEpisodes(query).content
 			}
 
-			setItems(
+			setInitialItems(
 				items = response.items,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
@@ -479,7 +484,7 @@ fun ItemRowAdapter.retrieveSimilarItems(api: ApiClient, query: GetSimilarItemsRe
 				api.libraryApi.getSimilarItems(query).content
 			}
 
-			setItems(
+			setInitialItems(
 				items = response.items,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
@@ -499,7 +504,7 @@ fun ItemRowAdapter.retrieveTrailers(api: ApiClient, query: GetTrailersRequest) {
 				api.userLibraryApi.getLocalTrailers(itemId = query.itemId)
 			}.content
 
-			setItems(
+			setInitialItems(
 				items = response,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
@@ -530,7 +535,7 @@ fun ItemRowAdapter.retrieveLiveTvRecommendedPrograms(
 				api.liveTvApi.getRecommendedPrograms(query).content
 			}
 
-			setItems(
+			setInitialItems(
 				items = response.items,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
@@ -556,7 +561,7 @@ fun ItemRowAdapter.retrieveLiveTvRecordings(api: ApiClient, query: GetRecordings
 				api.liveTvApi.getRecordings(query).content
 			}
 
-			setItems(
+			setInitialItems(
 				items = response.items,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
@@ -586,7 +591,7 @@ fun ItemRowAdapter.retrieveLiveTvSeriesTimers(
 				api.liveTvApi.getSeriesTimers().content
 			}
 
-			setItems(
+			setInitialItems(
 				items = buildList {
 					add(
 						GridButton(
@@ -648,16 +653,29 @@ fun ItemRowAdapter.retrieveLiveTvChannels(
 			}
 
 			totalItems = response.totalRecordCount
-			setItems(
-				items = response.items,
-				transform = { item, _ ->
-					BaseItemDtoBaseRowItem(
-						item,
-						false,
-						isStaticHeight,
-					)
-				},
-			)
+			if (startIndex == 0) {
+				setInitialItems(
+					items = response.items,
+					transform = { item, _ ->
+						BaseItemDtoBaseRowItem(
+							item,
+							false,
+							isStaticHeight,
+						)
+					},
+				)
+			} else {
+				setItems(
+					items = response.items,
+					transform = { item, _ ->
+						BaseItemDtoBaseRowItem(
+							item,
+							false,
+							isStaticHeight,
+						)
+					},
+				)
+			}
 
 			if (response.items.isEmpty()) removeRow()
 		}.fold(
@@ -685,16 +703,29 @@ fun ItemRowAdapter.retrieveAlbumArtists(
 			}
 
 			totalItems = response.totalRecordCount
-			setItems(
-				items = response.items,
-				transform = { item, _ ->
-					BaseItemDtoBaseRowItem(
-						item,
-						preferParentThumb,
-						isStaticHeight,
-					)
-				},
-			)
+			if (startIndex == 0) {
+				setInitialItems(
+					items = response.items,
+					transform = { item, _ ->
+						BaseItemDtoBaseRowItem(
+							item,
+							preferParentThumb,
+							isStaticHeight,
+						)
+					},
+				)
+			} else {
+				setItems(
+					items = response.items,
+					transform = { item, _ ->
+						BaseItemDtoBaseRowItem(
+							item,
+							preferParentThumb,
+							isStaticHeight,
+						)
+					},
+				)
+			}
 
 			if (response.items.isEmpty()) removeRow()
 		}.fold(
@@ -722,16 +753,29 @@ fun ItemRowAdapter.retrieveArtists(
 			}
 
 			totalItems = response.totalRecordCount
-			setItems(
-				items = response.items,
-				transform = { item, _ ->
-					BaseItemDtoBaseRowItem(
-						item,
-						preferParentThumb,
-						isStaticHeight,
-					)
-				},
-			)
+			if (startIndex == 0) {
+				setInitialItems(
+					items = response.items,
+					transform = { item, _ ->
+						BaseItemDtoBaseRowItem(
+							item,
+							preferParentThumb,
+							isStaticHeight,
+						)
+					},
+				)
+			} else {
+				setItems(
+					items = response.items,
+					transform = { item, _ ->
+						BaseItemDtoBaseRowItem(
+							item,
+							preferParentThumb,
+							isStaticHeight,
+						)
+					},
+				)
+			}
 
 			if (response.items.isEmpty()) removeRow()
 		}.fold(

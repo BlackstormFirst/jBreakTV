@@ -88,13 +88,13 @@ open class MutableObjectAdapter<T : Any> : ObjectAdapter, Iterable<T> {
 		data.clear()
 	}
 
-	fun remove(element: T): Boolean {
+	open fun remove(element: T): Boolean {
 		val index = indexOf(element)
 		if (index == -1) return false
 		return removeAt(index, 1)
 	}
 
-	fun removeAt(index: Int, length: Int = 1): Boolean {
+	open fun removeAt(index: Int, length: Int = 1): Boolean {
 		if (index < 0 || index >= data.size) return false
 
 		data.subList(index, index + length).clear()
