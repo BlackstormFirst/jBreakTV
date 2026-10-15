@@ -22,6 +22,8 @@ import coil3.transform.CircleCropTransformation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.util.BlurHashDecoder
@@ -30,6 +32,8 @@ import org.koin.core.component.inject
 import kotlin.math.max
 import kotlin.math.round
 import kotlin.time.Duration.Companion.milliseconds
+
+private val blurHashSemaphore = Semaphore(2)
 
 /**
  * An extension to the [ImageView] that makes it easy to load images from the network.
@@ -106,16 +110,24 @@ class AsyncImageView @JvmOverloads constructor(
 				val w = max(16, if (aspectRatio > 1) round(res * aspectRatio).toInt() else res)
 				val h = max(16, if (aspectRatio < 1) round(res / aspectRatio).toInt() else res)
 
-				val blurHashDrawable = withContext(Dispatchers.IO) {
-					BlurHashDecoder.decode(
-						blurHash = blurHash,
-						width = w,
-						height = h,
-						context = context,
-					)?.toDrawable(resources)
-				}
-				if (blurHashDrawable != null) {
-					initialPlaceholder = blurHashDrawable
+				// Fast path: check LRU cache synchronously on Main thread without context switch
+				val cachedBitmap = BlurHashDecoder.getCached(blurHash, w, h)
+				if (cachedBitmap != null) {
+					initialPlaceholder = cachedBitmap.toDrawable(resources)
+				} else {
+					val blurHashDrawable = withContext(Dispatchers.IO) {
+						blurHashSemaphore.withPermit {
+							BlurHashDecoder.decode(
+								blurHash = blurHash,
+								width = w,
+								height = h,
+								context = context,
+							)?.toDrawable(resources)
+						}
+					}
+					if (blurHashDrawable != null) {
+						initialPlaceholder = blurHashDrawable
+					}
 				}
 			}
 

@@ -73,6 +73,9 @@ fun AppBackground() {
 	val blurBackground by backgroundService.blurBackground.collectAsState()
 	val enabled by backgroundService.enabled.collectAsState()
 
+	val supportsHardwareBlur = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+	val applyComposeBlur = blurBackground && supportsHardwareBlur
+
 	if (enabled) {
 		Box(modifier = Modifier.fillMaxSize()) {
 			AnimatedContent(
@@ -93,7 +96,7 @@ fun AppBackground() {
 						colorFilter = ColorFilter.tint(colorResource(R.color.background_filter), BlendMode.SrcAtop),
 						modifier = Modifier
 							.fillMaxSize()
-							.then(if (blurBackground) Modifier.blur(10.dp) else Modifier)
+							.then(if (applyComposeBlur) Modifier.blur(10.dp) else Modifier)
 					)
 				} else {
 					AppThemeBackground()

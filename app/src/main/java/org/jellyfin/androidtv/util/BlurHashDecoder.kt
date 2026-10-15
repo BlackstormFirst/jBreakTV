@@ -45,6 +45,16 @@ object BlurHashDecoder {
 	}
 
 	/**
+	 * Returns the cached bitmap if already decoded, without performing any decoding calculations.
+	 */
+	fun getCached(blurHash: String?, width: Int, height: Int, punch: Float = 1f): Bitmap? {
+		if (blurHash == null || blurHash.length < 6 || width <= 0 || height <= 0) return null
+		val key = BlurHashKey(blurHash, width, height, punch)
+		val cached = cache[key]
+		return if (cached != null && !cached.isRecycled) cached else null
+	}
+
+	/**
 	 * Decode a blur hash into a new bitmap.
 	 */
 	fun decode(blurHash: String?, width: Int, height: Int, punch: Float = 1f, context: Context? = null): Bitmap? {
