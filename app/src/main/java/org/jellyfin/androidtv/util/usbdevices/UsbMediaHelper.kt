@@ -17,9 +17,19 @@ object UsbMediaHelper {
         "srt", "vtt", "ssa", "ass"
     )
 
+    val IMAGE_EXTENSIONS = setOf(
+        "jpg", "jpeg", "png", "webp", "bmp", "gif"
+    )
+
     fun isMediaFile(file: File): Boolean {
         if (!file.isFile) return false
-        return isVideoFile(file) || isAudioFile(file)
+        return isVideoFile(file) || isAudioFile(file) || isImageFile(file)
+    }
+
+    fun isImageFile(file: File): Boolean {
+        if (!file.isFile) return false
+        val ext = file.extension.lowercase(Locale.ROOT)
+        return IMAGE_EXTENSIONS.contains(ext)
     }
 
     fun isVideoFile(file: File): Boolean {
