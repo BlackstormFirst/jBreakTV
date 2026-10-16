@@ -179,6 +179,36 @@ class CardPresenter(
 	}
 }
 
+@Composable
+fun BaseRowItemCard(
+	item: BaseRowItem?,
+	focused: Boolean,
+	modifier: Modifier = Modifier,
+	showInfo: Boolean = true,
+	imageType: ImageType = ImageType.POSTER,
+	staticHeight: Int = 150,
+	uniformAspect: Boolean = false,
+) {
+	val userPreferences = org.koin.compose.koinInject<UserPreferences>()
+	val api = org.koin.compose.koinInject<ApiClient>()
+	val displayCirclePersonCards = remember(userPreferences) {
+		userPreferences[UserPreferences.displayCirclePersonCards]
+	}
+
+	Box(modifier = modifier) {
+		CardViewHolderContent(
+			item = item,
+			focused = focused,
+			showInfo = showInfo,
+			imageType = imageType,
+			staticHeight = staticHeight,
+			uniformAspect = uniformAspect,
+			displayCirclePersonCards = displayCirclePersonCards,
+			api = api,
+		)
+	}
+}
+
 private data class BaseRowItemDisplayConfig(
 	val image: JellyfinImage?,
 	val iconRes: Int,
