@@ -4,6 +4,10 @@ import org.jellyfin.androidtv.constant.ChangeTriggerType;
 import org.jellyfin.androidtv.constant.QueryType;
 import org.jellyfin.androidtv.data.querying.GetSeriesTimersRequest;
 import org.jellyfin.androidtv.data.querying.GetSpecialsRequest;
+import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
+import org.jellyfin.androidtv.ui.itemhandling.GridButtonBaseRowItem;
+import java.util.ArrayList;
+import java.util.List;
 import org.jellyfin.sdk.model.api.request.GetAlbumArtistsRequest;
 import org.jellyfin.sdk.model.api.request.GetArtistsRequest;
 import org.jellyfin.sdk.model.api.request.GetItemsRequest;
@@ -30,6 +34,7 @@ public class BrowseRowDef {
     private GetAlbumArtistsRequest albumArtistsQuery;
     private GetResumeItemsRequest resumeQuery;
     private GetSpecialsRequest specialsQuery;
+    private List<BaseRowItem> items;
     private QueryType queryType;
 
     private int chunkSize = 0;
@@ -137,6 +142,10 @@ public class BrowseRowDef {
         this.queryType = type;
     }
 
+    public BrowseRowDef(String header, GetResumeItemsRequest query, int chunkSize, ChangeTriggerType[] changeTriggers) {
+        this(header, query, chunkSize, false, true, changeTriggers);
+    }
+
     public BrowseRowDef(String header, GetResumeItemsRequest query, int chunkSize, boolean preferParentThumb, boolean staticHeight, ChangeTriggerType[] changeTriggers) {
         headerText = header;
         this.resumeQuery = query;
@@ -151,6 +160,17 @@ public class BrowseRowDef {
         headerText = header;
         this.specialsQuery = query;
         this.queryType = QueryType.Specials;
+    }
+
+    public BrowseRowDef(String header, List<? extends BaseRowItem> items) {
+        headerText = header;
+        this.items = new ArrayList<>(items);
+        this.queryType = QueryType.StaticItems;
+        this.staticHeight = true;
+    }
+
+    public List<BaseRowItem> getItems() {
+        return items;
     }
 
     public int getChunkSize() {

@@ -23,10 +23,11 @@ class SuggestedMoviesFragment : EnhancedBrowseFragment() {
 	}
 
 	override fun setupQueries(rowLoader: RowLoader) {
+		val folder = mFolder ?: return
 		lifecycleScope.launch {
 			val response = withContext(Dispatchers.IO) {
 				api.itemsApi.getItems(
-					parentId = mFolder.id,
+					parentId = folder.id,
 					includeItemTypes = setOf(BaseItemKind.MOVIE),
 					sortOrder = setOf(SortOrder.DESCENDING),
 					sortBy = setOf(ItemSortBy.DATE_PLAYED),

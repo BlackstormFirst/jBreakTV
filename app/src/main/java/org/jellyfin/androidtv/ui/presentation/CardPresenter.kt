@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.ImageType
+import org.jellyfin.androidtv.constant.PosterSize
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.composable.AsyncImage
@@ -59,6 +61,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
 import androidx.recyclerview.widget.RecyclerView
@@ -188,6 +191,7 @@ fun BaseRowItemCard(
 	imageType: ImageType = ImageType.POSTER,
 	staticHeight: Int = 150,
 	uniformAspect: Boolean = false,
+	fillMaxWidth: Boolean = false,
 ) {
 	val userPreferences = org.koin.compose.koinInject<UserPreferences>()
 	val api = org.koin.compose.koinInject<ApiClient>()
@@ -203,6 +207,7 @@ fun BaseRowItemCard(
 			imageType = imageType,
 			staticHeight = staticHeight,
 			uniformAspect = uniformAspect,
+			fillMaxWidth = fillMaxWidth,
 			displayCirclePersonCards = displayCirclePersonCards,
 			api = api,
 		)
@@ -252,7 +257,11 @@ private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Bo
 			)
 
 			BaseItemKind.SEASON, BaseItemKind.SERIES -> base.copy(
-				aspectRatio = if (imageType == ImageType.POSTER) ImageHelper.ASPECT_RATIO_2_3.toFloat() else base.aspectRatio,
+				aspectRatio = when (imageType) {
+					ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
+					ImageType.THUMB -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
+					else -> ImageHelper.ASPECT_RATIO_2_3.toFloat()
+				},
 				iconRes = R.drawable.ic_tv
 			)
 
@@ -288,8 +297,9 @@ private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Bo
 
 			BaseItemKind.MOVIE, BaseItemKind.VIDEO -> base.copy(
 				aspectRatio = when (imageType) {
-					ImageType.POSTER -> ImageHelper.ASPECT_RATIO_2_3.toFloat()
-					else -> base.aspectRatio
+					ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
+					ImageType.THUMB -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
+					else -> ImageHelper.ASPECT_RATIO_2_3.toFloat()
 				},
 				iconRes = R.drawable.ic_clapperboard,
 			)
@@ -369,6 +379,7 @@ private fun CardViewHolderContent(
 	imageType: ImageType,
 	staticHeight: Int,
 	uniformAspect: Boolean,
+	fillMaxWidth: Boolean = false,
 	displayCirclePersonCards: Boolean,
 	api: ApiClient,
 ) {
@@ -384,10 +395,21 @@ private fun CardViewHolderContent(
 	val aspectRatio = displayConfig.aspectRatio.takeIf { it >= 0.1f }
 		?: image?.aspectRatio?.takeIf { it >= 0.1f } ?: 1f
 
-	val size = when (item.staticHeight) {
-		true -> DpSize(staticHeight.dp * aspectRatio, staticHeight.dp)
-		false if (aspectRatio > 1f) -> DpSize(130.dp * aspectRatio, 130.dp)
+	val size = when {
+		fillMaxWidth -> DpSize(200.dp, (200f / aspectRatio).dp)
+		item.staticHeight -> DpSize(staticHeight.dp * aspectRatio, staticHeight.dp)
+		imageType == ImageType.BANNER -> DpSize(240.dp, 60.dp)
+		imageType == ImageType.THUMB -> DpSize(180.dp, 100.dp)
+		aspectRatio > 1f -> DpSize(130.dp * aspectRatio, 130.dp)
 		else -> DpSize(150.dp * aspectRatio, 150.dp)
+	}
+
+	val cardSizeModifier = if (fillMaxWidth) {
+		Modifier
+			.fillMaxWidth()
+			.aspectRatio(aspectRatio)
+	} else {
+		Modifier.size(size)
 	}
 
 	val usePreview = displayConfig.overrideShowInfo ?: showInfo
@@ -478,7 +500,11 @@ private fun CardViewHolderContent(
 				}
 			},
 			modifier = Modifier
-				.size(size)
+				.then(cardSizeModifier)
+				.graphicsLayer {
+					scaleX = if (focused) 1.15f else 1.0f
+					scaleY = if (focused) 1.15f else 1.0f
+				}
 				.then(if (isCircular) Modifier.clip(CircleShape) else Modifier)
 		)
 	}
@@ -509,6 +535,7 @@ private fun CardViewHolderContent(
 						maxLines = 1,
 						overflow = TextOverflow.Ellipsis,
 						textAlign = TextAlign.Center,
+						color = Color(0xFFAAAAAA),
 						modifier = Modifier.then(focusModifier),
 					)
 				}

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -20,11 +21,11 @@ object IconButtonDefaults {
 	@ReadOnlyComposable
 	@Composable
 	fun colors(
-		containerColor: Color = JellyfinTheme.colorScheme.button,
+		containerColor: Color = Color.Transparent,
 		contentColor: Color = JellyfinTheme.colorScheme.onButton,
 		focusedContainerColor: Color = JellyfinTheme.colorScheme.buttonFocused,
 		focusedContentColor: Color = JellyfinTheme.colorScheme.onButtonFocused,
-		disabledContainerColor: Color = JellyfinTheme.colorScheme.buttonDisabled,
+		disabledContainerColor: Color = Color.Transparent,
 		disabledContentColor: Color = JellyfinTheme.colorScheme.onButtonDisabled,
 	) = ButtonDefaults.colors(
 		containerColor = containerColor,
@@ -43,7 +44,7 @@ fun IconButton(
 	onLongClick: (() -> Unit)? = null,
 	enabled: Boolean = true,
 	shape: Shape = IconButtonDefaults.Shape,
-	colors: ButtonColors = ButtonDefaults.colors(),
+	colors: ButtonColors = IconButtonDefaults.colors(),
 	contentPadding: PaddingValues = IconButtonDefaults.ContentPadding,
 	interactionSource: MutableInteractionSource? = null,
 	content: @Composable BoxScope.() -> Unit
@@ -58,6 +59,7 @@ fun IconButton(
 		interactionSource = interactionSource,
 	) {
 		Box(
+			contentAlignment = Alignment.Center,
 			modifier = Modifier
 				.padding(contentPadding),
 			content = content,

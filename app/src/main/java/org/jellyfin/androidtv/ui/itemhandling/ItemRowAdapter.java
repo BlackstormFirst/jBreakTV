@@ -243,6 +243,17 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         queryType = QueryType.StaticChapters;
     }
 
+    public ItemRowAdapter(Context context, List<BaseRowItem> items, Presenter presenter) {
+        super(presenter);
+        this.context = context;
+        queryType = QueryType.StaticItems;
+        if (items != null) {
+            for (BaseRowItem item : items) {
+                add(item);
+            }
+        }
+    }
+
     public ItemRowAdapter(Context context, List<BaseItemDto> items, Presenter presenter, MutableObjectAdapter<Row> parent, QueryType queryType) {
         super(presenter);
         this.context = context;
@@ -396,7 +407,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         return totalItems;
     }
 
-    public void setSortBy(BrowseGridFragment.SortOption option) {
+    public void setSortBy(org.jellyfin.androidtv.ui.browsing.SortOption option) {
         if (!option.value.equals(mSortBy) || !option.order.equals(sortOrder)) {
             mSortBy = option.value;
             sortOrder = option.order;
@@ -732,6 +743,8 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
                 add(new BaseItemDtoBaseRowItem(item));
             }
             itemsLoaded = mItems.size();
+        } else if (size() > 0) {
+            itemsLoaded = size();
         } else {
             removeRow();
         }

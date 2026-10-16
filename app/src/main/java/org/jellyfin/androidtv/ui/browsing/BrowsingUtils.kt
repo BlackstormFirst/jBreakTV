@@ -26,6 +26,7 @@ import org.jellyfin.sdk.model.api.request.GetLiveTvChannelsRequest
 import org.jellyfin.sdk.model.api.request.GetNextUpRequest
 import org.jellyfin.sdk.model.api.request.GetRecommendedProgramsRequest
 import org.jellyfin.sdk.model.api.request.GetRecordingsRequest
+import org.jellyfin.sdk.model.api.request.GetResumeItemsRequest
 import org.jellyfin.sdk.model.api.request.GetSeasonsRequest
 import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
 import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
@@ -245,21 +246,11 @@ object BrowsingUtils {
 	)
 
 	@JvmStatic
-	fun createResumeItemsRequest(parentId: UUID, itemType: BaseItemKind) = GetItemsRequest(
+	fun createResumeItemsRequest(parentId: UUID, itemType: BaseItemKind) = GetResumeItemsRequest(
 		fields = ItemRepository.browseFields,
 		includeItemTypes = setOf(itemType),
-		recursive = true,
 		parentId = parentId,
-		imageTypeLimit = 1,
 		limit = 50,
-		collapseBoxSetItems = false,
-		enableTotalRecordCount = false,
-		isMissing = false,
-		isUnaired = false,
-		excludeLocationTypes = setOf(LocationType.VIRTUAL),
-		filters = setOf(ItemFilter.IS_RESUMABLE),
-		sortBy = setOf(ItemSortBy.DATE_PLAYED),
-		sortOrder = setOf(SortOrder.DESCENDING),
 	)
 
 	@JvmStatic
@@ -318,30 +309,36 @@ object BrowsingUtils {
 			parentId = parent.id,
 		)
 
-		if (parent.type == BaseItemKind.USER_VIEW || parent.type == BaseItemKind.COLLECTION_FOLDER) {
-			return when (parent.collectionType) {
-				CollectionType.MOVIES -> baseRequest.copy(
-					includeItemTypes = setOf(BaseItemKind.MOVIE),
-					recursive = true,
+		return when (parent.collectionType) {
+			CollectionType.MOVIES -> baseRequest.copy(
+				includeItemTypes = setOf(BaseItemKind.MOVIE),
+				recursive = true,
+			)
+
+			CollectionType.TVSHOWS -> baseRequest.copy(
+				includeItemTypes = setOf(BaseItemKind.SERIES),
+				recursive = true,
+				isMissing = false,
+				isUnaired = false,
+				excludeLocationTypes = setOf(LocationType.VIRTUAL),
+			)
+
+			CollectionType.MUSIC -> baseRequest.copy(
+				includeItemTypes = setOf(BaseItemKind.MUSIC_ALBUM),
+				recursive = true,
+			)
+
+			else -> when (parent.type) {
+				BaseItemKind.SEASON -> baseRequest.copy(
+					includeItemTypes = setOf(BaseItemKind.EPISODE),
 				)
 
-				CollectionType.TVSHOWS -> baseRequest.copy(
-					includeItemTypes = setOf(BaseItemKind.SERIES),
-					recursive = true,
-					isMissing = false,
-					isUnaired = false,
-					excludeLocationTypes = setOf(LocationType.VIRTUAL),
-				)
-
-				CollectionType.MUSIC -> baseRequest.copy(
-					includeItemTypes = setOf(BaseItemKind.MUSIC_ALBUM),
-					recursive = true,
+				BaseItemKind.SERIES -> baseRequest.copy(
+					includeItemTypes = setOf(BaseItemKind.SEASON),
 				)
 
 				else -> baseRequest
 			}
 		}
-
-		return baseRequest
 	}
 }

@@ -17,7 +17,7 @@ import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.GridButton
-import org.jellyfin.androidtv.ui.browsing.BrowseGridFragment.SortOption
+import org.jellyfin.androidtv.ui.browsing.SortOption
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
 import org.jellyfin.androidtv.util.usbdevices.UsbGridButton
@@ -105,7 +105,7 @@ fun <T : Any> ItemRowAdapter.setInitialItems(
 	}
 	replaceAll(mappedItems)
 	itemsLoaded = mappedItems.size
-	totalItems = mappedItems.size
+	totalItems = maxOf(totalItems, mappedItems.size)
 	lastFullRetrieve = java.time.Instant.now()
 	preloadRowImages(mappedItems)
 }
@@ -798,11 +798,12 @@ fun ItemRowAdapter.retrieveItems(
 ) {
 	ProcessLifecycleOwner.get().lifecycleScope.launch {
 		runCatching {
+			val effectiveLimit = if (batchSize > 0) batchSize else null
 			val response = withContext(Dispatchers.IO) {
 				api.itemsApi.getItems(
 					query.copy(
 						startIndex = startIndex,
-						limit = batchSize,
+						limit = effectiveLimit,
 					)
 				).content
 			}
@@ -819,7 +820,9 @@ fun ItemRowAdapter.retrieveItems(
 				},
 			)
 
-			if (itemsLoaded == 0) removeRow()
+			if (itemsLoaded == 0) {
+				removeRow()
+			}
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }

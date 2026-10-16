@@ -21,19 +21,21 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 	}
 
 	override fun setupQueries(rowLoader: RowLoader) {
-		if ((mFolder.childCount == null || mFolder.childCount == 0) && !setOf(
+		val folder = mFolder ?: return
+
+		if ((folder.childCount == null || folder.childCount == 0) && !setOf(
 				BaseItemKind.CHANNEL,
 				BaseItemKind.CHANNEL_FOLDER_ITEM,
 				BaseItemKind.USER_VIEW,
 				BaseItemKind.COLLECTION_FOLDER,
-			).contains(mFolder.type)
+			).contains(folder.type)
 		) return
 
-		if (showSpecialViewTypes.contains(mFolder.type)) {
-			if (mFolder.type != BaseItemKind.CHANNEL_FOLDER_ITEM) {
+		if (showSpecialViewTypes.contains(folder.type)) {
+			if (folder.type != BaseItemKind.CHANNEL_FOLDER_ITEM) {
 				val resume = GetItemsRequest(
 					fields = ItemRepository.browseFields,
-					parentId = mFolder.id,
+					parentId = folder.id,
 					limit = 50,
 					isMissing = false,
 					isUnaired = false,
@@ -47,7 +49,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 
 			val latest = GetItemsRequest(
 				fields = ItemRepository.browseFields,
-				parentId = mFolder.id,
+				parentId = folder.id,
 				limit = 50,
 				isMissing = false,
 				isUnaired = false,
@@ -61,26 +63,26 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 
 		val byName = GetItemsRequest(
 			fields = ItemRepository.browseFields,
-			parentId = mFolder.id,
+			parentId = folder.id,
 		)
-		val header = when (mFolder.type) {
-			BaseItemKind.SEASON -> mFolder.name
+		val header = when (folder.type) {
+			BaseItemKind.SEASON -> folder.name
 			else -> getString(R.string.lbl_by_name)
 		}
 
 		mRows.add(BrowseRowDef(header, byName, 100))
 
-		if (mFolder.type == BaseItemKind.SEASON) {
-			val specials = GetSpecialsRequest(mFolder.id)
+		if (folder.type == BaseItemKind.SEASON) {
+			val specials = GetSpecialsRequest(folder.id)
 			mRows.add(BrowseRowDef(getString(R.string.lbl_specials), specials))
 
-			val seriesId = mFolder.seriesId ?: mFolder.parentId
+			val seriesId = folder.seriesId ?: folder.parentId
 			if (seriesId != null) {
 				val otherSeasons = GetItemsRequest(
 					fields = ItemRepository.browseFields,
 					parentId = seriesId,
 					includeItemTypes = setOf(BaseItemKind.SEASON),
-					excludeItemIds = setOf(mFolder.id),
+					excludeItemIds = setOf(folder.id),
 				)
 				mRows.add(BrowseRowDef(getString(R.string.lbl_seasons), otherSeasons, 100))
 
