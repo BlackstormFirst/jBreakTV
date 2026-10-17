@@ -179,8 +179,10 @@ public class ItemLauncher {
                                     }
                                     List<BaseItemDto> finalItems = response;
                                     if (itemsPosition == -1) {
-                                        finalItems = new ArrayList<>(response);
-                                        finalItems.add(0, targetItem);
+                                        if (targetItem.isFolder() == null || !targetItem.isFolder()) {
+                                            finalItems = new ArrayList<>(response);
+                                            finalItems.add(0, targetItem);
+                                        }
                                         itemsPosition = 0;
                                     }
                                     int pos = 0;

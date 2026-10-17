@@ -9,7 +9,6 @@ import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
-import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -57,16 +56,7 @@ class PlaybackLauncher(
 			playbackManager.state.stop()
 			val items = if (shuffle) items.shuffled() else items
 
-			val effectiveItemsPosition = if (itemsPosition == 0 && items.size > 1 && position != null && position > 0) {
-				val posTicks = position.toLong() * 10000L
-				val matchedIndex = items.indexOfFirst {
-					val itemTicks = it.userData?.playbackPositionTicks ?: 0L
-					itemTicks > 0L && abs(itemTicks - posTicks) < 600000000L
-				}
-				if (matchedIndex > 0) matchedIndex else 0
-			} else {
-				itemsPosition
-			}
+			val effectiveItemsPosition = itemsPosition.coerceIn(0, (items.size - 1).coerceAtLeast(0))
 
 			videoQueueManager.clearVideoQueue()
 			videoQueueManager.setCurrentVideoQueue(items.toList())

@@ -320,15 +320,16 @@ class SdkPlaybackHelper(
 					response
 				}
 
-				val pos = item.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration) ?: Duration.ZERO
-
-				val allowIntros = pos == Duration.ZERO && item.type == BaseItemKind.MOVIE
+				val allowIntros = item.userData?.playbackPositionTicks == 0L && item.type == BaseItemKind.MOVIE
 				var items = getItems(item, allowIntros, shuffle)
 				var targetIndex = items.indexOfFirst { it.id == item.id }
 				if (targetIndex == -1) {
-					items = if (item.canPlay()) listOf(item) + items else items
+					items = if (item.canPlay() && item.isFolder != true) listOf(item) + items else items
 					targetIndex = items.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
 				}
+
+				val targetItem = items.getOrNull(targetIndex) ?: item
+				val pos = targetItem.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration)?.coerceAtLeast(Duration.ZERO) ?: Duration.ZERO
 
 				Triple(items, pos, targetIndex)
 			}.fold(
@@ -367,9 +368,11 @@ class SdkPlaybackHelper(
 					response.items
 				}
 
-				val pos = position?.ticks ?: items[0].userData?.playbackPositionTicks?.ticks?.minus(
+				val targetIdx = index ?: 0
+				val targetItem = items.getOrNull(targetIdx) ?: items.firstOrNull()
+				val pos = position?.ticks ?: targetItem?.userData?.playbackPositionTicks?.ticks?.minus(
 					resumeSubtractDuration
-				) ?: Duration.ZERO
+				)?.coerceAtLeast(Duration.ZERO) ?: Duration.ZERO
 
 				Pair(items, pos)
 			}.fold(

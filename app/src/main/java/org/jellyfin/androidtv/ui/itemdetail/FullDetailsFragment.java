@@ -284,18 +284,18 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
                 Instant lastPlaybackTime = dataRefreshService.getValue().getLastPlayback();
                 BaseItemDto lastPlayedItem = dataRefreshService.getValue().getLastPlayedItem();
-                Timber.d("current time %s last playback event time %s last refresh time %s", Instant.now().toEpochMilli(), lastPlaybackTime, mLastUpdated.toEpochMilli());
+                Timber.d("current time %s last playback event time %s last refresh time %s", Instant.now().toEpochMilli(), lastPlaybackTime, mLastUpdated != null ? mLastUpdated.toEpochMilli() : "null");
 
-                boolean isPlaybackRecent = lastPlaybackTime != null && (lastPlaybackTime.isAfter(mLastUpdated) || Instant.now().toEpochMilli() - lastPlaybackTime.toEpochMilli() < 2000);
+                boolean isPlaybackRecent = lastPlaybackTime != null && mLastUpdated != null && (lastPlaybackTime.isAfter(mLastUpdated) || Instant.now().toEpochMilli() - mLastUpdated.toEpochMilli() < 2000);
 
-                if (isPlaybackRecent && mBaseItem.getType() != BaseItemKind.MUSIC_ARTIST) {
+                if (mBaseItem != null && isPlaybackRecent && mBaseItem.getType() != BaseItemKind.MUSIC_ARTIST) {
                     Timber.i("Updating info after playback");
                     dataRefreshService.getValue().setLastPlayedItem(null); // blank this out so subsequent screens don't re-use stale item
                     if (lastPlayedItem != null && lastPlayedItem.getUserData() != null && lastPlayedItem.getId().equals(mBaseItem.getId())) {
                         mBaseItem = JavaCompat.copyWithUserData(mBaseItem, lastPlayedItem.getUserData());
                         updateWatched();
                         if (mResumeButton != null) {
-                            boolean resumeVisible = (mBaseItem.getType() == BaseItemKind.SERIES && !mBaseItem.getUserData().getPlayed()) || JavaCompat.getCanResume(mBaseItem);
+                            boolean resumeVisible = (mBaseItem.getType() == BaseItemKind.SERIES && (mBaseItem.getUserData() == null || !mBaseItem.getUserData().getPlayed())) || JavaCompat.getCanResume(mBaseItem);
                             mResumeButton.setVisibility(resumeVisible ? View.VISIBLE : View.GONE);
                             if (JavaCompat.getCanResume(mBaseItem)) {
                                 mResumeButton.setLabel(getString(R.string.lbl_resume_from, TimeUtils.formatMillis((mBaseItem.getUserData().getPlaybackPositionTicks() / 10000) - getResumePreroll())));
@@ -316,7 +316,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
                         mBaseItem = item;
                         if (mResumeButton != null) {
-                            boolean resumeVisible = (mBaseItem.getType() == BaseItemKind.SERIES && !mBaseItem.getUserData().getPlayed()) || JavaCompat.getCanResume(mBaseItem);
+                            boolean resumeVisible = (mBaseItem.getType() == BaseItemKind.SERIES && (mBaseItem.getUserData() == null || !mBaseItem.getUserData().getPlayed())) || JavaCompat.getCanResume(mBaseItem);
                             mResumeButton.setVisibility(resumeVisible ? View.VISIBLE : View.GONE);
                             if (JavaCompat.getCanResume(mBaseItem)) {
                                 mResumeButton.setLabel(getString(R.string.lbl_resume_from, TimeUtils.formatMillis((mBaseItem.getUserData().getPlaybackPositionTicks() / 10000) - getResumePreroll())));
@@ -1300,8 +1300,10 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 }
                 List<BaseItemDto> finalItems = response;
                 if (itemsPosition == -1) {
-                    finalItems = new ArrayList<>(response);
-                    finalItems.add(0, item);
+                    if (item.isFolder() == null || !item.isFolder()) {
+                        finalItems = new ArrayList<>(response);
+                        finalItems.add(0, item);
+                    }
                     itemsPosition = 0;
                 }
                 KoinJavaComponent.<PlaybackLauncher>get(PlaybackLauncher.class).launch(getContext(), finalItems, pos, false, itemsPosition, shuffle);

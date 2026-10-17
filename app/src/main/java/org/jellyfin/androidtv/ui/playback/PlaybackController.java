@@ -4,6 +4,7 @@ import static org.koin.java.KoinJavaComponent.get;
 import static org.koin.java.KoinJavaComponent.inject;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Handler;
 import android.view.SurfaceView;
@@ -538,24 +539,36 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             }
         }
 
-        if (forcedSubtitleIndex != null) {
+        if (forcedSubtitleIndex != null && forcedSubtitleIndex >= 0) {
             internalOptions.setSubtitleStreamIndex(forcedSubtitleIndex);
+        } else if (forcedSubtitleIndex == null) {
+            Integer bestSubIndex = playbackIndexManager.getValue().getBestSubtitleIndex(
+                    currentMediaSource,
+                    mFragment != null && mFragment.getContext() != null ? mFragment.getContext() : get(Context.class),
+                    currentAudioLang
+            );
+            internalOptions.setSubtitleStreamIndex(bestSubIndex != null && bestSubIndex >= 0 ? bestSubIndex : null);
         } else {
-            internalOptions.setSubtitleStreamIndex(playbackIndexManager.getValue().getBestSubtitleIndex(currentMediaSource, mFragment.getContext(), currentAudioLang));
+            internalOptions.setSubtitleStreamIndex(null);
         }
 
-        if (!isLiveTv) {
+        if (!isLiveTv && currentMediaSource != null) {
             internalOptions.setMediaSourceId(currentMediaSource.getId());
         }
         if (!isCurrentItemLocal(item)) {
             try {
+                Context context = mFragment != null && mFragment.getContext() != null
+                        ? mFragment.getContext()
+                        : get(Context.class);
                 DeviceProfile internalProfile = DeviceProfileKt.createDeviceProfile(
-                        mFragment.getContext(),
+                        context,
                         userPreferences.getValue(),
                         get(ServerVersion.class)
                 );
                 internalOptions.setProfile(internalProfile);
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                Timber.e(e, "Error creating device profile for internal player");
+            }
         }
         return internalOptions;
     }

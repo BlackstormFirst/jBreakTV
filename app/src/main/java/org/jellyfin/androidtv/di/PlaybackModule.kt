@@ -58,7 +58,7 @@ import org.jellyfin.sdk.model.api.MediaSourceType
 import org.jellyfin.sdk.model.api.MediaStreamProtocol
 
 val playbackModule = module {
-	single { LegacyPlaybackManager(get()) }
+	single { LegacyPlaybackManager(get(), get(), get(), androidContext()) }
 	single { VideoQueueManager() }
 	single { PlaybackIndexManager() }
 	single<MediaManager> { RewriteMediaManager(get(), get()) }
