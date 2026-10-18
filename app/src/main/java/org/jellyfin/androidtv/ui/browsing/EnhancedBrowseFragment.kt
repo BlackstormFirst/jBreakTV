@@ -5,8 +5,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +41,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -271,6 +277,51 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 	}
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun rememberHorizontalBringIntoViewSpec(): BringIntoViewSpec {
+	val density = LocalDensity.current
+	val paddingPx = with(density) { 56.dp.toPx() }
+	return remember(paddingPx) {
+		object : BringIntoViewSpec {
+			override fun calculateScrollDistance(
+				offset: Float,
+				size: Float,
+				containerSize: Float
+			): Float {
+				val trailingEdge = offset + size
+				val minVisible = paddingPx
+				val maxVisible = containerSize - paddingPx
+
+				return when {
+					offset < minVisible -> offset - minVisible
+					trailingEdge > maxVisible -> trailingEdge - maxVisible
+					else -> 0f
+				}
+			}
+		}
+	}
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun rememberPivotBringIntoViewSpec(): BringIntoViewSpec {
+	val density = LocalDensity.current
+	val headerHeightPx = with(density) { 38.dp.toPx() }
+	return remember(headerHeightPx) {
+		object : BringIntoViewSpec {
+			override fun calculateScrollDistance(
+				offset: Float,
+				size: Float,
+				containerSize: Float
+			): Float {
+				return offset - headerHeightPx
+			}
+		}
+	}
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EnhancedBrowseScreen(
 	title: String?,
@@ -287,6 +338,8 @@ fun EnhancedBrowseScreen(
 	val listState = rememberLazyListState()
 	val coroutineScope = rememberCoroutineScope()
 	var focusedRowIndex by remember { mutableIntStateOf(0) }
+	val pivotBringIntoViewSpec = rememberPivotBringIntoViewSpec()
+	val horizontalBringIntoViewSpec = rememberHorizontalBringIntoViewSpec()
 
 	val rowData = remember { mutableStateMapOf<Int, List<BaseRowItem>>() }
 	val rowAdapters = remember { mutableStateMapOf<Int, ItemRowAdapter>() }
@@ -376,107 +429,110 @@ fun EnhancedBrowseScreen(
 
 			Spacer(Modifier.height(16.dp))
 
-			LazyColumn(
-				state = listState,
-				modifier = Modifier
-					.fillMaxSize()
-					.clipToBounds(),
-				verticalArrangement = Arrangement.spacedBy(16.dp),
-				contentPadding = PaddingValues(bottom = 64.dp)
-			) {
-				itemsIndexed(rows, key = { rowIndex, row -> "${row.headerText}_$rowIndex" }) { rowIndex, def ->
-					val lifecycle = LocalLifecycleOwner.current.lifecycle
-					val itemsState = rowData[rowIndex] ?: emptyList()
+			CompositionLocalProvider(LocalBringIntoViewSpec provides pivotBringIntoViewSpec) {
+				LazyColumn(
+					state = listState,
+					modifier = Modifier
+						.fillMaxSize()
+						.clipToBounds(),
+					verticalArrangement = Arrangement.spacedBy(16.dp),
+					contentPadding = PaddingValues(bottom = 64.dp)
+				) {
+					itemsIndexed(rows, key = { rowIndex, row -> "${row.headerText}_$rowIndex" }) { rowIndex, def ->
+						val lifecycle = LocalLifecycleOwner.current.lifecycle
+						val itemsState = rowData[rowIndex] ?: emptyList()
 
-					LaunchedEffect(def) {
-						if (rowAdapters[rowIndex] == null) {
-							val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
-							rowAdapters[rowIndex] = adapter
-							adapter.setRetrieveFinishedListener(object : EmptyResponse(lifecycle) {
-								override fun onResponse() {
-									val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
-									rowData[rowIndex] = loaded
-									if (rowIndex == 0 && selectedItem == null && loaded.isNotEmpty()) {
-										selectedItem = loaded.first()
-										onItemFocused(loaded.first())
-									}
-								}
-							})
-							adapter.Retrieve()
-						}
-					}
-
-					if (itemsState.isNotEmpty()) {
-						Column {
-							Text(
-								text = def.headerText,
-								style = JellyfinTheme.typography.listHeader.copy(color = JellyfinTheme.colorScheme.listHeader),
-								modifier = Modifier.padding(horizontal = 56.dp, vertical = 6.dp)
-							)
-
-							LazyRow(
-								contentPadding = PaddingValues(horizontal = 56.dp),
-								horizontalArrangement = Arrangement.spacedBy(12.dp)
-							) {
-								itemsIndexed(itemsState, key = { index, item -> "${rowIndex}_${item.baseItem?.id}_$index" }) { index, item ->
-									var isFocused by remember { mutableStateOf(false) }
-									val isSelectedItem = (item == selectedItem || (selectedItem == null && rowIndex == 0 && index == 0))
-
-									if (isSelectedItem) {
-										LaunchedEffect(itemsState.isNotEmpty()) {
-											if (itemsState.isNotEmpty() && !hasRequestedFocus) {
-												hasRequestedFocus = true
-												if (selectedItem == null) {
-													selectedItem = itemsState.first()
-													onItemFocused(itemsState.first())
-												}
-												kotlinx.coroutines.delay(100)
-												try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
-											}
+						LaunchedEffect(def) {
+							if (rowAdapters[rowIndex] == null) {
+								val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+								rowAdapters[rowIndex] = adapter
+								adapter.setRetrieveFinishedListener(object : EmptyResponse(lifecycle) {
+									override fun onResponse() {
+										val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
+										rowData[rowIndex] = loaded
+										if (rowIndex == 0 && selectedItem == null && loaded.isNotEmpty()) {
+											selectedItem = loaded.first()
+											onItemFocused(loaded.first())
 										}
 									}
+								})
+								adapter.Retrieve()
+							}
+						}
 
-									Box(
-										modifier = Modifier
-											.zIndex(if (isFocused) 1f else 0f)
-											.then(if (isSelectedItem) Modifier.focusRequester(selectedItemFocusRequester) else Modifier)
-											.onFocusChanged { focusState ->
-												isFocused = focusState.isFocused
-												if (focusState.isFocused) {
-													selectedItem = item
-													if (focusedRowIndex != rowIndex) {
-														focusedRowIndex = rowIndex
-														coroutineScope.launch {
-															listState.animateScrollToItem(rowIndex)
-														}
+						if (itemsState.isNotEmpty()) {
+							Column {
+								Text(
+									text = def.headerText,
+									style = JellyfinTheme.typography.listHeader.copy(color = JellyfinTheme.colorScheme.listHeader),
+									modifier = Modifier.padding(start = 56.dp, end = 56.dp, top = 6.dp, bottom = 12.dp)
+								)
+
+							CompositionLocalProvider(LocalBringIntoViewSpec provides horizontalBringIntoViewSpec) {
+								LazyRow(
+									contentPadding = PaddingValues(horizontal = 56.dp),
+									horizontalArrangement = Arrangement.spacedBy(12.dp)
+								) {
+									itemsIndexed(itemsState, key = { index, item -> "${rowIndex}_${item.baseItem?.id}_$index" }) { index, item ->
+										var isFocused by remember { mutableStateOf(false) }
+										val isSelectedItem = (item == selectedItem || (selectedItem == null && rowIndex == 0 && index == 0))
+
+										if (isSelectedItem) {
+											LaunchedEffect(itemsState.isNotEmpty()) {
+												if (itemsState.isNotEmpty() && !hasRequestedFocus) {
+													hasRequestedFocus = true
+													if (selectedItem == null) {
+														selectedItem = itemsState.first()
+														onItemFocused(itemsState.first())
 													}
-													if (index >= itemsState.size - 3) {
-														rowAdapters[rowIndex]?.loadMoreItemsIfNeeded(index)
-													}
-													onItemFocused(item)
+													kotlinx.coroutines.delay(100)
+													try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
 												}
 											}
-											.clickable(
-												interactionSource = remember { MutableInteractionSource() },
-												indication = null,
-												onClick = {
-													rowAdapters[rowIndex]?.let { adapter ->
-														onItemClick(item, adapter)
+										}
+
+										Box(
+											modifier = Modifier
+												.zIndex(if (isFocused) 1f else 0f)
+												.then(if (isSelectedItem) Modifier.focusRequester(selectedItemFocusRequester) else Modifier)
+												.onFocusChanged { focusState ->
+													isFocused = focusState.isFocused
+													if (focusState.isFocused) {
+														selectedItem = item
+														if (focusedRowIndex != rowIndex) {
+															focusedRowIndex = rowIndex
+															coroutineScope.launch {
+																listState.animateScrollToItem(rowIndex)
+															}
+														}
+														if (index >= itemsState.size - 3) {
+															rowAdapters[rowIndex]?.loadMoreItemsIfNeeded(index)
+														}
+														onItemFocused(item)
 													}
 												}
-											)
-									) {
-										if (item is GridButtonBaseRowItem) {
-											GridButtonCard(
-												item = item,
-												focused = isFocused
-											)
-										} else {
-											BaseRowItemCard(
-												item = item,
-												focused = isFocused,
-												showInfo = false
-											)
+												.clickable(
+													interactionSource = remember { MutableInteractionSource() },
+													indication = null,
+													onClick = {
+														rowAdapters[rowIndex]?.let { adapter ->
+															onItemClick(item, adapter)
+														}
+													}
+												)
+										) {
+											if (item is GridButtonBaseRowItem) {
+												GridButtonCard(
+													item = item,
+													focused = isFocused
+												)
+											} else {
+												BaseRowItemCard(
+													item = item,
+													focused = isFocused,
+													showInfo = false
+												)
+											}
 										}
 									}
 								}
@@ -487,4 +543,5 @@ fun EnhancedBrowseScreen(
 			}
 		}
 	}
+}
 }
