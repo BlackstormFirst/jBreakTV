@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -250,6 +251,7 @@ fun AudioNowPlayingScreen(
 
 							Box(
 								modifier = Modifier
+									.zIndex(if (isFocused) 1f else 0f)
 									.onFocusChanged { focusState ->
 										isFocused = focusState.isFocused
 									}

@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Shape
@@ -67,6 +68,7 @@ fun UserCard(
 
 	Column(
 		modifier = modifier
+			.zIndex(if (focused) 1f else 0f)
 			.scale(scale)
 			.focusable(interactionSource = interactionSource)
 			.clickable(interactionSource = interactionSource, onClick = onClick, indication = null)

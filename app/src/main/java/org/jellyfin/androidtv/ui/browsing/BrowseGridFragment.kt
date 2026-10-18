@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -751,6 +752,7 @@ fun BrowseGridScreen(
 
 							Box(
 								modifier = Modifier
+									.zIndex(if (isFocused) 1f else 0f)
 									.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
 									.onFocusChanged { focusState ->
 										isFocused = focusState.isFocused
@@ -810,6 +812,7 @@ fun BrowseGridScreen(
 
 							Box(
 								modifier = Modifier
+									.zIndex(if (isFocused) 1f else 0f)
 									.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
 									.onFocusChanged { focusState ->
 										isFocused = focusState.isFocused

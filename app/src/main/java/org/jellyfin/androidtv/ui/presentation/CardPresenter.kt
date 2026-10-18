@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -199,7 +200,7 @@ fun BaseRowItemCard(
 		userPreferences[UserPreferences.displayCirclePersonCards]
 	}
 
-	Box(modifier = modifier) {
+	Box(modifier = modifier.zIndex(if (focused) 1f else 0f)) {
 		CardViewHolderContent(
 			item = item,
 			focused = focused,
@@ -501,6 +502,7 @@ private fun CardViewHolderContent(
 			},
 			modifier = Modifier
 				.then(cardSizeModifier)
+				.zIndex(if (focused) 1f else 0f)
 				.graphicsLayer {
 					scaleX = if (focused) 1.15f else 1.0f
 					scaleY = if (focused) 1.15f else 1.0f

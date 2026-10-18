@@ -38,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -390,6 +391,7 @@ fun BrowseFolderScreen(
 
 									Box(
 										modifier = Modifier
+											.zIndex(if (isFocused) 1f else 0f)
 											.then(if (isSelectedItem) Modifier.focusRequester(selectedItemFocusRequester) else Modifier)
 											.onFocusChanged { focusState ->
 												isFocused = focusState.isFocused
