@@ -14,6 +14,7 @@ import org.jellyfin.androidtv.util.sdk.getSubName
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import java.time.format.DateTimeFormatter
 import org.jellyfin.androidtv.constant.ImageType as BaseRowImageType
 
@@ -42,18 +43,21 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 	baseItem = item,
 ) {
 	override val showCardInfoOverlay
-		get() = when (baseItem?.type) {
-			BaseItemKind.FOLDER,
-			BaseItemKind.PHOTO_ALBUM,
-			BaseItemKind.USER_VIEW,
-			BaseItemKind.COLLECTION_FOLDER,
-			BaseItemKind.PHOTO,
-			BaseItemKind.VIDEO,
-			BaseItemKind.PERSON,
-			BaseItemKind.PLAYLIST,
-			BaseItemKind.MUSIC_ARTIST -> true
+		get() = when {
+			baseItem?.id == USB_TILE_UUID -> true
+			baseItem?.type == BaseItemKind.USER_VIEW -> false
+			baseItem?.type == BaseItemKind.COLLECTION_FOLDER -> false
+			else -> when (baseItem?.type) {
+				BaseItemKind.FOLDER,
+				BaseItemKind.PHOTO_ALBUM,
+				BaseItemKind.PHOTO,
+				BaseItemKind.VIDEO,
+				BaseItemKind.PERSON,
+				BaseItemKind.PLAYLIST,
+				BaseItemKind.MUSIC_ARTIST -> true
 
-			else -> false
+				else -> false
+			}
 		}
 
 	override val itemId get() = baseItem?.id

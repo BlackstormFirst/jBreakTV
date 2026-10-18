@@ -502,11 +502,6 @@ private fun CardViewHolderContent(
 			},
 			modifier = Modifier
 				.then(cardSizeModifier)
-				.zIndex(if (focused) 1f else 0f)
-				.graphicsLayer {
-					scaleX = if (focused) 1.15f else 1.0f
-					scaleY = if (focused) 1.15f else 1.0f
-				}
 				.then(if (isCircular) Modifier.clip(CircleShape) else Modifier)
 		)
 	}
@@ -519,6 +514,12 @@ private fun CardViewHolderContent(
 
 		ItemPreview(
 			card = { card() },
+			modifier = Modifier
+				.zIndex(if (focused) 1f else 0f)
+				.graphicsLayer {
+					scaleX = if (focused) 1.15f else 1.0f
+					scaleY = if (focused) 1.15f else 1.0f
+				},
 			title = title?.let { text ->
 				{
 					Text(
@@ -544,6 +545,15 @@ private fun CardViewHolderContent(
 			},
 		)
 	} else {
-		card()
+		Box(
+			modifier = Modifier
+				.zIndex(if (focused) 1f else 0f)
+				.graphicsLayer {
+					scaleX = if (focused) 1.15f else 1.0f
+					scaleY = if (focused) 1.15f else 1.0f
+				}
+		) {
+			card()
+		}
 	}
 }

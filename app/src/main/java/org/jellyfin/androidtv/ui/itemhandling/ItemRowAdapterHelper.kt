@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -940,7 +941,7 @@ fun setItemsStartLetter(
 @JvmOverloads
 fun ItemRowAdapter.refreshItem(
 	api: ApiClient,
-	lifecycleOwner: LifecycleOwner,
+	coroutineScope: CoroutineScope,
 	currentBaseRowItem: BaseRowItem,
 	callback: () -> Unit = {}
 ) {
@@ -948,7 +949,7 @@ fun ItemRowAdapter.refreshItem(
 	if (currentBaseRowItem.baseItem?.id == USB_TILE_UUID) return
 	val currentBaseItem = currentBaseRowItem.baseItem ?: return
 
-	lifecycleOwner.lifecycleScope.launch {
+	coroutineScope.launch {
 		runCatching {
 			withContext(Dispatchers.IO) {
 				api.userLibraryApi.getItem(itemId = currentBaseItem.id).content
@@ -969,13 +970,21 @@ fun ItemRowAdapter.refreshItem(
 						preferSeriesPoster = currentBaseRowItem.preferSeriesPoster
 					)
 				)
+				callback()
 			},
 			onFailure = { err ->
 				if (err is InvalidStatusException && err.status == 404) remove(currentBaseRowItem)
 				else Timber.e(err, "Failed to refresh item")
+				callback()
 			}
 		)
-
-		callback()
 	}
 }
+
+@JvmOverloads
+fun ItemRowAdapter.refreshItem(
+	api: ApiClient,
+	lifecycleOwner: LifecycleOwner,
+	currentBaseRowItem: BaseRowItem,
+	callback: () -> Unit = {}
+) = refreshItem(api, lifecycleOwner.lifecycleScope, currentBaseRowItem, callback)

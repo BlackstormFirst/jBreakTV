@@ -6,7 +6,7 @@ import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.Row
 import androidx.leanback.widget.RowPresenter
-import androidx.lifecycle.LifecycleCoroutineScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.jellyfin.androidtv.data.model.AppNotification
@@ -16,7 +16,7 @@ import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 
 class NotificationsHomeFragmentRow(
-	lifecycleScope: LifecycleCoroutineScope,
+	coroutineScope: CoroutineScope,
 	private val notificationsRepository: NotificationsRepository,
 ) : HomeFragmentRow, OnItemViewClickedListener {
 	private val announcementAdapter by lazy { MutableObjectAdapter<AppNotification>(AppNotificationPresenter()) }
@@ -28,7 +28,7 @@ class NotificationsHomeFragmentRow(
 		notificationsRepository.notifications.onEach { notifications ->
 			announcementAdapter.replaceAll(notifications)
 			update(notifications.isEmpty())
-		}.launchIn(lifecycleScope)
+		}.launchIn(coroutineScope)
 	}
 
 	private fun update(empty: Boolean) {
