@@ -108,6 +108,9 @@ class FullDetailsFragment : Fragment() {
                                 playbackHelper.retrieveAndPlay(item.id, true, requireContext())
                             }
                         },
+                        onPreviousEpisodeClick = { prevId ->
+                            navigationRepository.navigate(Destinations.itemDetails(prevId), true)
+                        },
                         onGoToSeriesClick = {
                             state.item?.seriesId?.let { seriesId ->
                                 navigationRepository.navigate(Destinations.itemDetails(seriesId))

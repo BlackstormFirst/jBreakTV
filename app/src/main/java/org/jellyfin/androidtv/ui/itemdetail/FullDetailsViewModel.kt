@@ -35,6 +35,7 @@ import org.jellyfin.androidtv.util.sdk.compat.canResume
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
+import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.sockets.subscribe
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -69,6 +70,7 @@ data class FullDetailsUiState(
     val writerText: String? = null,
     val genresText: String? = null,
     val canDelete: Boolean = false,
+    val prevItemId: UUID? = null,
     val rows: List<DetailsRowState> = emptyList()
 )
 
@@ -165,6 +167,20 @@ class FullDetailsViewModel(
 
             val canDel = currentUser.policy?.enableContentDeletion == true && baseItem.canDelete == true
 
+            // Fetch previous episode ID for EPISODE (Leanback mPrevItemId)
+            val previousEpisodeId = if (baseItem.type == BaseItemKind.EPISODE && baseItem.seriesId != null) {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val response = api.tvShowsApi.getEpisodes(
+                            seriesId = baseItem.seriesId!!,
+                            adjacentTo = baseItem.id
+                        ).content
+                        val currentIndex = response.items.indexOfFirst { it.id == baseItem.id }
+                        if (currentIndex > 0) response.items.getOrNull(currentIndex - 1)?.id else null
+                    }.getOrNull()
+                }
+            } else null
+
             _uiState.value = FullDetailsUiState(
                 isLoading = false,
                 item = baseItem,
@@ -176,7 +192,8 @@ class FullDetailsViewModel(
                 directorText = directors,
                 writerText = writers,
                 genresText = genres,
-                canDelete = canDel
+                canDelete = canDel,
+                prevItemId = previousEpisodeId
             )
 
             loadAdditionalRows(context, baseItem, userId)

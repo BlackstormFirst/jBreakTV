@@ -83,6 +83,7 @@ import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.compose.koinInject
+import java.util.UUID
 
 /**
  * Unified BringIntoViewSpec for 10-foot TV navigation matching Leanback VerticalGridView & HorizontalGridView:
@@ -115,7 +116,7 @@ private fun rememberTvPivotBringIntoViewSpec(listState: LazyListState): BringInt
                     }
                 }
 
-                // Vertical LazyColumn pass for Item 0 (Header / Action Buttons when at top):
+                // Vertical LazyColumn scroll distance pass for Item 0 (Header / Action Buttons when at top):
                 // Do NOT scroll if currently at top offset 0 and focusing header/buttons
                 if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 && offset < containerSize * 0.45f) {
                     return 0f
@@ -331,6 +332,7 @@ fun VideoDetailsScreen(
     onTrailerClick: () -> Unit,
     onQueueClick: () -> Unit,
     onShuffleClick: () -> Unit,
+    onPreviousEpisodeClick: (UUID) -> Unit,
     onGoToSeriesClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onHomeClick: () -> Unit,
@@ -559,7 +561,8 @@ fun VideoDetailsScreen(
 
                                 Spacer(Modifier.height(16.dp))
 
-                                // Action Buttons Row using TextUnderButton
+                                // Action Buttons Row using TextUnderButton in exact Leanback order:
+                                // 1. Resume -> 2. Play -> 3. Queue -> 4. Shuffle -> 5. Trailers -> 6. Watched -> 7. Favorite -> 8. Previous Episode -> 9. GoToSeries -> 10. Delete
                                 LazyRow(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalAlignment = Alignment.Top,
@@ -568,81 +571,96 @@ fun VideoDetailsScreen(
                                         .focusGroup()
                                         .focusRestorer()
                                 ) {
-                                    if (!isPerson) {
-                                        if (state.canResume) {
-                                            item {
-                                                val resumeLabel = if (!state.resumePositionText.isNullOrEmpty()) {
-                                                    stringResource(R.string.lbl_resume_from, state.resumePositionText)
-                                                } else {
-                                                    stringResource(R.string.home_section_resume)
-                                                }
-
-                                                TextUnderButton(
-                                                    iconRes = R.drawable.ic_resume,
-                                                    label = resumeLabel,
-                                                    onClick = onResumeClick,
-                                                    onFocused = { scrollToHeaderTop() },
-                                                    modifier = Modifier.focusRequester(initialPlayButtonFocusRequester)
-                                                )
-                                            }
-                                        }
-
+                                    // 1. Resume
+                                    if (state.canResume && !isPerson) {
                                         item {
+                                            val resumeLabel = if (!state.resumePositionText.isNullOrEmpty()) {
+                                                stringResource(R.string.lbl_resume_from, state.resumePositionText)
+                                            } else {
+                                                stringResource(R.string.home_section_resume)
+                                            }
+
+                                            TextUnderButton(
+                                                iconRes = R.drawable.ic_resume,
+                                                label = resumeLabel,
+                                                onClick = onResumeClick,
+                                                onFocused = { scrollToHeaderTop() },
+                                                modifier = Modifier.focusRequester(initialPlayButtonFocusRequester)
+                                            )
+                                        }
+                                    }
+
+                                    // 2. Play
+                                    if (!isPerson) {
+                                        item {
+                                            val playLabel = if (item.type == BaseItemKind.SERIES) {
+                                                stringResource(R.string.lbl_play_next_up)
+                                            } else if (item.isFolder == true) {
+                                                stringResource(R.string.lbl_play_all)
+                                            } else {
+                                                stringResource(R.string.lbl_play)
+                                            }
+
                                             TextUnderButton(
                                                 iconRes = R.drawable.ic_play,
-                                                label = stringResource(if (item.type == BaseItemKind.SERIES) R.string.lbl_play_next_up else R.string.lbl_play),
+                                                label = playLabel,
                                                 onClick = onPlayClick,
                                                 onFocused = { scrollToHeaderTop() },
                                                 modifier = if (!state.canResume) Modifier.focusRequester(initialPlayButtonFocusRequester) else Modifier
                                             )
                                         }
+                                    }
 
-                                        if (hasTrailers) {
-                                            item {
-                                                TextUnderButton(
-                                                    iconRes = R.drawable.ic_trailer,
-                                                    label = stringResource(R.string.lbl_play_trailers),
-                                                    onClick = onTrailerClick,
-                                                    onFocused = { scrollToHeaderTop() }
-                                                )
-                                            }
-                                        }
-
-                                        if (isMusic) {
-                                            item {
-                                                TextUnderButton(
-                                                    iconRes = R.drawable.ic_add,
-                                                    label = stringResource(R.string.lbl_add_to_queue),
-                                                    onClick = onQueueClick,
-                                                    onFocused = { scrollToHeaderTop() }
-                                                )
-                                            }
-                                        }
-
-                                        if (isFolderOrMusic) {
-                                            item {
-                                                TextUnderButton(
-                                                    iconRes = R.drawable.ic_shuffle,
-                                                    label = stringResource(R.string.lbl_shuffle_all),
-                                                    onClick = onShuffleClick,
-                                                    onFocused = { scrollToHeaderTop() }
-                                                )
-                                            }
-                                        }
-
-                                        if (item.type == BaseItemKind.EPISODE && item.seriesId != null) {
-                                            item {
-                                                TextUnderButton(
-                                                    iconRes = R.drawable.ic_tv,
-                                                    label = stringResource(R.string.lbl_goto_series),
-                                                    onClick = onGoToSeriesClick,
-                                                    onFocused = { scrollToHeaderTop() }
-                                                )
-                                            }
+                                    // 3. Add to Queue (Music)
+                                    if (isMusic && !isPerson) {
+                                        item {
+                                            TextUnderButton(
+                                                iconRes = R.drawable.ic_add,
+                                                label = stringResource(R.string.lbl_add_to_queue),
+                                                onClick = onQueueClick,
+                                                onFocused = { scrollToHeaderTop() }
+                                            )
                                         }
                                     }
 
-                                    // Favorite button is shown for all items including PERSON
+                                    // 4. Shuffle (Folder or Music)
+                                    if (isFolderOrMusic && !isPerson) {
+                                        item {
+                                            TextUnderButton(
+                                                iconRes = R.drawable.ic_shuffle,
+                                                label = stringResource(R.string.lbl_shuffle_all),
+                                                onClick = onShuffleClick,
+                                                onFocused = { scrollToHeaderTop() }
+                                            )
+                                        }
+                                    }
+
+                                    // 5. Trailers
+                                    if (hasTrailers && !isPerson) {
+                                        item {
+                                            TextUnderButton(
+                                                iconRes = R.drawable.ic_trailer,
+                                                label = stringResource(R.string.lbl_play_trailers),
+                                                onClick = onTrailerClick,
+                                                onFocused = { scrollToHeaderTop() }
+                                            )
+                                        }
+                                    }
+
+                                    // 6. Watched (Vu)
+                                    if (!isPerson) {
+                                        item {
+                                            TextUnderButton(
+                                                iconRes = R.drawable.ic_check,
+                                                label = stringResource(R.string.lbl_watched),
+                                                onClick = onPlayedClick,
+                                                onFocused = { scrollToHeaderTop() },
+                                                isActivated = state.isPlayed
+                                            )
+                                        }
+                                    }
+
+                                    // 7. Favorite (Favori - shown for all including PERSON)
                                     item {
                                         TextUnderButton(
                                             iconRes = R.drawable.ic_star,
@@ -654,26 +672,40 @@ fun VideoDetailsScreen(
                                         )
                                     }
 
-                                    if (!isPerson) {
+                                    // 8. Previous Episode (Épisode précédent - matching Leanback mPrevButton)
+                                    if (item.type == BaseItemKind.EPISODE && state.prevItemId != null && !isPerson) {
                                         item {
+                                            val prevId = state.prevItemId
                                             TextUnderButton(
-                                                iconRes = R.drawable.ic_check,
-                                                label = stringResource(R.string.lbl_watched),
-                                                onClick = onPlayedClick,
-                                                onFocused = { scrollToHeaderTop() },
-                                                isActivated = state.isPlayed
+                                                iconRes = R.drawable.ic_previous_episode,
+                                                label = stringResource(R.string.lbl_previous_episode),
+                                                onClick = { onPreviousEpisodeClick(prevId) },
+                                                onFocused = { scrollToHeaderTop() }
                                             )
                                         }
+                                    }
 
-                                        if (state.canDelete) {
-                                            item {
-                                                TextUnderButton(
-                                                    iconRes = R.drawable.ic_delete,
-                                                    label = stringResource(R.string.lbl_delete),
-                                                    onClick = onDeleteClick,
-                                                    onFocused = { scrollToHeaderTop() }
-                                                )
-                                            }
+                                    // 9. Go to Series (Episode)
+                                    if (item.type == BaseItemKind.EPISODE && item.seriesId != null && !isPerson) {
+                                        item {
+                                            TextUnderButton(
+                                                iconRes = R.drawable.ic_tv,
+                                                label = stringResource(R.string.lbl_goto_series),
+                                                onClick = onGoToSeriesClick,
+                                                onFocused = { scrollToHeaderTop() }
+                                            )
+                                        }
+                                    }
+
+                                    // 10. Delete
+                                    if (state.canDelete && !isPerson) {
+                                        item {
+                                            TextUnderButton(
+                                                iconRes = R.drawable.ic_delete,
+                                                label = stringResource(R.string.lbl_delete),
+                                                onClick = onDeleteClick,
+                                                onFocused = { scrollToHeaderTop() }
+                                            )
                                         }
                                     }
                                 }
