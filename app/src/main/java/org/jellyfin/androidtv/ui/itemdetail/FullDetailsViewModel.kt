@@ -1,0 +1,522 @@
+package org.jellyfin.androidtv.ui.itemdetail
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.auth.repository.UserRepository
+import org.jellyfin.androidtv.constant.QueryType
+import org.jellyfin.androidtv.data.model.DataRefreshService
+import org.jellyfin.androidtv.data.querying.GetAdditionalPartsRequest
+import org.jellyfin.androidtv.data.querying.GetNextEpisodesRequest
+import org.jellyfin.androidtv.data.querying.GetSpecialsRequest
+import org.jellyfin.androidtv.data.querying.GetTrailersRequest
+import org.jellyfin.androidtv.data.repository.ItemMutationRepository
+import org.jellyfin.androidtv.data.repository.ItemRepository
+import org.jellyfin.androidtv.ui.browsing.BrowseRowAdapterFactory
+import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
+import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
+import org.jellyfin.androidtv.ui.presentation.CardPresenter
+import org.jellyfin.androidtv.util.TimeUtils
+import org.jellyfin.androidtv.util.getTimeFormatter
+import org.jellyfin.androidtv.util.sdk.buildChapterItems
+import org.jellyfin.androidtv.util.sdk.compat.canResume
+import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.extensions.itemsApi
+import org.jellyfin.sdk.api.client.extensions.libraryApi
+import org.jellyfin.sdk.api.client.extensions.userLibraryApi
+import org.jellyfin.sdk.api.sockets.subscribe
+import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.ItemFields
+import org.jellyfin.sdk.model.api.LibraryChangedMessage
+import org.jellyfin.sdk.model.api.PersonKind
+import org.jellyfin.sdk.model.api.UserDataChangedMessage
+import org.jellyfin.sdk.model.api.request.GetItemsRequest
+import org.jellyfin.sdk.model.api.request.GetNextUpRequest
+import org.jellyfin.sdk.model.api.request.GetSeasonsRequest
+import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
+import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
+import java.time.Instant
+import java.time.LocalDateTime
+import java.util.UUID
+
+data class DetailsRowState(
+    val title: String,
+    val adapter: ItemRowAdapter
+)
+
+data class FullDetailsUiState(
+    val isLoading: Boolean = true,
+    val item: BaseItemDto? = null,
+    val isFavorite: Boolean = false,
+    val isPlayed: Boolean = false,
+    val canResume: Boolean = false,
+    val resumePositionText: String? = null,
+    val endTimeText: String? = null,
+    val directorText: String? = null,
+    val writerText: String? = null,
+    val genresText: String? = null,
+    val canDelete: Boolean = false,
+    val rows: List<DetailsRowState> = emptyList()
+)
+
+class FullDetailsViewModel(
+    private val api: ApiClient,
+    private val userRepository: UserRepository,
+    private val itemMutationRepository: ItemMutationRepository,
+    private val dataRefreshService: DataRefreshService
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(FullDetailsUiState())
+    val uiState: StateFlow<FullDetailsUiState> = _uiState.asStateFlow()
+
+    private var currentItemId: UUID? = null
+
+    init {
+        // Subscribe to real-time WebSockets
+        viewModelScope.launch {
+            api.webSocket.subscribe<UserDataChangedMessage>()
+                .onEach { message ->
+                    val changedData = message.data
+                    val itemId = currentItemId
+                    if (itemId != null && changedData?.userDataList?.any { it.itemId == itemId } == true) {
+                        dataRefreshService.lastPlayback = Instant.now()
+                    }
+                }
+                .launchIn(this)
+
+            api.webSocket.subscribe<LibraryChangedMessage>()
+                .onEach {
+                    dataRefreshService.lastLibraryChange = Instant.now()
+                }
+                .launchIn(this)
+        }
+    }
+
+    fun loadItem(context: Context, itemId: UUID) {
+        currentItemId = itemId
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            val currentUser = userRepository.currentUser.filterNotNull().first()
+            val userId = currentUser.id
+
+            val baseItem = withContext(Dispatchers.IO) {
+                runCatching {
+                    val response = api.itemsApi.getItems(
+                        userId = userId,
+                        ids = listOf(itemId),
+                        fields = setOf(
+                            ItemFields.CAN_DELETE,
+                            ItemFields.CHAPTERS,
+                            ItemFields.CHILD_COUNT,
+                            ItemFields.CUMULATIVE_RUN_TIME_TICKS,
+                            ItemFields.DATE_CREATED,
+                            ItemFields.GENRES,
+                            ItemFields.ITEM_COUNTS,
+                            ItemFields.MEDIA_SOURCES,
+                            ItemFields.MEDIA_STREAMS,
+                            ItemFields.OVERVIEW,
+                            ItemFields.PEOPLE,
+                            ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
+                            ItemFields.TAGLINES
+                        )
+                    ).content
+                    response.items.firstOrNull() ?: api.userLibraryApi.getItem(itemId = itemId).content
+                }.getOrElse {
+                    runCatching {
+                        api.userLibraryApi.getItem(itemId = itemId).content
+                    }.getOrNull()
+                }
+            }
+
+            if (baseItem == null) {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                return@launch
+            }
+
+            val isFav = baseItem.userData?.isFavorite ?: false
+            val isPl = baseItem.userData?.played ?: false
+            val canRes = baseItem.canResume
+
+            val resumeText = if (canRes) {
+                val ticks = baseItem.userData?.playbackPositionTicks ?: 0L
+                val millis = ticks / 10000
+                TimeUtils.formatMillis(millis)
+            } else null
+
+            val endTimeText = calculateEndTime(context, baseItem)
+
+            val directors = baseItem.people?.filter { it.type == PersonKind.DIRECTOR }?.mapNotNull { it.name }?.joinToString(", ")
+            val writers = baseItem.people?.filter { it.type == PersonKind.WRITER }?.mapNotNull { it.name }?.joinToString(", ")
+            val genres = baseItem.genres?.joinToString(" / ")
+
+            val canDel = currentUser.policy?.enableContentDeletion == true && baseItem.canDelete == true
+
+            _uiState.value = FullDetailsUiState(
+                isLoading = false,
+                item = baseItem,
+                isFavorite = isFav,
+                isPlayed = isPl,
+                canResume = canRes,
+                resumePositionText = resumeText,
+                endTimeText = endTimeText,
+                directorText = directors,
+                writerText = writers,
+                genresText = genres,
+                canDelete = canDel
+            )
+
+            loadAdditionalRows(context, baseItem, userId)
+        }
+    }
+
+    private fun calculateEndTime(context: Context, baseItem: BaseItemDto): String? {
+        val runtimeTicks = baseItem.runTimeTicks ?: return null
+        if (runtimeTicks <= 0) return null
+
+        val currentPos = baseItem.userData?.playbackPositionTicks ?: 0L
+        val remainingTicks = (runtimeTicks - currentPos).coerceAtLeast(0L)
+        val endTime = LocalDateTime.now().plusNanos(remainingTicks * 100)
+        return context.getTimeFormatter().format(endTime)
+    }
+
+    private fun loadAdditionalRows(context: Context, baseItem: BaseItemDto, userId: UUID) {
+        viewModelScope.launch {
+            val rows = mutableListOf<DetailsRowState>()
+
+            when (baseItem.type) {
+                BaseItemKind.MOVIE -> {
+                    // Additional Parts
+                    if ((baseItem.partCount ?: 0) > 0) {
+                        runCatching {
+                            val query = GetAdditionalPartsRequest(baseItem.id)
+                            val adapter = ItemRowAdapter(context, query, CardPresenter(), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_additional_parts), adapter))
+                        }
+                    }
+
+                    // Cast / Crew
+                    baseItem.people?.takeIf { it.isNotEmpty() }?.let { peopleList ->
+                        runCatching {
+                            val adapter = ItemRowAdapter(peopleList, context, CardPresenter(true, 130), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                        }
+                    }
+
+                    // Chapters
+                    baseItem.chapters?.takeIf { it.isNotEmpty() }?.let {
+                        runCatching {
+                            val chapterItems = baseItem.buildChapterItems()
+                            val adapter = ItemRowAdapter(context, chapterItems, CardPresenter(true, 120), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_chapters), adapter))
+                        }
+                    }
+
+                    // Specials
+                    if ((baseItem.specialFeatureCount ?: 0) > 0) {
+                        runCatching {
+                            val query = GetSpecialsRequest(baseItem.id)
+                            val adapter = ItemRowAdapter(context, query, CardPresenter(), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
+                        }
+                    }
+
+                    // Trailers
+                    if ((baseItem.localTrailerCount ?: 0) > 1) {
+                        runCatching {
+                            val query = GetTrailersRequest(baseItem.id)
+                            val adapter = ItemRowAdapter(context, query, CardPresenter(), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_trailers), adapter))
+                        }
+                    }
+
+                    // Similar Movies
+                    runCatching {
+                        val similarQuery = GetSimilarItemsRequest(itemId = baseItem.id, userId = userId, limit = 12, fields = ItemRepository.browseFields)
+                        val similarDef = BrowseRowDef(context.getString(R.string.lbl_more_like_this), similarQuery, QueryType.SimilarMovies)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, similarDef)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
+                    }
+                }
+
+                BaseItemKind.TRAILER -> {
+                    // Cast / Crew
+                    baseItem.people?.takeIf { it.isNotEmpty() }?.let { peopleList ->
+                        runCatching {
+                            val adapter = ItemRowAdapter(peopleList, context, CardPresenter(true, 130), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                        }
+                    }
+
+                    // Similar Trailers
+                    runCatching {
+                        val similarQuery = GetSimilarItemsRequest(itemId = baseItem.id, userId = userId, limit = 12, fields = ItemRepository.browseFields)
+                        val similarDef = BrowseRowDef(context.getString(R.string.lbl_more_like_this), similarQuery, QueryType.SimilarMovies)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, similarDef)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
+                    }
+                }
+
+                BaseItemKind.SERIES -> {
+                    // Next Up
+                    runCatching {
+                        val nextUpQuery = GetNextUpRequest(seriesId = baseItem.id, userId = userId, fields = ItemRepository.nextUpFields)
+                        val adapter = ItemRowAdapter(context, nextUpQuery, false, CardPresenter(true, 130), null)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_next_up), adapter))
+                    }
+
+                    // Seasons
+                    runCatching {
+                        val seasonsQuery = GetSeasonsRequest(seriesId = baseItem.id, userId = userId, fields = ItemRepository.browseFields)
+                        val adapter = ItemRowAdapter(context, seasonsQuery, CardPresenter(), null)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_seasons), adapter))
+                    }
+
+                    // Upcoming Episodes
+                    runCatching {
+                        val upcomingQuery = GetUpcomingEpisodesRequest(parentId = baseItem.id, userId = userId, fields = ItemRepository.browseFields)
+                        val adapter = ItemRowAdapter(context, upcomingQuery, CardPresenter(), null)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_upcoming), adapter))
+                    }
+
+                    // Specials
+                    if ((baseItem.specialFeatureCount ?: 0) > 0) {
+                        runCatching {
+                            val query = GetSpecialsRequest(baseItem.id)
+                            val adapter = ItemRowAdapter(context, query, CardPresenter(), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
+                        }
+                    }
+
+                    // Cast / Crew
+                    baseItem.people?.takeIf { it.isNotEmpty() }?.let { peopleList ->
+                        runCatching {
+                            val adapter = ItemRowAdapter(peopleList, context, CardPresenter(true, 130), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                        }
+                    }
+
+                    // Similar Series
+                    runCatching {
+                        val similarQuery = GetSimilarItemsRequest(itemId = baseItem.id, userId = userId, limit = 12, fields = ItemRepository.browseFields)
+                        val similarDef = BrowseRowDef(context.getString(R.string.lbl_more_like_this), similarQuery, QueryType.SimilarSeries)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, similarDef)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
+                    }
+                }
+
+                BaseItemKind.SEASON -> {
+                    // Episodes of this Season
+                    runCatching {
+                        val query = GetItemsRequest(parentId = baseItem.id, userId = userId, fields = ItemRepository.browseFields)
+                        val def = BrowseRowDef(context.getString(R.string.lbl_episodes), query, 0)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_episodes), adapter))
+                    }
+
+                    // Seasons of parent Series (if seriesId present)
+                    baseItem.seriesId?.let { seriesId ->
+                        runCatching {
+                            val seasonsQuery = GetSeasonsRequest(seriesId = seriesId, userId = userId, fields = ItemRepository.browseFields)
+                            val adapter = ItemRowAdapter(context, seasonsQuery, CardPresenter(), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_seasons), adapter))
+                        }
+                    }
+
+                    // Cast / Crew
+                    baseItem.people?.takeIf { it.isNotEmpty() }?.let { peopleList ->
+                        runCatching {
+                            val adapter = ItemRowAdapter(peopleList, context, CardPresenter(true, 130), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                        }
+                    }
+                }
+
+                BaseItemKind.EPISODE -> {
+                    // Additional Parts
+                    if ((baseItem.partCount ?: 0) > 0) {
+                        runCatching {
+                            val query = GetAdditionalPartsRequest(baseItem.id)
+                            val adapter = ItemRowAdapter(context, query, CardPresenter(), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_additional_parts), adapter))
+                        }
+                    }
+
+                    // Next Episode
+                    if (baseItem.seasonId != null && baseItem.seriesId != null) {
+                        runCatching {
+                            val query = GetNextEpisodesRequest(baseItem.seriesId!!, baseItem.seasonId!!, baseItem.id)
+                            val adapter = ItemRowAdapter(context, query, true, CardPresenter(true, 120), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_next_episode), adapter))
+                        }
+                    }
+
+                    // Guest Stars (matching Leanback: only PersonKind.GUEST_STAR)
+                    baseItem.people?.filter { it.type == PersonKind.GUEST_STAR }?.takeIf { it.isNotEmpty() }?.let { guests ->
+                        runCatching {
+                            val adapter = ItemRowAdapter(guests, context, CardPresenter(true, 130), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_guest_stars), adapter))
+                        }
+                    }
+
+                    // Chapters
+                    baseItem.chapters?.takeIf { it.isNotEmpty() }?.let {
+                        runCatching {
+                            val chapterItems = baseItem.buildChapterItems()
+                            val adapter = ItemRowAdapter(context, chapterItems, CardPresenter(true, 120), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_chapters), adapter))
+                        }
+                    }
+                }
+
+                BaseItemKind.PERSON -> {
+                    // Movies
+                    runCatching {
+                        val query = GetItemsRequest(personIds = listOf(baseItem.id), includeItemTypes = listOf(BaseItemKind.MOVIE), userId = userId, fields = ItemRepository.browseFields)
+                        val def = BrowseRowDef(context.getString(R.string.lbl_movies), query, 100)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_movies), adapter))
+                    }
+
+                    // TV Series
+                    runCatching {
+                        val query = GetItemsRequest(personIds = listOf(baseItem.id), includeItemTypes = listOf(BaseItemKind.SERIES), userId = userId, fields = ItemRepository.browseFields)
+                        val def = BrowseRowDef(context.getString(R.string.lbl_tv_series), query, 100)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_tv_series), adapter))
+                    }
+
+                    // Episodes
+                    runCatching {
+                        val query = GetItemsRequest(personIds = listOf(baseItem.id), includeItemTypes = listOf(BaseItemKind.EPISODE), userId = userId, fields = ItemRepository.browseFields)
+                        val def = BrowseRowDef(context.getString(R.string.lbl_episodes), query, 100)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_episodes), adapter))
+                    }
+                }
+
+                BaseItemKind.MUSIC_ARTIST -> {
+                    // Albums
+                    runCatching {
+                        val query = GetItemsRequest(artistIds = listOf(baseItem.id), includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM), userId = userId, fields = ItemRepository.browseFields)
+                        val def = BrowseRowDef(context.getString(R.string.lbl_albums), query, 100)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_albums), adapter))
+                    }
+                }
+
+                BaseItemKind.MUSIC_ALBUM -> {
+                    // Songs
+                    runCatching {
+                        val query = GetItemsRequest(parentId = baseItem.id, includeItemTypes = listOf(BaseItemKind.AUDIO), userId = userId, fields = ItemRepository.browseFields)
+                        val def = BrowseRowDef(context.getString(R.string.lbl_songs), query, 100)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_songs), adapter))
+                    }
+
+                    // Cast / Crew
+                    baseItem.people?.takeIf { it.isNotEmpty() }?.let { peopleList ->
+                        runCatching {
+                            val adapter = ItemRowAdapter(peopleList, context, CardPresenter(true, 130), null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                        }
+                    }
+                }
+
+                BaseItemKind.BOX_SET, BaseItemKind.PLAYLIST -> {
+                    // Items in Collection / Playlist
+                    runCatching {
+                        val query = GetItemsRequest(parentId = baseItem.id, userId = userId, fields = ItemRepository.browseFields)
+                        val def = BrowseRowDef(context.getString(R.string.lbl_items), query, 100)
+                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        adapter.Retrieve()
+                        rows.add(DetailsRowState(context.getString(R.string.lbl_items), adapter))
+                    }
+                }
+
+                else -> Unit
+            }
+
+            _uiState.value = _uiState.value.copy(rows = rows)
+        }
+    }
+
+    fun toggleFavorite() {
+        val currentItem = _uiState.value.item ?: return
+        val newFav = !_uiState.value.isFavorite
+        viewModelScope.launch {
+            runCatching {
+                itemMutationRepository.setFavorite(currentItem.id, newFav)
+                _uiState.value = _uiState.value.copy(isFavorite = newFav)
+                dataRefreshService.lastFavoriteUpdate = Instant.now()
+            }
+        }
+    }
+
+    fun togglePlayed() {
+        val currentItem = _uiState.value.item ?: return
+        val newPlayed = !_uiState.value.isPlayed
+        viewModelScope.launch {
+            runCatching {
+                itemMutationRepository.setPlayed(currentItem.id, newPlayed)
+                _uiState.value = _uiState.value.copy(
+                    isPlayed = newPlayed,
+                    canResume = if (newPlayed) false else _uiState.value.canResume
+                )
+                dataRefreshService.lastPlayback = Instant.now()
+            }
+        }
+    }
+
+    fun deleteCurrentItem(onSuccess: () -> Unit) {
+        val currentItem = _uiState.value.item ?: return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    api.libraryApi.deleteItem(currentItem.id)
+                }
+                dataRefreshService.lastDeletedItemId = currentItem.id
+                onSuccess()
+            }
+        }
+    }
+}
