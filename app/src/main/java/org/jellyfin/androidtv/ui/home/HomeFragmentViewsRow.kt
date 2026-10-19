@@ -63,14 +63,14 @@ class HomeFragmentViewsRow(
 		return row
 	}
 
-	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
+	override fun addRows(context: Context, cardPresenter: CardPresenter, onRowAdded: (ListRow) -> Unit, onRowRemoved: (ListRow) -> Unit) {
 		val presenter = if (small) smallCardPresenter else largeCardPresenter
-		val rowAdapter = ItemRowAdapter(context, GetUserViewsRequest, presenter, rowsAdapter)
+		val rowAdapter = ItemRowAdapter(context, GetUserViewsRequest, presenter, null)
 
 		val header = HeaderItem(context.getString(R.string.lbl_my_media))
 		val row = ListRow(header, rowAdapter)
 		rowAdapter.setRow(row)
 		rowAdapter.Retrieve()
-		rowsAdapter.add(row)
+		onRowAdded(row)
 	}
 }

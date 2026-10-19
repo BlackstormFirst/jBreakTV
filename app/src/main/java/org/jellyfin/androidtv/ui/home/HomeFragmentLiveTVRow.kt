@@ -18,8 +18,8 @@ class HomeFragmentLiveTVRow(
 	private val context: Context,
 	private val userRepository: UserRepository,
 ) : HomeFragmentRow {
-	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
-		val header = HeaderItem(rowsAdapter.size().toLong(), context.getString(R.string.pref_live_tv_cat))
+	override fun addRows(context: Context, cardPresenter: CardPresenter, onRowAdded: (ListRow) -> Unit, onRowRemoved: (ListRow) -> Unit) {
+		val header = HeaderItem(context.getString(R.string.pref_live_tv_cat))
 		val adapter = ArrayObjectAdapter(GridButtonPresenter())
 
 		// Live TV Guide button
@@ -33,6 +33,6 @@ class HomeFragmentLiveTVRow(
 			adapter.add(GridButton(LiveTvOption.LIVE_TV_SERIES_OPTION_ID, context.getString(R.string.lbl_series)))
 		}
 
-		rowsAdapter.add(ListRow(header, adapter))
+		onRowAdded(ListRow(header, adapter))
 	}
 }

@@ -18,26 +18,32 @@ class HomeFragmentNowPlayingRow(
 	private val mediaManager: MediaManager,
 ) : HomeFragmentRow {
 	var row: ListRow? = null
+	private var onRowAdded: ((ListRow) -> Unit)? = null
+	private var onRowRemoved: ((ListRow) -> Unit)? = null
 
-	override fun addToRowsAdapter(
+	override fun addRows(
 		context: Context,
 		cardPresenter: CardPresenter,
-		rowsAdapter: MutableObjectAdapter<Row>
+		onRowAdded: (ListRow) -> Unit,
+		onRowRemoved: (ListRow) -> Unit
 	) {
-		update(context, rowsAdapter)
+		this.onRowAdded = onRowAdded
+		this.onRowRemoved = onRowRemoved
+		update(context)
 	}
 
-	fun update(context: Context, rowsAdapter: MutableObjectAdapter<Row>) {
+	fun update(context: Context) {
 		if (mediaManager.hasAudioQueueItems()) {
 			// Ensure row exists
-			if (row == null) row = ListRow(
-				HeaderItem(context.getString(R.string.lbl_now_playing)),
-				AudioQueueBaseRowAdapter(playbackManager, coroutineScope)
-			)
-			// Add row if it wasn't added already
-			if (!rowsAdapter.contains(row!!)) rowsAdapter.add(0, row!!)
+			if (row == null) {
+				row = ListRow(
+					HeaderItem(context.getString(R.string.lbl_now_playing)),
+					AudioQueueBaseRowAdapter(playbackManager, coroutineScope)
+				)
+				onRowAdded?.invoke(row!!)
+			}
 		} else if (row != null) {
-			rowsAdapter.remove(row!!)
+			onRowRemoved?.invoke(row!!)
 			row = null
 		}
 	}

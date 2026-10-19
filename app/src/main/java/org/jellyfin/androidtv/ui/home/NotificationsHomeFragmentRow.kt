@@ -21,8 +21,9 @@ class NotificationsHomeFragmentRow(
 ) : HomeFragmentRow, OnItemViewClickedListener {
 	private val announcementAdapter by lazy { MutableObjectAdapter<AppNotification>(AppNotificationPresenter()) }
 	val listRow by lazy { ListRow(null, announcementAdapter) }
-	private var rowsAdapter: MutableObjectAdapter<Row>? = null
 	private var rowAdded = false
+	private var onRowAdded: ((ListRow) -> Unit)? = null
+	private var onRowRemoved: ((ListRow) -> Unit)? = null
 
 	init {
 		notificationsRepository.notifications.onEach { notifications ->
@@ -32,21 +33,22 @@ class NotificationsHomeFragmentRow(
 	}
 
 	private fun update(empty: Boolean) {
-		if (rowsAdapter == null) return
+		if (onRowAdded == null) return
 
 		if (empty && rowAdded) {
-			rowsAdapter?.remove(listRow)
+			onRowRemoved?.invoke(listRow)
 			rowAdded = false
 		}
 
 		if (!empty && !rowAdded) {
-			rowsAdapter?.add(0, listRow)
+			onRowAdded?.invoke(listRow)
 			rowAdded = true
 		}
 	}
 
-	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
-		this.rowsAdapter = rowsAdapter
+	override fun addRows(context: Context, cardPresenter: CardPresenter, onRowAdded: (ListRow) -> Unit, onRowRemoved: (ListRow) -> Unit) {
+		this.onRowAdded = onRowAdded
+		this.onRowRemoved = onRowRemoved
 		update(notificationsRepository.notifications.value.isEmpty())
 	}
 

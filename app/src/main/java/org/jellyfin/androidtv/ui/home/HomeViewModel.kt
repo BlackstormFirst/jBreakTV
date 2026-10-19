@@ -84,8 +84,8 @@ class HomeViewModel(
 
     private val helper by lazy { HomeFragmentHelper(context, userRepository, userPreferences) }
 
-    private val rowsAdapter = MutableObjectAdapter<Row>()
-    private val rowSectionIndices = mutableMapOf<Row, Int>()
+    private val _rows = mutableListOf<ListRow>()
+    private val rowSectionIndices = mutableMapOf<ListRow, Int>()
 
     private val notificationsRow by lazy { NotificationsHomeFragmentRow(viewModelScope, notificationsRepository) }
     private val nowPlaying by lazy { HomeFragmentNowPlayingRow(viewModelScope, playbackManager, mediaManager) }
@@ -104,18 +104,24 @@ class HomeViewModel(
     private var currentRow: ListRow? = null
     private var justLoaded = true
 
-    init {
-        rowsAdapter.registerObserver(object : androidx.leanback.widget.ObjectAdapter.DataObserver() {
-            override fun onChanged() { updateUiState() }
-            override fun onItemRangeChanged(positionStart: Int, itemCount: Int) { updateUiState() }
-            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) { updateUiState() }
-            override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) { updateUiState() }
-            override fun onItemMoved(fromPosition: Int, toPosition: Int) { updateUiState() }
-        })
+    private val rowDataObserver = object : androidx.leanback.widget.ObjectAdapter.DataObserver() {
+        override fun onChanged() { updateUiState() }
+        override fun onItemRangeChanged(positionStart: Int, itemCount: Int) { updateUiState() }
+        override fun onItemRangeInserted(positionStart: Int, itemCount: Int) { updateUiState() }
+        override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) { updateUiState() }
+        override fun onItemMoved(fromPosition: Int, toPosition: Int) { updateUiState() }
+    }
 
+    init {
         val cardPresenter = CardPresenter()
-        notificationsRow.addToRowsAdapter(context, cardPresenter, rowsAdapter)
-        nowPlaying.addToRowsAdapter(context, cardPresenter, rowsAdapter)
+        notificationsRow.addRows(context, cardPresenter,
+            onRowAdded = { addRowInOrder(it, -200) },
+            onRowRemoved = { removeRow(it) }
+        )
+        nowPlaying.addRows(context, cardPresenter,
+            onRowAdded = { addRowInOrder(it, -100) },
+            onRowRemoved = { removeRow(it) }
+        )
 
         loadHomeSections(cardPresenter)
 
@@ -140,8 +146,8 @@ class HomeViewModel(
         viewModelScope.launch {
             UsbStorageManager.mountedVolumes.collect { volumes ->
                 var foundViewsRow = false
-                for (i in 0 until rowsAdapter.size()) {
-                    val listRow = (rowsAdapter[i] as? ListRow) ?: continue
+                for (i in 0 until _rows.size) {
+                    val listRow = _rows[i]
                     val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
                     if (itemAdapter.queryType == QueryType.Views) {
                         foundViewsRow = true
@@ -159,8 +165,8 @@ class HomeViewModel(
 
     private fun updateUiState() {
         val rowStates = mutableListOf<HomeRowState>()
-        for (i in 0 until rowsAdapter.size()) {
-            val listRow = rowsAdapter[i] as? ListRow ?: continue
+        for (i in 0 until _rows.size) {
+            val listRow = _rows[i]
             val rowAdapter = listRow.adapter ?: continue
             val items = (0 until rowAdapter.size()).mapNotNull { rowAdapter.get(it) }
             val sectionIdx = getSectionIndex(listRow)
@@ -178,7 +184,7 @@ class HomeViewModel(
         _uiState.value = HomeUiState.Success(rowStates)
     }
 
-    private fun getSectionIndex(row: Row): Int {
+    private fun getSectionIndex(row: ListRow): Int {
         return rowSectionIndices[row] ?: when (row) {
             notificationsRow.listRow -> -200
             nowPlaying.row -> -100
@@ -189,9 +195,9 @@ class HomeViewModel(
     private fun addRowInOrder(row: ListRow, sectionIndex: Int) {
         rowSectionIndices[row] = sectionIndex
 
-        var insertPos = rowsAdapter.size()
-        for (i in 0 until rowsAdapter.size()) {
-            val existingRow = rowsAdapter[i] ?: continue
+        var insertPos = _rows.size
+        for (i in 0 until _rows.size) {
+            val existingRow = _rows[i]
             val existingIndex = getSectionIndex(existingRow)
             if (existingIndex > sectionIndex) {
                 insertPos = i
@@ -200,13 +206,21 @@ class HomeViewModel(
         }
 
         val itemAdapter = row.adapter as? ItemRowAdapter
-        itemAdapter?.parent = rowsAdapter
-        rowsAdapter.add(insertPos, row)
+        _rows.add(insertPos, row)
+        row.adapter?.registerObserver(rowDataObserver)
 
         if (itemAdapter?.queryType == QueryType.LiveTvProgram && insertPos > 0) {
-            val previousRow = rowsAdapter[insertPos - 1]
-            previousRow?.let { itemAdapter.setSiblingRow(it) }
+            val previousRow = _rows[insertPos - 1]
+            itemAdapter.setSiblingRow(previousRow)
         }
+        updateUiState()
+    }
+
+    private fun removeRow(row: ListRow) {
+        _rows.remove(row)
+        rowSectionIndices.remove(row)
+        row.adapter?.unregisterObserver(rowDataObserver)
+        updateUiState()
     }
 
     private fun loadHomeSections(cardPresenter: CardPresenter) {
@@ -259,11 +273,10 @@ class HomeViewModel(
                     }
                     HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
                         val liveTvRow = HomeFragmentLiveTVRow(context, userRepository)
-                        val tempAdapter = MutableObjectAdapter<Row>()
-                        liveTvRow.addToRowsAdapter(context, cardPresenter, tempAdapter)
-                        (0 until tempAdapter.size()).mapNotNull { tempAdapter[it] as? ListRow }.forEachIndexed { idx, row ->
-                            rowsList.add(row to (baseSectionIndex + idx))
-                        }
+                        liveTvRow.addRows(context, cardPresenter,
+                            onRowAdded = { rowsList.add(it to (baseSectionIndex)) },
+                            onRowRemoved = { removeRow(it) }
+                        )
                         val r = helper.loadOnNow() as HomeFragmentBrowseRowDefRow
                         val listRow = r.prepareRow(context, cardPresenter, api)
                         if (listRow != null) rowsList.add(listRow to (baseSectionIndex + 10))
@@ -350,8 +363,8 @@ class HomeViewModel(
             dataRefreshService.lastDeletedItemId = null
         }
 
-        for (i in 0 until rowsAdapter.size()) {
-            val listRow = (rowsAdapter[i] as? ListRow) ?: continue
+        for (i in 0 until _rows.size) {
+            val listRow = _rows[i]
             val itemAdapter = (listRow.adapter as? ItemRowAdapter) ?: continue
             if (itemAdapter.queryType == QueryType.Views) {
                 itemAdapter.ensureUsbTilePresent()
@@ -365,11 +378,11 @@ class HomeViewModel(
             justLoaded = false
         }
 
-        nowPlaying.update(context, rowsAdapter)
+        nowPlaying.update(context)
     }
 
     override fun onQueueStatusChanged(hasQueue: Boolean) {
-        nowPlaying.update(context, rowsAdapter)
+        nowPlaying.update(context)
     }
 
     fun refreshRows(force: Boolean = false, delayed: Boolean = true) {
@@ -377,8 +390,8 @@ class HomeViewModel(
             if (delayed) delay(1.5.seconds)
             val minInterval = Instant.now().minusSeconds(300)
 
-            repeat(rowsAdapter.size()) { i ->
-                val rowAdapter = ((rowsAdapter[i] as? ListRow)?.adapter as? ItemRowAdapter) ?: return@repeat
+            repeat(_rows.size) { i ->
+                val rowAdapter = ((_rows[i]).adapter as? ItemRowAdapter) ?: return@repeat
                 if (rowAdapter.queryType == QueryType.Views) return@repeat
 
                 if (force) {
@@ -394,8 +407,8 @@ class HomeViewModel(
     }
 
     fun refreshItemById(itemId: UUID) {
-        repeat(rowsAdapter.size()) { i ->
-            val listRow = rowsAdapter[i] as? ListRow ?: return@repeat
+        repeat(_rows.size) { i ->
+            val listRow = _rows[i]
             val itemAdapter = listRow.adapter as? ItemRowAdapter ?: return@repeat
             repeat(itemAdapter.size()) { j ->
                 val rowItem = itemAdapter[j] as? BaseRowItem ?: return@repeat
@@ -413,7 +426,7 @@ class HomeViewModel(
     }
 
     fun onItemClicked(item: Any, rowIndex: Int) {
-        val listRow = if (rowIndex in 0 until rowsAdapter.size()) rowsAdapter[rowIndex] as? ListRow else null
+        val listRow = if (rowIndex in 0 until _rows.size) _rows[rowIndex] else null
         if (listRow == null) return
 
         if (item is AppNotification) {
@@ -476,7 +489,7 @@ class HomeViewModel(
             lastFocusedItemKey = getItemKey(item)
             lastFocusedRowIndex = rowIndex
         }
-        val listRow = if (rowIndex in 0 until rowsAdapter.size()) rowsAdapter[rowIndex] as? ListRow else null
+        val listRow = if (rowIndex in 0 until _rows.size) _rows[rowIndex] else null
         if (item !is BaseRowItem) {
             currentItem = item
             backgroundService.clearBackgrounds()

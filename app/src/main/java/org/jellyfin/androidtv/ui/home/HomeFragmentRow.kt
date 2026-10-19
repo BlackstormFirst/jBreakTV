@@ -1,10 +1,9 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
-import androidx.leanback.widget.Row
+import androidx.leanback.widget.ListRow
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
-import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 
 interface HomeFragmentRow {
-	fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>)
+	fun addRows(context: Context, cardPresenter: CardPresenter, onRowAdded: (ListRow) -> Unit, onRowRemoved: (ListRow) -> Unit)
 }
