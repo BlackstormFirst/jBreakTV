@@ -39,6 +39,8 @@ import androidx.fragment.compose.content
 import org.jellyfin.androidtv.data.service.BackgroundService
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
+import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
+import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
@@ -148,6 +150,7 @@ class SearchFragment : Fragment() {
 								items(group.items.toList(), key = { it.id }) { baseItem ->
 									val rowItem = remember(baseItem) { BaseItemDtoBaseRowItem(baseItem) }
 									var isFocused by remember { mutableStateOf(false) }
+									var showContextMenu by remember { mutableStateOf(false) }
 
 									Box(
 										modifier = Modifier
@@ -158,14 +161,27 @@ class SearchFragment : Fragment() {
 													backgroundService.setBackground(baseItem)
 												}
 											}
-											.clickable {
-												itemLauncher.launch(rowItem, null, context)
-											}
+											.itemCardClickable(
+												onClick = {
+													itemLauncher.launch(rowItem, null, context)
+												},
+												onLongClick = {
+													showContextMenu = true
+												}
+											)
 									) {
 										BaseRowItemCard(
 											item = rowItem,
 											focused = isFocused
 										)
+
+										if (showContextMenu) {
+											ItemContextMenu(
+												item = rowItem,
+												expanded = showContextMenu,
+												onDismissRequest = { showContextMenu = false }
+											)
+										}
 									}
 								}
 							}

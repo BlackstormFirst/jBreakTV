@@ -23,6 +23,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
+import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
+import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -307,6 +310,8 @@ fun ItemListScreen(
 					}
 				}
 
+				var showContextMenu by remember { mutableStateOf(false) }
+
 				Box(
 					modifier = Modifier
 						.fillMaxWidth()
@@ -319,10 +324,9 @@ fun ItemListScreen(
 							}
 						)
 						.onFocusChanged { isFocused = it.isFocused }
-						.clickable(
-							interactionSource = remember { MutableInteractionSource() },
-							indication = null,
-							onClick = { onItemClick(item, index) }
+						.itemCardClickable(
+							onClick = { onItemClick(item, index) },
+							onLongClick = { showContextMenu = true }
 						)
 						.padding(horizontal = 16.dp, vertical = 12.dp)
 				) {
@@ -383,6 +387,15 @@ fun ItemListScreen(
 							text = formattedRunTime,
 							style = JellyfinTheme.typography.listHeadline,
 							color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption
+						)
+					}
+
+					if (showContextMenu) {
+						val rowItem = remember(item) { BaseItemDtoBaseRowItem(item) }
+						ItemContextMenu(
+							item = rowItem,
+							expanded = showContextMenu,
+							onDismissRequest = { showContextMenu = false }
 						)
 					}
 				}

@@ -74,6 +74,8 @@ import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
+import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
+import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
@@ -734,6 +736,7 @@ fun BrowseGridScreen(
 					) {
 						itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
 							var isFocused by remember { mutableStateOf(false) }
+							var showContextMenu by remember { mutableStateOf(false) }
 							val isFirstCard = index == 0
 
 							if (isFirstCard) {
@@ -763,14 +766,13 @@ fun BrowseGridScreen(
 											onItemFocused(item)
 										}
 									}
-									.clickable(
-										interactionSource = remember { MutableInteractionSource() },
-										indication = null,
+									.itemCardClickable(
 										onClick = {
 											adapterRef.value?.let { adapter ->
 												onItemClick(item, adapter)
 											}
-										}
+										},
+										onLongClick = { showContextMenu = true }
 									)
 							) {
 								BaseRowItemCard(
@@ -779,6 +781,14 @@ fun BrowseGridScreen(
 									showInfo = false,
 									imageType = imageType
 								)
+
+								if (showContextMenu) {
+									ItemContextMenu(
+										item = item,
+										expanded = showContextMenu,
+										onDismissRequest = { showContextMenu = false }
+									)
+								}
 							}
 						}
 					}
@@ -794,6 +804,7 @@ fun BrowseGridScreen(
 					) {
 						itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
 							var isFocused by remember { mutableStateOf(false) }
+							var showContextMenu by remember { mutableStateOf(false) }
 							val isFirstCard = index == 0
 
 							if (isFirstCard) {
@@ -823,14 +834,13 @@ fun BrowseGridScreen(
 											onItemFocused(item)
 										}
 									}
-									.clickable(
-										interactionSource = remember { MutableInteractionSource() },
-										indication = null,
+									.itemCardClickable(
 										onClick = {
 											adapterRef.value?.let { adapter ->
 												onItemClick(item, adapter)
 											}
-										}
+										},
+										onLongClick = { showContextMenu = true }
 									)
 							) {
 								BaseRowItemCard(
@@ -840,6 +850,14 @@ fun BrowseGridScreen(
 									imageType = imageType,
 									fillMaxWidth = true
 								)
+
+								if (showContextMenu) {
+									ItemContextMenu(
+										item = item,
+										expanded = showContextMenu,
+										onDismissRequest = { showContextMenu = false }
+									)
+								}
 							}
 						}
 					}

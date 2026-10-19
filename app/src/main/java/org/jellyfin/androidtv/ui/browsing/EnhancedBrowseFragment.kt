@@ -79,6 +79,8 @@ import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
+import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
+import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.GridButtonBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
@@ -475,6 +477,7 @@ fun EnhancedBrowseScreen(
 								) {
 									itemsIndexed(itemsState, key = { index, item -> "${rowIndex}_${item.baseItem?.id}_$index" }) { index, item ->
 										var isFocused by remember { mutableStateOf(false) }
+										var showContextMenu by remember { mutableStateOf(false) }
 										val isSelectedItem = (item == selectedItem || (selectedItem == null && rowIndex == 0 && index == 0))
 
 										if (isSelectedItem) {
@@ -511,12 +514,15 @@ fun EnhancedBrowseScreen(
 														onItemFocused(item)
 													}
 												}
-												.clickable(
-													interactionSource = remember { MutableInteractionSource() },
-													indication = null,
+												.itemCardClickable(
 													onClick = {
 														rowAdapters[rowIndex]?.let { adapter ->
 															onItemClick(item, adapter)
+														}
+													},
+													onLongClick = {
+														if (item is BaseRowItem) {
+															showContextMenu = true
 														}
 													}
 												)
@@ -531,6 +537,14 @@ fun EnhancedBrowseScreen(
 													item = item,
 													focused = isFocused,
 													showInfo = false
+												)
+											}
+
+											if (showContextMenu && item is BaseRowItem) {
+												ItemContextMenu(
+													item = item,
+													expanded = showContextMenu,
+													onDismissRequest = { showContextMenu = false }
 												)
 											}
 										}

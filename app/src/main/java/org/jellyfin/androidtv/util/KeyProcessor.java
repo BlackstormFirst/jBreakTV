@@ -176,8 +176,16 @@ public class KeyProcessor {
     }
 
     public PopupMenu createItemMenu(BaseRowItem rowItem, UserItemDataDto userData, FragmentActivity activity) {
+        return createItemMenu(rowItem, userData, activity, null);
+    }
+
+    public PopupMenu createItemMenu(BaseRowItem rowItem, UserItemDataDto userData, FragmentActivity activity, android.view.View anchorView) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed() || rowItem == null) return null;
         BaseItemDto item = rowItem.getBaseItem();
-        PopupMenu menu = new PopupMenu(activity, activity.getCurrentFocus(), Gravity.END);
+        if (item == null) return null;
+
+        android.view.View targetView = anchorView != null ? anchorView : (activity.getCurrentFocus() != null ? activity.getCurrentFocus() : activity.getWindow().getDecorView());
+        PopupMenu menu = new PopupMenu(activity, targetView, Gravity.END);
         int order = 0;
 
         if (rowItem instanceof AudioQueueBaseRowItem) {
@@ -229,25 +237,30 @@ public class KeyProcessor {
                 menu.getMenu().add(0, MENU_ADD_QUEUE, order++, R.string.lbl_add_to_queue);
             }
 
+            boolean isPlayed = userData != null && userData.getPlayed();
+            boolean isFavorite = userData != null && userData.isFavorite();
+
             if (isMusic) {
                 if (item.getType() != BaseItemKind.PLAYLIST) {
                     menu.getMenu().add(0, MENU_INSTANT_MIX, order++, R.string.lbl_instant_mix);
                 }
             } else {
-                if (userData != null && userData.getPlayed()) {
+                if (isPlayed) {
                     menu.getMenu().add(0, MENU_UNMARK_PLAYED, order++, activity.getString(R.string.lbl_mark_unplayed));
                 } else {
                     menu.getMenu().add(0, MENU_MARK_PLAYED, order++, activity.getString(R.string.lbl_mark_played));
                 }
             }
 
-            if (userData != null) {
-                if (userData.isFavorite()) {
-                    menu.getMenu().add(0, MENU_UNMARK_FAVORITE, order++, activity.getString(R.string.lbl_remove_favorite));
-                } else {
-                    menu.getMenu().add(0, MENU_MARK_FAVORITE, order++, activity.getString(R.string.lbl_add_favorite));
-                }
+            if (isFavorite) {
+                menu.getMenu().add(0, MENU_UNMARK_FAVORITE, order++, activity.getString(R.string.lbl_remove_favorite));
+            } else {
+                menu.getMenu().add(0, MENU_MARK_FAVORITE, order++, activity.getString(R.string.lbl_add_favorite));
             }
+        }
+
+        if (!menu.getMenu().hasVisibleItems()) {
+            return null;
         }
 
         menu.setOnMenuItemClickListener(new KeyProcessorItemMenuClickListener(activity, rowItem));
@@ -256,7 +269,9 @@ public class KeyProcessor {
     }
 
     private void createPlayMenu(BaseRowItem rowItem, boolean isMusic, FragmentActivity activity) {
-        PopupMenu menu = new PopupMenu(activity, activity.getCurrentFocus(), Gravity.END);
+        if (activity == null || activity.isFinishing() || activity.isDestroyed() || rowItem == null || rowItem.getBaseItem() == null) return;
+        android.view.View anchorView = activity.getCurrentFocus() != null ? activity.getCurrentFocus() : activity.getWindow().getDecorView();
+        PopupMenu menu = new PopupMenu(activity, anchorView, Gravity.END);
         int order = 0;
         if (!isMusic && rowItem.getBaseItem().getType() != BaseItemKind.PLAYLIST) {
             menu.getMenu().add(0, MENU_PLAY_FIRST_UNWATCHED, order++, R.string.lbl_play_first_unwatched);
@@ -266,6 +281,8 @@ public class KeyProcessor {
         if (isMusic) {
             menu.getMenu().add(0, MENU_ADD_QUEUE, order, R.string.lbl_add_to_queue);
         }
+
+        if (!menu.getMenu().hasVisibleItems()) return;
 
         menu.setOnMenuItemClickListener(new KeyProcessorItemMenuClickListener(activity, rowItem));
         menu.show();

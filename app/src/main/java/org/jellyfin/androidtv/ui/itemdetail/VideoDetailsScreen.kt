@@ -76,6 +76,8 @@ import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
+import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
+import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.home.collectAsStateAny
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
@@ -760,7 +762,8 @@ fun VideoDetailsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 itemsIndexed(items, key = { index, item -> "${rowIndex}_${item.hashCode()}_$index" }) { index: Int, rowItem: Any ->
-                                    var isFocused by remember { mutableStateOf(false) }
+                                        var isFocused by remember { mutableStateOf(false) }
+                                    var showContextMenu by remember { mutableStateOf(false) }
 
                                     val cardBringIntoViewRequester = remember { BringIntoViewRequester() }
 
@@ -776,11 +779,14 @@ fun VideoDetailsScreen(
                                                     }
                                                 }
                                             }
-                                            .clickable(
-                                                interactionSource = remember { MutableInteractionSource() },
-                                                indication = null,
+                                            .itemCardClickable(
                                                 onClick = {
                                                     if (rowItem is BaseRowItem) onItemClick(rowItem)
+                                                },
+                                                onLongClick = {
+                                                    if (rowItem is BaseRowItem) {
+                                                        showContextMenu = true
+                                                    }
                                                 }
                                             )
                                     ) {
@@ -790,6 +796,14 @@ fun VideoDetailsScreen(
                                                 focused = isFocused,
                                                 showInfo = true
                                             )
+
+                                            if (showContextMenu) {
+                                                ItemContextMenu(
+                                                    item = rowItem,
+                                                    expanded = showContextMenu,
+                                                    onDismissRequest = { showContextMenu = false }
+                                                )
+                                            }
                                         }
                                     }
                                 }

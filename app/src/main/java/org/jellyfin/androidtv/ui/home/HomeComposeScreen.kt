@@ -2,7 +2,6 @@ package org.jellyfin.androidtv.ui.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -45,6 +44,8 @@ import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.browsing.GridButtonCard
+import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
+import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.GridButtonBaseRowItem
 import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
@@ -188,6 +189,7 @@ fun HomeComposeScreen(
                                         "${rowIndex}_${item.hashCode()}_$index"
                                     }) { index, item ->
                                         var isFocused by remember { mutableStateOf(false) }
+                                        var showContextMenu by remember { mutableStateOf(false) }
                                         val itemKey = remember(item) { getItemKey(item) }
 
                                         val focusRequester = remember(itemKey) {
@@ -220,11 +222,14 @@ fun HomeComposeScreen(
                                                         onItemFocus(item, rowIndex)
                                                     }
                                                 }
-                                                .clickable(
-                                                    interactionSource = remember { MutableInteractionSource() },
-                                                    indication = null,
+                                                .itemCardClickable(
                                                     onClick = {
                                                         onItemClick(item, rowIndex)
+                                                    },
+                                                    onLongClick = {
+                                                        if (item is BaseRowItem) {
+                                                            showContextMenu = true
+                                                        }
                                                     }
                                                 )
                                         ) {
@@ -244,6 +249,14 @@ fun HomeComposeScreen(
                                                         )
                                                     }
                                                 }
+                                            }
+
+                                            if (showContextMenu && item is BaseRowItem) {
+                                                ItemContextMenu(
+                                                    item = item,
+                                                    expanded = showContextMenu,
+                                                    onDismissRequest = { showContextMenu = false }
+                                                )
                                             }
                                         }
                                     }

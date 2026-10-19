@@ -504,10 +504,10 @@ class HomeViewModel(
         }
     }
 
-    fun handleKey(keyCode: Int): Boolean {
+    fun handleKey(keyCode: Int, activity: androidx.fragment.app.FragmentActivity?): Boolean {
         val item = currentItem
-        if (item is BaseRowItem) {
-            return keyProcessor.handleKey(keyCode, item, null)
+        if (item is BaseRowItem && activity != null) {
+            return keyProcessor.handleKey(keyCode, item, activity)
         }
         return false
     }

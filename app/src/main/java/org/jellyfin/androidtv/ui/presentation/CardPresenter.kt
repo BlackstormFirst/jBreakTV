@@ -54,6 +54,8 @@ import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.androidtv.util.apiclient.JellyfinImage
 import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.getActivity
+import org.jellyfin.androidtv.util.KeyProcessor
+import androidx.fragment.app.FragmentActivity
 import org.jellyfin.design.Tokens
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -159,6 +161,17 @@ class CardPresenter(
 
 			_focused.value = view.isFocused
 			composeView.onFocusChangeListener = { _, focused -> _focused.value = focused }
+			composeView.setOnLongClickListener {
+				val activity = composeView.context.getActivity() as? FragmentActivity
+				val item = _item.value
+				if (activity != null && item != null) {
+					val keyProcessor: KeyProcessor by org.koin.java.KoinJavaComponent.inject(KeyProcessor::class.java)
+					keyProcessor.createItemMenu(item, item.baseItem?.userData, activity)
+					true
+				} else {
+					composeView.context.getActivity()?.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MENU)) ?: false
+				}
+			}
 		}
 
 		fun bind(item: BaseRowItem) {

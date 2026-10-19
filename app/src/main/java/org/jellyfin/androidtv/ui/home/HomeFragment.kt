@@ -50,11 +50,7 @@ class HomeFragment : Fragment() {
 
         JellyfinTheme {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .onPreviewKeyEvent { keyEvent ->
-                        viewModel.handleKey(keyEvent.nativeKeyEvent.keyCode)
-                    }
+                modifier = Modifier.fillMaxSize()
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     MainToolbar(MainToolbarActiveButton.Home)
