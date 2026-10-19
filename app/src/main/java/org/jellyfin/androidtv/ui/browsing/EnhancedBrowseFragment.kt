@@ -161,14 +161,14 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 					EnhancedBrowseScreen(
 						title = mFolder?.name,
 						rows = rowsState,
-						onItemClick = { item, adapter ->
+						onItemClick = { item: BaseRowItem, adapter: ItemRowAdapter ->
 							if (item is GridButtonBaseRowItem) {
 								handleGridButtonClick(item.gridButton)
 							} else {
 								itemLauncher.launch(item, adapter, requireContext())
 							}
 						},
-						onItemFocused = { item ->
+						onItemFocused = { item: BaseRowItem? ->
 							if (item != null) {
 								backgroundService.setBackground(item.baseItem)
 							} else {
