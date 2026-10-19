@@ -25,6 +25,7 @@ import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowAdapterFactory
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
+import org.jellyfin.androidtv.ui.browsing.BrowsingUtils
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.util.TimeUtils
@@ -403,29 +404,26 @@ class FullDetailsViewModel(
                 }
 
                 BaseItemKind.PERSON -> {
-                    // Movies
+                    // Movies (using BrowsingUtils.createPersonItemsRequest for recursive search)
                     runCatching {
-                        val query = GetItemsRequest(personIds = listOf(baseItem.id), includeItemTypes = listOf(BaseItemKind.MOVIE), userId = userId, fields = ItemRepository.browseFields)
-                        val def = BrowseRowDef(context.getString(R.string.lbl_movies), query, 100)
-                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        val query = BrowsingUtils.createPersonItemsRequest(baseItem.id, BaseItemKind.MOVIE)
+                        val adapter = ItemRowAdapter(context, query, 100, false, CardPresenter(), null)
                         adapter.Retrieve()
                         rows.add(DetailsRowState(context.getString(R.string.lbl_movies), adapter))
                     }
 
                     // TV Series
                     runCatching {
-                        val query = GetItemsRequest(personIds = listOf(baseItem.id), includeItemTypes = listOf(BaseItemKind.SERIES), userId = userId, fields = ItemRepository.browseFields)
-                        val def = BrowseRowDef(context.getString(R.string.lbl_tv_series), query, 100)
-                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        val query = BrowsingUtils.createPersonItemsRequest(baseItem.id, BaseItemKind.SERIES)
+                        val adapter = ItemRowAdapter(context, query, 100, false, CardPresenter(), null)
                         adapter.Retrieve()
                         rows.add(DetailsRowState(context.getString(R.string.lbl_tv_series), adapter))
                     }
 
                     // Episodes
                     runCatching {
-                        val query = GetItemsRequest(personIds = listOf(baseItem.id), includeItemTypes = listOf(BaseItemKind.EPISODE), userId = userId, fields = ItemRepository.browseFields)
-                        val def = BrowseRowDef(context.getString(R.string.lbl_episodes), query, 100)
-                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        val query = BrowsingUtils.createPersonItemsRequest(baseItem.id, BaseItemKind.EPISODE)
+                        val adapter = ItemRowAdapter(context, query, 100, false, CardPresenter(), null)
                         adapter.Retrieve()
                         rows.add(DetailsRowState(context.getString(R.string.lbl_episodes), adapter))
                     }
@@ -434,9 +432,8 @@ class FullDetailsViewModel(
                 BaseItemKind.MUSIC_ARTIST -> {
                     // Albums
                     runCatching {
-                        val query = GetItemsRequest(artistIds = listOf(baseItem.id), includeItemTypes = listOf(BaseItemKind.MUSIC_ALBUM), userId = userId, fields = ItemRepository.browseFields)
-                        val def = BrowseRowDef(context.getString(R.string.lbl_albums), query, 100)
-                        val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+                        val query = BrowsingUtils.createArtistItemsRequest(baseItem.id, BaseItemKind.MUSIC_ALBUM)
+                        val adapter = ItemRowAdapter(context, query, 100, false, CardPresenter(), null)
                         adapter.Retrieve()
                         rows.add(DetailsRowState(context.getString(R.string.lbl_albums), adapter))
                     }

@@ -131,22 +131,25 @@ private fun rememberTvPivotBringIntoViewSpec(listState: LazyListState): BringInt
 
 /**
  * Composable matching ExpandableTextView.kt and view_row_details.xml:
- * Fixed 120dp height matching Leanback's layout_height="0dp" between genre and left info items.
- * Displays overview text up to 6 lines. If ellipsized, it becomes focusable and opens a full overlay dialog on click.
+ * Fixed 120dp / 180dp height matching Leanback's layout_height="0dp" between genre and left info items.
+ * Displays overview text up to maxLines (6 or 9 for Person). If ellipsized, it becomes focusable and opens a full overlay dialog on click.
  */
 @Composable
 fun ExpandableOverviewText(
     overviewText: String?,
+    maxLines: Int = 6,
     modifier: Modifier = Modifier
 ) {
     var isEllipsized by remember { mutableStateOf(false) }
     var isFocused by remember { mutableStateOf(false) }
     var showDialog by remember { mutableStateOf(false) }
 
+    val boxHeight = if (maxLines > 6) 180.dp else 120.dp
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(boxHeight)
             .then(
                 if (isEllipsized) {
                     Modifier
@@ -171,7 +174,7 @@ fun ExpandableOverviewText(
                     fontWeight = FontWeight.Light,
                     color = Color.White
                 ),
-                maxLines = 6,
+                maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis,
                 onTextLayout = { textLayoutResult ->
                     if (textLayoutResult.hasVisualOverflow) {
@@ -344,6 +347,10 @@ fun VideoDetailsScreen(
     val initialPlayButtonFocusRequester = remember { FocusRequester() }
     var initialFocusRequested by remember { mutableStateOf(false) }
 
+    val isPerson = remember(item) {
+        item.type == BaseItemKind.PERSON
+    }
+
     // Smoothly scroll LazyColumn back to top (item 0, offset 0) whenever an action button receives focus from below
     val scrollToHeaderTop = {
         if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
@@ -367,7 +374,7 @@ fun VideoDetailsScreen(
     // Leanback logic: Try logo image first, fallback to primary poster image
     val rightImageUrl = remember(item) {
         imageHelper.getLogoImageUrl(item, maxWidth = 600)
-            ?: imageHelper.getPrimaryImageUrl(item, preferParentThumb = false, fillHeight = 300)
+            ?: imageHelper.getPrimaryImageUrl(item, preferParentThumb = false, fillHeight = if (isPerson) 300 else 200)
     }
 
     val isMusic = remember(item) {
@@ -459,23 +466,25 @@ fun VideoDetailsScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
 
-                                Spacer(Modifier.height(4.dp))
+                                if (!isPerson) {
+                                    Spacer(Modifier.height(4.dp))
 
-                                BaseItemInfoRow(
-                                    item = item,
-                                    mediaSource = null,
-                                    includeRuntime = true
-                                )
-
-                                if (!state.genresText.isNullOrBlank()) {
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        text = state.genresText,
-                                        style = TextStyle(
-                                            fontSize = 14.sp,
-                                            color = Color.White.copy(alpha = 0.8f)
-                                        )
+                                    BaseItemInfoRow(
+                                        item = item,
+                                        mediaSource = null,
+                                        includeRuntime = true
                                     )
+
+                                    if (!state.genresText.isNullOrBlank()) {
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            text = state.genresText,
+                                            style = TextStyle(
+                                                fontSize = 14.sp,
+                                                color = Color.White.copy(alpha = 0.8f)
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -488,50 +497,52 @@ fun VideoDetailsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.Top
                         ) {
-                            // Left Column (guide_left_end = 150dp width, right-aligned)
+                            // Left Column (guide_left_end = 150dp width, right-aligned) - Hidden for PERSON
                             Column(
                                 modifier = Modifier.width(150.dp),
                                 horizontalAlignment = Alignment.End
                             ) {
-                                if (!state.directorText.isNullOrBlank()) {
-                                    Text(
-                                        text = "RÉALISATEUR",
-                                        style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                    )
-                                    Text(
-                                        text = state.directorText,
-                                        style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f)),
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.End
-                                    )
-                                    Spacer(Modifier.height(16.dp))
-                                }
+                                if (!isPerson) {
+                                    if (!state.directorText.isNullOrBlank()) {
+                                        Text(
+                                            text = "RÉALISATEUR",
+                                            style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        )
+                                        Text(
+                                            text = state.directorText,
+                                            style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f)),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.End
+                                        )
+                                        Spacer(Modifier.height(16.dp))
+                                    }
 
-                                if (!state.writerText.isNullOrBlank()) {
-                                    Text(
-                                        text = "SCÉNARISTE",
-                                        style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                    )
-                                    Text(
-                                        text = state.writerText,
-                                        style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f)),
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.End
-                                    )
-                                    Spacer(Modifier.height(16.dp))
-                                }
+                                    if (!state.writerText.isNullOrBlank()) {
+                                        Text(
+                                            text = "SCÉNARISTE",
+                                            style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        )
+                                        Text(
+                                            text = state.writerText,
+                                            style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f)),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.End
+                                        )
+                                        Spacer(Modifier.height(16.dp))
+                                    }
 
-                                if (!state.endTimeText.isNullOrBlank()) {
-                                    Text(
-                                        text = "HEURE DE FIN",
-                                        style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                    )
-                                    Text(
-                                        text = state.endTimeText,
-                                        style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
-                                    )
+                                    if (!state.endTimeText.isNullOrBlank()) {
+                                        Text(
+                                            text = "HEURE DE FIN",
+                                            style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        )
+                                        Text(
+                                            text = state.endTimeText,
+                                            style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
+                                        )
+                                    }
                                 }
                             }
 
@@ -541,11 +552,14 @@ fun VideoDetailsScreen(
                             Column(
                                 modifier = Modifier.weight(1f)
                             ) {
-                                ExpandableOverviewText(overviewText = item.overview)
+                                ExpandableOverviewText(
+                                    overviewText = item.overview,
+                                    maxLines = if (isPerson) 9 else 6
+                                )
 
                                 Spacer(Modifier.height(16.dp))
 
-                                // Action Buttons Row using TextUnderButton with focusRestorer for previous button memory
+                                // Action Buttons Row using TextUnderButton
                                 LazyRow(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalAlignment = Alignment.Top,
@@ -554,106 +568,112 @@ fun VideoDetailsScreen(
                                         .focusGroup()
                                         .focusRestorer()
                                 ) {
-                                    if (state.canResume) {
-                                        item {
-                                            val resumeLabel = if (!state.resumePositionText.isNullOrEmpty()) {
-                                                stringResource(R.string.lbl_resume_from, state.resumePositionText)
-                                            } else {
-                                                stringResource(R.string.home_section_resume)
+                                    if (!isPerson) {
+                                        if (state.canResume) {
+                                            item {
+                                                val resumeLabel = if (!state.resumePositionText.isNullOrEmpty()) {
+                                                    stringResource(R.string.lbl_resume_from, state.resumePositionText)
+                                                } else {
+                                                    stringResource(R.string.home_section_resume)
+                                                }
+
+                                                TextUnderButton(
+                                                    iconRes = R.drawable.ic_resume,
+                                                    label = resumeLabel,
+                                                    onClick = onResumeClick,
+                                                    onFocused = { scrollToHeaderTop() },
+                                                    modifier = Modifier.focusRequester(initialPlayButtonFocusRequester)
+                                                )
                                             }
+                                        }
 
+                                        item {
                                             TextUnderButton(
-                                                iconRes = R.drawable.ic_resume,
-                                                label = resumeLabel,
-                                                onClick = onResumeClick,
+                                                iconRes = R.drawable.ic_play,
+                                                label = stringResource(if (item.type == BaseItemKind.SERIES) R.string.lbl_play_next_up else R.string.lbl_play),
+                                                onClick = onPlayClick,
                                                 onFocused = { scrollToHeaderTop() },
-                                                modifier = Modifier.focusRequester(initialPlayButtonFocusRequester)
+                                                modifier = if (!state.canResume) Modifier.focusRequester(initialPlayButtonFocusRequester) else Modifier
                                             )
+                                        }
+
+                                        if (hasTrailers) {
+                                            item {
+                                                TextUnderButton(
+                                                    iconRes = R.drawable.ic_trailer,
+                                                    label = stringResource(R.string.lbl_play_trailers),
+                                                    onClick = onTrailerClick,
+                                                    onFocused = { scrollToHeaderTop() }
+                                                )
+                                            }
+                                        }
+
+                                        if (isMusic) {
+                                            item {
+                                                TextUnderButton(
+                                                    iconRes = R.drawable.ic_add,
+                                                    label = stringResource(R.string.lbl_add_to_queue),
+                                                    onClick = onQueueClick,
+                                                    onFocused = { scrollToHeaderTop() }
+                                                )
+                                            }
+                                        }
+
+                                        if (isFolderOrMusic) {
+                                            item {
+                                                TextUnderButton(
+                                                    iconRes = R.drawable.ic_shuffle,
+                                                    label = stringResource(R.string.lbl_shuffle_all),
+                                                    onClick = onShuffleClick,
+                                                    onFocused = { scrollToHeaderTop() }
+                                                )
+                                            }
+                                        }
+
+                                        if (item.type == BaseItemKind.EPISODE && item.seriesId != null) {
+                                            item {
+                                                TextUnderButton(
+                                                    iconRes = R.drawable.ic_tv,
+                                                    label = stringResource(R.string.lbl_goto_series),
+                                                    onClick = onGoToSeriesClick,
+                                                    onFocused = { scrollToHeaderTop() }
+                                                )
+                                            }
                                         }
                                     }
 
-                                    item {
-                                        TextUnderButton(
-                                            iconRes = R.drawable.ic_play,
-                                            label = stringResource(if (item.type == BaseItemKind.SERIES) R.string.lbl_play_next_up else R.string.lbl_play),
-                                            onClick = onPlayClick,
-                                            onFocused = { scrollToHeaderTop() },
-                                            modifier = if (!state.canResume) Modifier.focusRequester(initialPlayButtonFocusRequester) else Modifier
-                                        )
-                                    }
-
-                                    if (hasTrailers) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_trailer,
-                                                label = stringResource(R.string.lbl_play_trailers),
-                                                onClick = onTrailerClick,
-                                                onFocused = { scrollToHeaderTop() }
-                                            )
-                                        }
-                                    }
-
-                                    if (isMusic) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_add,
-                                                label = stringResource(R.string.lbl_add_to_queue),
-                                                onClick = onQueueClick,
-                                                onFocused = { scrollToHeaderTop() }
-                                            )
-                                        }
-                                    }
-
-                                    if (isFolderOrMusic) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_shuffle,
-                                                label = stringResource(R.string.lbl_shuffle_all),
-                                                onClick = onShuffleClick,
-                                                onFocused = { scrollToHeaderTop() }
-                                            )
-                                        }
-                                    }
-
-                                    if (item.type == BaseItemKind.EPISODE && item.seriesId != null) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_tv,
-                                                label = stringResource(R.string.lbl_goto_series),
-                                                onClick = onGoToSeriesClick,
-                                                onFocused = { scrollToHeaderTop() }
-                                            )
-                                        }
-                                    }
-
+                                    // Favorite button is shown for all items including PERSON
                                     item {
                                         TextUnderButton(
                                             iconRes = R.drawable.ic_star,
                                             label = stringResource(R.string.lbl_add_favorite),
                                             onClick = onFavoriteClick,
                                             onFocused = { scrollToHeaderTop() },
-                                            isActivated = state.isFavorite
+                                            isActivated = state.isFavorite,
+                                            modifier = if (isPerson) Modifier.focusRequester(initialPlayButtonFocusRequester) else Modifier
                                         )
                                     }
 
-                                    item {
-                                        TextUnderButton(
-                                            iconRes = R.drawable.ic_check,
-                                            label = stringResource(R.string.lbl_watched),
-                                            onClick = onPlayedClick,
-                                            onFocused = { scrollToHeaderTop() },
-                                            isActivated = state.isPlayed
-                                        )
-                                    }
-
-                                    if (state.canDelete) {
+                                    if (!isPerson) {
                                         item {
                                             TextUnderButton(
-                                                iconRes = R.drawable.ic_delete,
-                                                label = stringResource(R.string.lbl_delete),
-                                                onClick = onDeleteClick,
-                                                onFocused = { scrollToHeaderTop() }
+                                                iconRes = R.drawable.ic_check,
+                                                label = stringResource(R.string.lbl_watched),
+                                                onClick = onPlayedClick,
+                                                onFocused = { scrollToHeaderTop() },
+                                                isActivated = state.isPlayed
                                             )
+                                        }
+
+                                        if (state.canDelete) {
+                                            item {
+                                                TextUnderButton(
+                                                    iconRes = R.drawable.ic_delete,
+                                                    label = stringResource(R.string.lbl_delete),
+                                                    onClick = onDeleteClick,
+                                                    onFocused = { scrollToHeaderTop() }
+                                                )
+                                            }
                                         }
                                     }
                                 }
