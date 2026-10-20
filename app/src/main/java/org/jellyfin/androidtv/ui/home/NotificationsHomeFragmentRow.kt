@@ -11,45 +11,56 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.jellyfin.androidtv.data.model.AppNotification
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
-import org.jellyfin.androidtv.ui.notification.AppNotificationPresenter
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
-import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 
 class NotificationsHomeFragmentRow(
 	coroutineScope: CoroutineScope,
 	private val notificationsRepository: NotificationsRepository,
 ) : HomeFragmentRow, OnItemViewClickedListener {
-	private val announcementAdapter by lazy { MutableObjectAdapter<AppNotification>(AppNotificationPresenter()) }
-	val listRow by lazy { ListRow(null, announcementAdapter) }
-	private var rowAdded = false
 	private var onRowAdded: ((ListRow) -> Unit)? = null
 	private var onRowRemoved: ((ListRow) -> Unit)? = null
 
+	private var onRowStateAdded: ((HomeRowState) -> Unit)? = null
+	private var onRowStateRemoved: ((HomeRowState) -> Unit)? = null
+	private var rowState: HomeRowState? = null
+
 	init {
 		notificationsRepository.notifications.onEach { notifications ->
-			announcementAdapter.replaceAll(notifications)
-			update(notifications.isEmpty())
+			updateState(notifications)
 		}.launchIn(coroutineScope)
 	}
 
-	private fun update(empty: Boolean) {
-		if (onRowAdded == null) return
+	override fun addRowStates(
+		context: Context,
+		cardPresenter: CardPresenter,
+		onRowStateAdded: (HomeRowState) -> Unit,
+		onRowStateRemoved: (HomeRowState) -> Unit
+	) {
+		this.onRowStateAdded = onRowStateAdded
+		this.onRowStateRemoved = onRowStateRemoved
+		updateState(notificationsRepository.notifications.value)
+	}
 
-		if (empty && rowAdded) {
-			onRowRemoved?.invoke(listRow)
-			rowAdded = false
-		}
-
-		if (!empty && !rowAdded) {
-			onRowAdded?.invoke(listRow)
-			rowAdded = true
+	private fun updateState(notifications: List<AppNotification>) {
+		if (notifications.isEmpty()) {
+			if (rowState != null) {
+				onRowStateRemoved?.invoke(rowState!!)
+				rowState = null
+			}
+		} else {
+			val newState = HomeRowState(
+				id = "notifications_row",
+				title = null,
+				items = notifications
+			)
+			rowState = newState
+			onRowStateAdded?.invoke(newState)
 		}
 	}
 
 	override fun addRows(context: Context, cardPresenter: CardPresenter, onRowAdded: (ListRow) -> Unit, onRowRemoved: (ListRow) -> Unit) {
 		this.onRowAdded = onRowAdded
 		this.onRowRemoved = onRowRemoved
-		update(notificationsRepository.notifications.value.isEmpty())
 	}
 
 	override fun onItemClicked(itemViewHolder: Presenter.ViewHolder?, item: Any?, rowViewHolder: RowPresenter.ViewHolder?, row: Row?) {

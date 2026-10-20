@@ -86,6 +86,7 @@ class HomeViewModel(
 
     private val _rows = mutableListOf<ListRow>()
     private val rowSectionIndices = mutableMapOf<ListRow, Int>()
+    private val _directRowStates = mutableListOf<HomeRowState>()
 
     private val notificationsRow by lazy { NotificationsHomeFragmentRow(viewModelScope, notificationsRepository) }
     private val nowPlaying by lazy { HomeFragmentNowPlayingRow(viewModelScope, playbackManager, mediaManager) }
@@ -113,15 +114,39 @@ class HomeViewModel(
         override fun onItemMoved(fromPosition: Int, toPosition: Int) { updateUiState() }
     }
 
+    private fun addDirectRowState(rowState: HomeRowState) {
+        val index = _directRowStates.indexOfFirst { it.id == rowState.id }
+        if (index >= 0) {
+            _directRowStates[index] = rowState
+        } else {
+            _directRowStates.add(rowState)
+        }
+        updateUiState()
+    }
+
+    private fun removeDirectRowState(rowState: HomeRowState) {
+        _directRowStates.removeAll { it.id == rowState.id }
+        updateUiState()
+    }
+
     init {
         val cardPresenter = CardPresenter()
         notificationsRow.addRows(context, cardPresenter,
             onRowAdded = { addRowInOrder(it, -200) },
             onRowRemoved = { removeRow(it) }
         )
+        notificationsRow.addRowStates(context, cardPresenter,
+            onRowStateAdded = { addDirectRowState(it.copy(sectionIndex = -200)) },
+            onRowStateRemoved = { removeDirectRowState(it) }
+        )
+
         nowPlaying.addRows(context, cardPresenter,
             onRowAdded = { addRowInOrder(it, -100) },
             onRowRemoved = { removeRow(it) }
+        )
+        nowPlaying.addRowStates(context, cardPresenter,
+            onRowStateAdded = { addDirectRowState(it.copy(sectionIndex = -100)) },
+            onRowStateRemoved = { removeDirectRowState(it) }
         )
 
         loadHomeSections(cardPresenter)
@@ -182,15 +207,15 @@ class HomeViewModel(
                 )
             )
         }
+
+        rowStates.addAll(_directRowStates)
+        rowStates.sortBy { it.sectionIndex }
+
         _uiState.value = HomeUiState.Success(rowStates)
     }
 
     private fun getSectionIndex(row: ListRow): Int {
-        return rowSectionIndices[row] ?: when (row) {
-            notificationsRow.listRow -> -200
-            nowPlaying.row -> -100
-            else -> Int.MAX_VALUE
-        }
+        return rowSectionIndices[row] ?: Int.MAX_VALUE
     }
 
     private fun addRowInOrder(row: ListRow, sectionIndex: Int) {
@@ -244,13 +269,13 @@ class HomeViewModel(
                 when (section) {
                     HomeSectionType.LIBRARY_TILES_SMALL -> {
                         val r = HomeFragmentViewsRow(small = false)
-                        val listRow = r.createListRow(context, userViewsRepository)
-                        if (listRow != null) rowsList.add(listRow to baseSectionIndex)
+                        val state = r.createRowState(context, userViewsRepository)
+                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex))
                     }
                     HomeSectionType.LIBRARY_BUTTONS -> {
                         val r = HomeFragmentViewsRow(small = true)
-                        val listRow = r.createListRow(context, userViewsRepository)
-                        if (listRow != null) rowsList.add(listRow to baseSectionIndex)
+                        val state = r.createRowState(context, userViewsRepository)
+                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex))
                     }
                     HomeSectionType.RESUME -> {
                         val r = helper.loadResumeVideo() as HomeFragmentBrowseRowDefRow
@@ -274,9 +299,9 @@ class HomeViewModel(
                     }
                     HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
                         val liveTvRow = HomeFragmentLiveTVRow(context, userRepository)
-                        liveTvRow.addRows(context, cardPresenter,
-                            onRowAdded = { rowsList.add(it to (baseSectionIndex)) },
-                            onRowRemoved = { removeRow(it) }
+                        liveTvRow.addRowStates(context, cardPresenter,
+                            onRowStateAdded = { addDirectRowState(it.copy(sectionIndex = baseSectionIndex)) },
+                            onRowStateRemoved = { removeDirectRowState(it) }
                         )
                         val r = helper.loadOnNow() as HomeFragmentBrowseRowDefRow
                         val listRow = r.prepareRow(context, cardPresenter, api)

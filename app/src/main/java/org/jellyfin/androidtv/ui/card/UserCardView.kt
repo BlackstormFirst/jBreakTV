@@ -7,7 +7,7 @@ import android.view.KeyEvent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -47,19 +47,19 @@ import org.jellyfin.androidtv.util.popupMenu
 import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.showIfNotEmpty
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun UserCard(
 	image: @Composable () -> Unit,
 	name: @Composable () -> Unit,
 	onClick: () -> Unit,
 	modifier: Modifier = Modifier,
+	onLongClick: (() -> Unit)? = null,
 	interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 	shape: Shape = CircleShape,
 ) {
 	val focused by interactionSource.collectIsFocusedAsState()
 
-	// Mix button background with input foreground because we display text beneath the profile picture on a transparent background similar
-	// to the input text
 	val color = when {
 		focused -> JellyfinTheme.colorScheme.buttonFocused to JellyfinTheme.colorScheme.onInputFocused
 		else -> JellyfinTheme.colorScheme.button to JellyfinTheme.colorScheme.onInput
@@ -71,7 +71,12 @@ fun UserCard(
 			.zIndex(if (focused) 1f else 0f)
 			.scale(scale)
 			.focusable(interactionSource = interactionSource)
-			.clickable(interactionSource = interactionSource, onClick = onClick, indication = null)
+			.combinedClickable(
+				interactionSource = interactionSource,
+				onClick = onClick,
+				onLongClick = onLongClick,
+				indication = null
+			)
 	) {
 		Box(
 			modifier = Modifier

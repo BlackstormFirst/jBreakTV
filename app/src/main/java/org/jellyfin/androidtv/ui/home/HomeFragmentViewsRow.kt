@@ -27,14 +27,10 @@ class HomeFragmentViewsRow(
 		val largeCardPresenter = CardPresenter(true, 126)
 	}
 
-	suspend fun createListRow(
+	suspend fun createRowState(
 		context: Context,
 		userViewsRepository: UserViewsRepository,
-		rowsAdapter: MutableObjectAdapter<Row>? = null,
-	): ListRow? {
-		val presenter = if (small) smallCardPresenter else largeCardPresenter
-		val rowAdapter = ItemRowAdapter(context, GetUserViewsRequest, presenter, rowsAdapter)
-
+	): HomeRowState? {
 		val userPreferences = get<UserPreferences>()
 		val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
 		val usbVolumes = UsbStorageManager.getMountedVolumes(context)
@@ -49,7 +45,7 @@ class HomeFragmentViewsRow(
 			addAll(filteredItems)
 		}
 
-		rowAdapter.setInitialItems(finalServerAndUsbItems) { item, _ ->
+		val rowItems = finalServerAndUsbItems.mapNotNull { item ->
 			when (item) {
 				is UsbBaseRowItem -> item
 				is BaseItemDto -> BaseItemDtoBaseRowItem(item, staticHeight = true)
@@ -57,10 +53,11 @@ class HomeFragmentViewsRow(
 			}
 		}
 
-		val header = HeaderItem(context.getString(R.string.lbl_my_media))
-		val row = ListRow(header, rowAdapter)
-		rowAdapter.setRow(row)
-		return row
+		return HomeRowState(
+			id = "views_row_${if (small) "small" else "large"}",
+			title = context.getString(R.string.lbl_my_media),
+			items = rowItems
+		)
 	}
 
 	override fun addRows(context: Context, cardPresenter: CardPresenter, onRowAdded: (ListRow) -> Unit, onRowRemoved: (ListRow) -> Unit) {
