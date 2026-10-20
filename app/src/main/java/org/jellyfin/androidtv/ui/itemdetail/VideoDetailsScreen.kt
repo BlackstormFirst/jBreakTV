@@ -258,7 +258,8 @@ fun TextUnderButton(
     onClick: () -> Unit,
     onFocused: () -> Unit = {},
     modifier: Modifier = Modifier,
-    isActivated: Boolean = false
+    isActivated: Boolean = false,
+    activeIconColor: Color? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
@@ -270,7 +271,15 @@ fun TextUnderButton(
         colorResource(R.color.button_default_normal_background)
     }
 
-    val iconColor = if (isFocused) {
+    val effectiveActiveIconColor = activeIconColor ?: when (iconRes) {
+        R.drawable.ic_check -> Color.Red
+        R.drawable.ic_star -> Color(0xFFFFD700)
+        else -> null
+    }
+
+    val iconColor = if (isActivated && effectiveActiveIconColor != null) {
+        effectiveActiveIconColor
+    } else if (isFocused) {
         JellyfinTheme.colorScheme.onButtonFocused
     } else {
         Color.White

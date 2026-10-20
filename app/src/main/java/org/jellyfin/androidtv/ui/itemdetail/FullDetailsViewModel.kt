@@ -497,11 +497,13 @@ class FullDetailsViewModel(
     fun toggleFavorite() {
         val currentItem = _uiState.value.item ?: return
         val newFav = !_uiState.value.isFavorite
+        _uiState.value = _uiState.value.copy(isFavorite = newFav)
         viewModelScope.launch {
             runCatching {
                 itemMutationRepository.setFavorite(currentItem.id, newFav)
-                _uiState.value = _uiState.value.copy(isFavorite = newFav)
                 dataRefreshService.lastFavoriteUpdate = Instant.now()
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(isFavorite = !newFav)
             }
         }
     }
@@ -509,14 +511,19 @@ class FullDetailsViewModel(
     fun togglePlayed() {
         val currentItem = _uiState.value.item ?: return
         val newPlayed = !_uiState.value.isPlayed
+        _uiState.value = _uiState.value.copy(
+            isPlayed = newPlayed,
+            canResume = if (newPlayed) false else _uiState.value.canResume
+        )
         viewModelScope.launch {
             runCatching {
                 itemMutationRepository.setPlayed(currentItem.id, newPlayed)
-                _uiState.value = _uiState.value.copy(
-                    isPlayed = newPlayed,
-                    canResume = if (newPlayed) false else _uiState.value.canResume
-                )
                 dataRefreshService.lastPlayback = Instant.now()
+            }.onFailure {
+                _uiState.value = _uiState.value.copy(
+                    isPlayed = !newPlayed,
+                    canResume = if (!newPlayed) false else _uiState.value.canResume
+                )
             }
         }
     }
