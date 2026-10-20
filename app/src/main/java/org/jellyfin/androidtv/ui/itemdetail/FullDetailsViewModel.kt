@@ -85,6 +85,8 @@ class FullDetailsViewModel(
     val uiState: StateFlow<FullDetailsUiState> = _uiState.asStateFlow()
 
     private var currentItemId: UUID? = null
+    private var justLoaded = true
+    private var appContext: Context? = null
 
     init {
         // Subscribe to real-time WebSockets
@@ -95,6 +97,7 @@ class FullDetailsViewModel(
                     val itemId = currentItemId
                     if (itemId != null && changedData?.userDataList?.any { it.itemId == itemId } == true) {
                         dataRefreshService.lastPlayback = Instant.now()
+                        refresh()
                     }
                 }
                 .launchIn(this)
@@ -102,15 +105,39 @@ class FullDetailsViewModel(
             api.webSocket.subscribe<LibraryChangedMessage>()
                 .onEach {
                     dataRefreshService.lastLibraryChange = Instant.now()
+                    refresh()
                 }
                 .launchIn(this)
         }
     }
 
     fun loadItem(context: Context, itemId: UUID) {
+        appContext = context.applicationContext
         currentItemId = itemId
+        justLoaded = true
+        fetchItem(context, itemId, showLoading = true)
+    }
+
+    fun onResume(context: Context, itemId: UUID) {
+        appContext = context.applicationContext
+        if (!justLoaded) {
+            refresh(context)
+        } else {
+            justLoaded = false
+        }
+    }
+
+    fun refresh(context: Context? = appContext) {
+        val ctx = context ?: return
+        val itemId = currentItemId ?: return
+        fetchItem(ctx, itemId, showLoading = false)
+    }
+
+    private fun fetchItem(context: Context, itemId: UUID, showLoading: Boolean) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            if (showLoading) {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+            }
 
             val currentUser = userRepository.currentUser.filterNotNull().first()
             val userId = currentUser.id
@@ -145,7 +172,9 @@ class FullDetailsViewModel(
             }
 
             if (baseItem == null) {
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                if (showLoading) {
+                    _uiState.value = _uiState.value.copy(isLoading = false)
+                }
                 return@launch
             }
 
@@ -181,7 +210,7 @@ class FullDetailsViewModel(
                 }
             } else null
 
-            _uiState.value = FullDetailsUiState(
+            _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 item = baseItem,
                 isFavorite = isFav,

@@ -103,6 +103,7 @@ class HomeViewModel(
     private var currentItem: Any? = null
     private var currentRow: ListRow? = null
     private var justLoaded = true
+    private var lastHandledPlayback: Instant? = null
 
     private val rowDataObserver = object : androidx.leanback.widget.ObjectAdapter.DataObserver() {
         override fun onChanged() { updateUiState() }
@@ -371,9 +372,15 @@ class HomeViewModel(
             }
         }
 
+        val lastPlayback = dataRefreshService.lastPlayback
+        val playbackChanged = lastPlayback != null && (lastHandledPlayback == null || lastPlayback.isAfter(lastHandledPlayback))
+        if (playbackChanged) {
+            lastHandledPlayback = lastPlayback
+        }
+
         if (!justLoaded) {
             refreshCurrentItem()
-            refreshRows()
+            refreshRows(force = playbackChanged, delayed = false)
         } else {
             justLoaded = false
         }

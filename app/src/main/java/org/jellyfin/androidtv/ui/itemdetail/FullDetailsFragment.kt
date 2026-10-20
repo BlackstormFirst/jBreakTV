@@ -133,4 +133,13 @@ class FullDetailsFragment : Fragment() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        val itemIdStr = arguments?.getString("ItemId")
+        val itemId = Utils.uuidOrNull(itemIdStr)
+        if (itemId != null) {
+            viewModel.onResume(requireContext(), itemId)
+        }
+    }
 }
