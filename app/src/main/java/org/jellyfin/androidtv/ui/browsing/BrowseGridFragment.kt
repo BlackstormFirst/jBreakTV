@@ -4,8 +4,11 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +31,7 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +49,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
@@ -161,6 +166,32 @@ class BrowseGridFragment : Fragment() {
 		super.onViewCreated(view, savedInstanceState)
 		view.post {
 			view.requestFocus()
+		}
+	}
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun rememberGridBringIntoViewSpec(): BringIntoViewSpec {
+	val density = LocalDensity.current
+	val paddingPx = with(density) { 40.dp.toPx() }
+	return remember(paddingPx) {
+		object : BringIntoViewSpec {
+			override fun calculateScrollDistance(
+				offset: Float,
+				size: Float,
+				containerSize: Float
+			): Float {
+				val trailingEdge = offset + size
+				val minVisible = paddingPx
+				val maxVisible = containerSize - paddingPx
+
+				return when {
+					offset < minVisible -> offset - minVisible
+					trailingEdge > maxVisible -> trailingEdge - maxVisible
+					else -> 0f
+				}
+			}
 		}
 	}
 }
@@ -354,6 +385,7 @@ fun AlphaPickerButton(
 	}
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BrowseGridScreen(
 	folder: BaseItemDto?,
@@ -723,159 +755,162 @@ fun BrowseGridScreen(
 			Spacer(Modifier.height(12.dp))
 
 			val posterSize = libraryPreferences?.get(LibraryPreferences.posterSize) ?: PosterSize.SMALL
+			val gridBringIntoViewSpec = rememberGridBringIntoViewSpec()
 
-			Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-				if (gridDirection == GridDirection.HORIZONTAL) {
-					val horizontalRows = if (imageType == ImageType.BANNER || imageType == ImageType.THUMB) 3 else 2
-					LazyHorizontalGrid(
-						rows = GridCells.Fixed(horizontalRows),
-						contentPadding = PaddingValues(horizontal = 40.dp, vertical = 8.dp),
-						horizontalArrangement = Arrangement.spacedBy(16.dp),
-						verticalArrangement = Arrangement.spacedBy(16.dp),
-						modifier = Modifier.fillMaxSize()
-					) {
-						itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
-							var isFocused by remember { mutableStateOf(false) }
-							var showContextMenu by remember { mutableStateOf(false) }
-							val isFirstCard = index == 0
+			CompositionLocalProvider(LocalBringIntoViewSpec provides gridBringIntoViewSpec) {
+				Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+					if (gridDirection == GridDirection.HORIZONTAL) {
+						val horizontalRows = if (imageType == ImageType.BANNER || imageType == ImageType.THUMB) 3 else 2
+						LazyHorizontalGrid(
+							rows = GridCells.Fixed(horizontalRows),
+							contentPadding = PaddingValues(horizontal = 40.dp, vertical = 8.dp),
+							horizontalArrangement = Arrangement.spacedBy(16.dp),
+							verticalArrangement = Arrangement.spacedBy(16.dp),
+							modifier = Modifier.fillMaxSize()
+						) {
+							itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
+								var isFocused by remember { mutableStateOf(false) }
+								var showContextMenu by remember { mutableStateOf(false) }
+								val isFirstCard = index == 0
 
-							if (isFirstCard) {
-								LaunchedEffect(itemsState.isNotEmpty()) {
-									if (itemsState.isNotEmpty() && !hasRequestedFocus) {
-										hasRequestedFocus = true
-										if (selectedItem == null) {
-											selectedItem = itemsState.first()
-											onItemFocused(itemsState.first())
+								if (isFirstCard) {
+									LaunchedEffect(itemsState.isNotEmpty()) {
+										if (itemsState.isNotEmpty() && !hasRequestedFocus) {
+											hasRequestedFocus = true
+											if (selectedItem == null) {
+												selectedItem = itemsState.first()
+												onItemFocused(itemsState.first())
+											}
+											kotlinx.coroutines.delay(100)
+											try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
 										}
-										kotlinx.coroutines.delay(100)
-										try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+									}
+								}
+
+								Box(
+									modifier = Modifier
+										.zIndex(if (isFocused) 1f else 0f)
+										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
+										.onFocusChanged { focusState ->
+											isFocused = focusState.isFocused
+											if (focusState.isFocused) {
+												selectedItem = item
+												selectedIndex = index
+												adapterRef.value?.loadMoreItemsIfNeeded(index)
+												onItemFocused(item)
+											}
+										}
+										.itemCardClickable(
+											onClick = {
+												adapterRef.value?.let { adapter ->
+													onItemClick(item, adapter)
+												}
+											},
+											onLongClick = { showContextMenu = true }
+										)
+								) {
+									BaseRowItemCard(
+										item = item,
+										focused = isFocused,
+										showInfo = false,
+										imageType = imageType
+									)
+
+									if (showContextMenu) {
+										ItemContextMenu(
+											item = item,
+											expanded = showContextMenu,
+											onDismissRequest = { showContextMenu = false }
+										)
 									}
 								}
 							}
+						}
+					} else {
+						val gridColumns = getGridColumnCount(imageType, posterSize, gridDirection)
 
-							Box(
-								modifier = Modifier
-									.zIndex(if (isFocused) 1f else 0f)
-									.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
-									.onFocusChanged { focusState ->
-										isFocused = focusState.isFocused
-										if (focusState.isFocused) {
-											selectedItem = item
-											selectedIndex = index
-											adapterRef.value?.loadMoreItemsIfNeeded(index)
-											onItemFocused(item)
+						LazyVerticalGrid(
+							columns = gridColumns,
+							horizontalArrangement = Arrangement.spacedBy(10.dp),
+							verticalArrangement = Arrangement.spacedBy(10.dp),
+							contentPadding = PaddingValues(horizontal = 40.dp, vertical = 8.dp),
+							modifier = Modifier.fillMaxSize()
+						) {
+							itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
+								var isFocused by remember { mutableStateOf(false) }
+								var showContextMenu by remember { mutableStateOf(false) }
+								val isFirstCard = index == 0
+
+								if (isFirstCard) {
+									LaunchedEffect(itemsState.isNotEmpty()) {
+										if (itemsState.isNotEmpty() && !hasRequestedFocus) {
+											hasRequestedFocus = true
+											if (selectedItem == null) {
+												selectedItem = itemsState.first()
+												onItemFocused(itemsState.first())
+											}
+											kotlinx.coroutines.delay(100)
+											try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
 										}
 									}
-									.itemCardClickable(
-										onClick = {
-											adapterRef.value?.let { adapter ->
-												onItemClick(item, adapter)
-											}
-										},
-										onLongClick = { showContextMenu = true }
-									)
-							) {
-								BaseRowItemCard(
-									item = item,
-									focused = isFocused,
-									showInfo = false,
-									imageType = imageType
-								)
+								}
 
-								if (showContextMenu) {
-									ItemContextMenu(
+								Box(
+									modifier = Modifier
+										.zIndex(if (isFocused) 1f else 0f)
+										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
+										.onFocusChanged { focusState ->
+											isFocused = focusState.isFocused
+											if (focusState.isFocused) {
+												selectedItem = item
+												selectedIndex = index
+												adapterRef.value?.loadMoreItemsIfNeeded(index)
+												onItemFocused(item)
+											}
+										}
+										.itemCardClickable(
+											onClick = {
+												adapterRef.value?.let { adapter ->
+													onItemClick(item, adapter)
+												}
+											},
+											onLongClick = { showContextMenu = true }
+										)
+								) {
+									BaseRowItemCard(
 										item = item,
-										expanded = showContextMenu,
-										onDismissRequest = { showContextMenu = false }
+										focused = isFocused,
+										showInfo = false,
+										imageType = imageType,
+										fillMaxWidth = true
 									)
+
+									if (showContextMenu) {
+										ItemContextMenu(
+											item = item,
+											expanded = showContextMenu,
+											onDismissRequest = { showContextMenu = false }
+										)
+									}
 								}
 							}
 						}
 					}
-				} else {
-					val gridColumns = getGridColumnCount(imageType, posterSize, gridDirection)
 
-					LazyVerticalGrid(
-						columns = gridColumns,
-						horizontalArrangement = Arrangement.spacedBy(10.dp),
-						verticalArrangement = Arrangement.spacedBy(10.dp),
-						contentPadding = PaddingValues(horizontal = 40.dp, vertical = 8.dp),
-						modifier = Modifier.fillMaxSize()
-					) {
-						itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
-							var isFocused by remember { mutableStateOf(false) }
-							var showContextMenu by remember { mutableStateOf(false) }
-							val isFirstCard = index == 0
-
-							if (isFirstCard) {
-								LaunchedEffect(itemsState.isNotEmpty()) {
-									if (itemsState.isNotEmpty() && !hasRequestedFocus) {
-										hasRequestedFocus = true
-										if (selectedItem == null) {
-											selectedItem = itemsState.first()
-											onItemFocused(itemsState.first())
-										}
-										kotlinx.coroutines.delay(100)
-										try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
-									}
-								}
-							}
-
-							Box(
-								modifier = Modifier
-									.zIndex(if (isFocused) 1f else 0f)
-									.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
-									.onFocusChanged { focusState ->
-										isFocused = focusState.isFocused
-										if (focusState.isFocused) {
-											selectedItem = item
-											selectedIndex = index
-											adapterRef.value?.loadMoreItemsIfNeeded(index)
-											onItemFocused(item)
-										}
-									}
-									.itemCardClickable(
-										onClick = {
-											adapterRef.value?.let { adapter ->
-												onItemClick(item, adapter)
-											}
-										},
-										onLongClick = { showContextMenu = true }
-									)
-							) {
-								BaseRowItemCard(
-									item = item,
-									focused = isFocused,
-									showInfo = false,
-									imageType = imageType,
-									fillMaxWidth = true
-								)
-
-								if (showContextMenu) {
-									ItemContextMenu(
-										item = item,
-										expanded = showContextMenu,
-										onDismissRequest = { showContextMenu = false }
-									)
-								}
-							}
-						}
+					if (itemsState.isNotEmpty()) {
+						val totalDisplayable = maxOf(adapterRef.value?.totalItems ?: 0, itemsState.size)
+						Text(
+							text = "${selectedIndex + 1} | $totalDisplayable",
+							style = JellyfinTheme.typography.default.copy(
+								fontSize = 18.sp,
+								fontWeight = FontWeight.Light
+							),
+							color = Color.White,
+							modifier = Modifier
+								.align(Alignment.BottomEnd)
+								.padding(end = 60.dp, bottom = 16.dp)
+						)
 					}
-				}
-
-				if (itemsState.isNotEmpty()) {
-					val totalDisplayable = maxOf(adapterRef.value?.totalItems ?: 0, itemsState.size)
-					Text(
-						text = "${selectedIndex + 1} | $totalDisplayable",
-						style = JellyfinTheme.typography.default.copy(
-							fontSize = 18.sp,
-							fontWeight = FontWeight.Light
-						),
-						color = Color.White,
-						modifier = Modifier
-							.align(Alignment.BottomEnd)
-							.padding(end = 60.dp, bottom = 16.dp)
-					)
 				}
 			}
 		}

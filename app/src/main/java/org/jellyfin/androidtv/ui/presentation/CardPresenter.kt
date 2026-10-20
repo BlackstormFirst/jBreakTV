@@ -3,6 +3,10 @@ package org.jellyfin.androidtv.ui.presentation
 import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -442,6 +446,19 @@ private fun CardViewHolderContent(
 		)
 	}
 
+	val cardShape = if (isCircular) CircleShape else JellyfinTheme.shapes.medium
+
+	val animatedScale by animateFloatAsState(
+		targetValue = if (focused) 1.15f else 1.0f,
+		animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+		label = "BaseRowItemCardScale"
+	)
+	val shadowElevation by animateDpAsState(
+		targetValue = if (focused) 8.dp else 0.dp,
+		animationSpec = tween(durationMillis = 150),
+		label = "BaseRowItemCardShadow"
+	)
+
 	val card = @Composable {
 		ItemCard(
 			image = {
@@ -514,6 +531,11 @@ private fun CardViewHolderContent(
 				}
 			},
 			modifier = Modifier
+				.graphicsLayer {
+					this.shadowElevation = shadowElevation.toPx()
+					this.shape = cardShape
+					this.clip = false
+				}
 				.then(cardSizeModifier)
 				.then(if (isCircular) Modifier.clip(CircleShape) else Modifier)
 		)
@@ -530,8 +552,8 @@ private fun CardViewHolderContent(
 			modifier = Modifier
 				.zIndex(if (focused) 1f else 0f)
 				.graphicsLayer {
-					scaleX = if (focused) 1.15f else 1.0f
-					scaleY = if (focused) 1.15f else 1.0f
+					scaleX = animatedScale
+					scaleY = animatedScale
 				},
 			title = title?.let { text ->
 				{
@@ -562,8 +584,8 @@ private fun CardViewHolderContent(
 			modifier = Modifier
 				.zIndex(if (focused) 1f else 0f)
 				.graphicsLayer {
-					scaleX = if (focused) 1.15f else 1.0f
-					scaleY = if (focused) 1.15f else 1.0f
+					scaleX = animatedScale
+					scaleY = animatedScale
 				}
 		) {
 			card()

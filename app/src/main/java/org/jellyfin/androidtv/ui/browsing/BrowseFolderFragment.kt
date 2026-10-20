@@ -4,6 +4,10 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -42,6 +46,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
@@ -188,21 +193,38 @@ fun GridButtonCard(
 	modifier: Modifier = Modifier
 ) {
 	val button = item.gridButton
-	val backgroundColor = if (focused) {
-		JellyfinTheme.colorScheme.buttonFocused
-	} else {
-		colorResource(R.color.button_default_normal_background)
-	}
-	val textColor = if (focused) {
-		JellyfinTheme.colorScheme.onButtonFocused
-	} else {
-		colorResource(R.color.button_default_normal_text)
-	}
+	val animatedScale by animateFloatAsState(
+		targetValue = if (focused) 1.08f else 1.0f,
+		animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+		label = "GridButtonCardScale"
+	)
+	val backgroundColor by animateColorAsState(
+		targetValue = if (focused) {
+			JellyfinTheme.colorScheme.buttonFocused
+		} else {
+			colorResource(R.color.button_default_normal_background)
+		},
+		animationSpec = tween(durationMillis = 150),
+		label = "GridButtonCardBg"
+	)
+	val textColor by animateColorAsState(
+		targetValue = if (focused) {
+			JellyfinTheme.colorScheme.onButtonFocused
+		} else {
+			colorResource(R.color.button_default_normal_text)
+		},
+		animationSpec = tween(durationMillis = 150),
+		label = "GridButtonCardText"
+	)
 
 	Row(
 		horizontalArrangement = Arrangement.spacedBy(8.dp),
 		verticalAlignment = Alignment.CenterVertically,
 		modifier = modifier
+			.graphicsLayer {
+				scaleX = animatedScale
+				scaleY = animatedScale
+			}
 			.width(140.dp)
 			.height(40.dp)
 			.clip(RoundedCornerShape(8.dp))
