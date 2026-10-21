@@ -30,6 +30,7 @@ import org.jellyfin.sdk.model.api.MediaStream
 import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.SeriesStatus
 import org.jellyfin.sdk.model.api.VideoRangeType
+import org.jellyfin.sdk.model.api.Video3dFormat
 import org.jellyfin.sdk.model.extensions.ticks
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -183,6 +184,15 @@ fun InfoRowMediaDetails(mediaSource: MediaSourceInfo) {
 			colors = InfoRowColors.Default,
 		) {
 			Text(resolution)
+		}
+	}
+
+	if (mediaSource.video3dFormat != null) {
+		InfoRowItem(
+			contentDescription = null,
+			colors = InfoRowColors.Default,
+		) {
+			Text(stringResource(R.string.lbl_3d))
 		}
 	}
 
