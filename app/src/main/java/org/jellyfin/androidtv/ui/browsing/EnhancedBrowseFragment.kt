@@ -62,8 +62,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
-import androidx.leanback.app.RowsSupportFragment
-import androidx.leanback.widget.Row as LeanbackRow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
@@ -127,9 +125,6 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 	@JvmField protected var itemType: BaseItemKind? = null
 	@JvmField protected var showViews: Boolean = true
 	@JvmField protected var mRows = ArrayList<BrowseRowDef>()
-	@JvmField protected var mCardPresenter: CardPresenter = CardPresenter()
-	@JvmField protected var mRowsAdapter: MutableObjectAdapter<LeanbackRow> = MutableObjectAdapter(PositionableListRowPresenter())
-	@JvmField protected var mRowsFragment: RowsSupportFragment? = null
 
 	private val rowsState = mutableStateListOf<BrowseRowDef>()
 

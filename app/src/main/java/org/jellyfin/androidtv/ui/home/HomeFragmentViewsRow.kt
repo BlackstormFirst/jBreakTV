@@ -1,18 +1,10 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
-import androidx.leanback.widget.HeaderItem
-import androidx.leanback.widget.ListRow
-import androidx.leanback.widget.Row
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.data.querying.GetUserViewsRequest
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
-import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
-import org.jellyfin.androidtv.ui.itemhandling.setInitialItems
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
-import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
 import org.jellyfin.androidtv.util.usbdevices.UsbStorageManager
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -22,10 +14,6 @@ import org.koin.core.component.get
 class HomeFragmentViewsRow(
 	val small: Boolean,
 ) : HomeFragmentRow, KoinComponent {
-	private companion object {
-		val smallCardPresenter = CardPresenter(true, 75)
-		val largeCardPresenter = CardPresenter(true, 126)
-	}
 
 	suspend fun createRowState(
 		context: Context,
@@ -58,16 +46,5 @@ class HomeFragmentViewsRow(
 			title = context.getString(R.string.lbl_my_media),
 			items = rowItems
 		)
-	}
-
-	override fun addRows(context: Context, cardPresenter: CardPresenter, onRowAdded: (ListRow) -> Unit, onRowRemoved: (ListRow) -> Unit) {
-		val presenter = if (small) smallCardPresenter else largeCardPresenter
-		val rowAdapter = ItemRowAdapter(context, GetUserViewsRequest, presenter, null)
-
-		val header = HeaderItem(context.getString(R.string.lbl_my_media))
-		val row = ListRow(header, rowAdapter)
-		rowAdapter.setRow(row)
-		rowAdapter.Retrieve()
-		onRowAdded(row)
 	}
 }

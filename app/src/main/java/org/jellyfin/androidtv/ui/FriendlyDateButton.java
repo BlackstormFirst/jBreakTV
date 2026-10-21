@@ -39,7 +39,7 @@ public class FriendlyDateButton extends FrameLayout {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
 
         if (gainFocus) {
-            setBackgroundColor(getResources().getColor(androidx.leanback.R.color.lb_default_brand_color));
+            setBackgroundColor(getResources().getColor(org.jellyfin.androidtv.R.color.jellyfin_blue));
         } else {
             setBackgroundColor(0);
         }

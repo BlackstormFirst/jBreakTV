@@ -1,11 +1,6 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
-import androidx.leanback.widget.ListRow
-import androidx.leanback.widget.OnItemViewClickedListener
-import androidx.leanback.widget.Presenter
-import androidx.leanback.widget.Row
-import androidx.leanback.widget.RowPresenter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -16,9 +11,7 @@ import org.jellyfin.androidtv.ui.presentation.CardPresenter
 class NotificationsHomeFragmentRow(
 	coroutineScope: CoroutineScope,
 	private val notificationsRepository: NotificationsRepository,
-) : HomeFragmentRow, OnItemViewClickedListener {
-	private var onRowAdded: ((ListRow) -> Unit)? = null
-	private var onRowRemoved: ((ListRow) -> Unit)? = null
+) : HomeFragmentRow {
 
 	private var onRowStateAdded: ((HomeRowState) -> Unit)? = null
 	private var onRowStateRemoved: ((HomeRowState) -> Unit)? = null
@@ -56,16 +49,5 @@ class NotificationsHomeFragmentRow(
 			rowState = newState
 			onRowStateAdded?.invoke(newState)
 		}
-	}
-
-	override fun addRows(context: Context, cardPresenter: CardPresenter, onRowAdded: (ListRow) -> Unit, onRowRemoved: (ListRow) -> Unit) {
-		this.onRowAdded = onRowAdded
-		this.onRowRemoved = onRowRemoved
-	}
-
-	override fun onItemClicked(itemViewHolder: Presenter.ViewHolder?, item: Any?, rowViewHolder: RowPresenter.ViewHolder?, row: Row?) {
-		if (item !is AppNotification) return
-
-		notificationsRepository.dismissNotification(item)
 	}
 }

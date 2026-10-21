@@ -1,7 +1,6 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
-import androidx.leanback.widget.ListRow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -19,10 +18,6 @@ class HomeFragmentNowPlayingRow(
 	private val playbackManager: PlaybackManager,
 	private val mediaManager: MediaManager,
 ) : HomeFragmentRow {
-	var row: ListRow? = null
-	private var onRowAdded: ((ListRow) -> Unit)? = null
-	private var onRowRemoved: ((ListRow) -> Unit)? = null
-
 	private var onRowStateAdded: ((HomeRowState) -> Unit)? = null
 	private var onRowStateRemoved: ((HomeRowState) -> Unit)? = null
 	private var rowState: HomeRowState? = null
@@ -46,18 +41,10 @@ class HomeFragmentNowPlayingRow(
 		}
 	}
 
-	override fun addRows(
-		context: Context,
-		cardPresenter: CardPresenter,
-		onRowAdded: (ListRow) -> Unit,
-		onRowRemoved: (ListRow) -> Unit
-	) {
-		this.onRowAdded = onRowAdded
-		this.onRowRemoved = onRowRemoved
-	}
-
-	fun update(context: Context) {
-		// Removed Leanback functionality
+	fun update() {
+		coroutineScope.launch {
+			updateState()
+		}
 	}
 
 	private suspend fun updateState() {
