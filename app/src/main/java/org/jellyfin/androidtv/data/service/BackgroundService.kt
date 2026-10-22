@@ -47,6 +47,8 @@ class BackgroundService(
 	private var lastBackgroundTimerUpdate = 0L
 
 	// Current background data
+	private var loadedUrls: Set<String> = emptySet()
+	private var pendingUrls: Set<String>? = null
 	private var _backgrounds = emptyList<ImageBitmap>()
 	private var _currentIndex = 0
 	private var _currentBackground = MutableStateFlow<ImageBitmap?>(null)
@@ -59,6 +61,7 @@ class BackgroundService(
 	// Saved background for restoration after splash screen
 	private var savedBackground: ImageBitmap? = null
 	private var savedBackgrounds: List<ImageBitmap> = emptyList()
+	private var savedLoadedUrls: Set<String> = emptySet()
 
 	/**
 	 * Temporarily resets the background to the default theme background,
@@ -68,6 +71,7 @@ class BackgroundService(
 		if (_currentBackground.value != null) {
 			savedBackground = _currentBackground.value
 			savedBackgrounds = _backgrounds
+			savedLoadedUrls = loadedUrls
 		}
 		_currentBackground.value = null
 	}
@@ -78,9 +82,11 @@ class BackgroundService(
 	fun restoreSavedBackground() {
 		val saved = savedBackground ?: return
 		_backgrounds = savedBackgrounds
+		loadedUrls = savedLoadedUrls
 		_currentBackground.value = saved
 		savedBackground = null
 		savedBackgrounds = emptyList()
+		savedLoadedUrls = emptySet()
 	}
 
 	/**
@@ -137,6 +143,22 @@ class BackgroundService(
 		// Re-enable backgrounds if disabled
 		_enabled.value = true
 
+		// If the requested backdrops are already loaded and displayed, do nothing
+		if (backdropUrls == loadedUrls && _backgrounds.isNotEmpty() && _currentBackground.value != null) {
+			if (pendingUrls != null && pendingUrls != loadedUrls) {
+				loadBackgroundsJob?.cancel()
+				pendingUrls = null
+			}
+			return
+		}
+
+		// If a load job is already actively debouncing/loading this exact set of URLs, let it continue
+		if (backdropUrls == pendingUrls && loadBackgroundsJob?.isActive == true) {
+			return
+		}
+
+		pendingUrls = backdropUrls
+
 		// Cancel current loading job
 		loadBackgroundsJob?.cancel()
 		loadBackgroundsJob = scope.launch(Dispatchers.IO) {
@@ -166,6 +188,8 @@ class BackgroundService(
 
 				if (loaded.isNotEmpty()) {
 					_backgrounds = loaded
+					loadedUrls = backdropUrls
+					pendingUrls = null
 					_currentIndex = 0
 					showImmediateBackground()
 				}
@@ -186,6 +210,8 @@ class BackgroundService(
 
 	fun clearBackgrounds() {
 		loadBackgroundsJob?.cancel()
+		pendingUrls = null
+		loadedUrls = emptySet()
 
 		// Re-enable backgrounds if disabled
 		_enabled.value = true
