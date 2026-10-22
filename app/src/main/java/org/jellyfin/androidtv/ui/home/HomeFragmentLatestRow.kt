@@ -23,7 +23,6 @@ class HomeFragmentLatestRow(
 
 	suspend fun prepareRowStates(
 		context: Context,
-		cardPresenter: CardPresenter,
 		api: ApiClient,
 	): List<HomeRowState> = coroutineScope {
 		val configuration = userRepository.currentUser.value?.configuration
@@ -44,10 +43,16 @@ class HomeFragmentLatestRow(
 				)
 				val title = context.getString(R.string.lbl_latest_in, item.name)
 				val rowDef = BrowseRowDef(title, request, arrayOf(ChangeTriggerType.LibraryUpdated))
-				HomeFragmentBrowseRowDefRow(rowDef).prepareRowState(context, cardPresenter, api)
+				HomeFragmentBrowseRowDefRow(rowDef).prepareRowState(context, api)
 			}
 		}.awaitAll().filterNotNull()
 	}
+
+	suspend fun prepareRowStates(
+		context: Context,
+		cardPresenter: CardPresenter,
+		api: ApiClient,
+	): List<HomeRowState> = prepareRowStates(context, api)
 
 	companion object {
 		// Collections excluded from latest row based on app support and common sense

@@ -98,7 +98,6 @@ fun HomeComposeScreen(
     onItemFocus: (item: Any?, rowIndex: Int) -> Unit
 ) {
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
     val pivotBringIntoViewSpec = rememberPivotBringIntoViewSpec()
     val horizontalBringIntoViewSpec = rememberHorizontalBringIntoViewSpec()
 
@@ -165,7 +164,7 @@ fun HomeComposeScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 64.dp)
             ) {
-                itemsIndexed(rows, key = { rowIndex, rowState -> rowState.id + "_" + rowIndex }) { rowIndex, rowState ->
+                itemsIndexed(rows, key = { _, rowState -> rowState.id }) { rowIndex, rowState ->
                     val headerText = rowState.title ?: ""
                     val items = rowState.items
 
@@ -185,8 +184,8 @@ fun HomeComposeScreen(
                                     contentPadding = PaddingValues(horizontal = 56.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    itemsIndexed(items, key = { index, item ->
-                                        "${rowIndex}_${item.hashCode()}_$index"
+                                    itemsIndexed(items, key = { _, item ->
+                                        getItemKey(item)
                                     }) { index, item ->
                                         var isFocused by remember { mutableStateOf(false) }
                                         var showContextMenu by remember { mutableStateOf(false) }
@@ -215,9 +214,6 @@ fun HomeComposeScreen(
                                                         selectedItem = item
                                                         if (focusedRowIndex != rowIndex) {
                                                             focusedRowIndex = rowIndex
-                                                            coroutineScope.launch {
-                                                                listState.animateScrollToItem(rowIndex)
-                                                            }
                                                         }
                                                         onItemFocus(item, rowIndex)
                                                     }

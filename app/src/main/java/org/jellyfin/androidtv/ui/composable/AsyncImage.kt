@@ -3,28 +3,24 @@ package org.jellyfin.androidtv.ui.composable
 import android.graphics.drawable.Drawable
 import android.widget.ImageView
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.viewinterop.AndroidView
+import coil3.compose.AsyncImage as CoilAsyncImage
+import coil3.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jellyfin.androidtv.ui.AsyncImageView
 import org.jellyfin.androidtv.util.BlurHashDecoder
-
-private data class AsyncImageState(
-	val url: String?,
-	val blurHash: String?,
-)
+import kotlin.math.max
+import kotlin.math.round
 
 @Composable
 fun AsyncImage(
@@ -36,31 +32,57 @@ fun AsyncImage(
 	blurHashResolution: Int = 16,
 	scaleType: ImageView.ScaleType? = null,
 ) {
-	// Only the important properties are added to AsyncImageState
-	var state by remember { mutableStateOf<AsyncImageState?>(null) }
+	val context = LocalContext.current
 
-	AndroidView(
+	val contentScale = when (scaleType) {
+		ImageView.ScaleType.FIT_CENTER -> ContentScale.Fit
+		ImageView.ScaleType.CENTER_CROP -> ContentScale.Crop
+		ImageView.ScaleType.CENTER_INSIDE -> ContentScale.Inside
+		ImageView.ScaleType.FIT_XY -> ContentScale.FillBounds
+		else -> ContentScale.Crop
+	}
+
+	val blurPlaceholderState = produceState<Painter?>(initialValue = null, url, blurHash, aspectRatio, blurHashResolution) {
+		if (!blurHash.isNullOrEmpty() && aspectRatio > 0f) {
+			val res = max(16, blurHashResolution)
+			val w = max(16, if (aspectRatio > 1) round(res * aspectRatio).toInt() else res)
+			val h = max(16, if (aspectRatio < 1) round(res / aspectRatio).toInt() else res)
+
+			val cachedBitmap = BlurHashDecoder.getCached(blurHash, w, h)
+			if (cachedBitmap != null) {
+				value = BitmapPainter(cachedBitmap.asImageBitmap())
+			} else {
+				val decodedBitmap = withContext(Dispatchers.IO) {
+					BlurHashDecoder.decode(
+						blurHash = blurHash,
+						width = w,
+						height = h,
+						context = context,
+					)
+				}
+				if (decodedBitmap != null) {
+					value = BitmapPainter(decodedBitmap.asImageBitmap())
+				}
+			}
+		}
+	}
+
+	val placeholderPainter = blurPlaceholderState.value
+
+	val model = remember(context, url) {
+		ImageRequest.Builder(context)
+			.data(url ?: placeholder)
+			.memoryCacheKey(url)
+			.build()
+	}
+
+	CoilAsyncImage(
+		model = model,
+		contentDescription = null,
 		modifier = modifier,
-		factory = { context ->
-			AsyncImageView(context).also { view ->
-				view.adjustViewBounds = true
-				view.scaleType = scaleType ?: ImageView.ScaleType.FIT_CENTER
-			}
-		},
-		update = { view ->
-			val compositionState = AsyncImageState(url, blurHash)
-			if (state != compositionState) {
-				state = compositionState
-
-				view.load(
-					url = compositionState.url,
-					blurHash = compositionState.blurHash,
-					placeholder = placeholder,
-					aspectRatio = aspectRatio.toDouble(),
-					blurHashResolution = blurHashResolution,
-				)
-			}
-		},
+		contentScale = contentScale,
+		placeholder = placeholderPainter,
+		error = placeholderPainter,
 	)
 }
 
