@@ -110,6 +110,8 @@ class BrowseViewFragment : EnhancedBrowseFragment() {
 			}
 
 			CollectionType.MUSIC -> {
+				itemType = BaseItemKind.MUSIC_ALBUM
+
 				// Latest
 				mRows.add(
 					BrowseRowDef(

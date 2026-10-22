@@ -170,6 +170,9 @@ class ItemListFragment : Fragment() {
 			},
 			onItemClick = { _, index ->
 				playItems(items, index, false)
+			},
+			onHomeClick = {
+				navigationRepository.reset(Destinations.home, clearHistory = true)
 			}
 		)
 	}

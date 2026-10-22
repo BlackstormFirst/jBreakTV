@@ -46,7 +46,13 @@ class ImageHelper(
 		item: BaseItemDto,
 		width: Int? = null,
 		height: Int? = null,
-	): String? = item.itemImages[ImageType.PRIMARY]?.getUrl(api, maxWidth = width, maxHeight = height)
+	): String? {
+		val image = when (item.type) {
+			BaseItemKind.AUDIO -> item.itemImages[ImageType.PRIMARY] ?: item.albumPrimaryImage ?: item.parentImages[ImageType.PRIMARY]
+			else -> item.itemImages[ImageType.PRIMARY]
+		}
+		return image?.getUrl(api, maxWidth = width, maxHeight = height)
+	}
 
 	fun getPrimaryImageUrl(
 		item: BaseItemDto,
@@ -58,9 +64,9 @@ class ImageHelper(
 			preferParentThumb && item.type == BaseItemKind.EPISODE -> item.parentImages[ImageType.THUMB] ?: item.seriesThumbImage
 			item.type == BaseItemKind.SEASON -> item.itemImages[ImageType.PRIMARY] ?: item.seriesPrimaryImage
 			item.type == BaseItemKind.PROGRAM && item.imageTags?.containsKey(ImageType.THUMB) == true -> item.itemImages[ImageType.THUMB]
-			item.type == BaseItemKind.AUDIO -> item.albumPrimaryImage
+			item.type == BaseItemKind.AUDIO -> item.itemImages[ImageType.PRIMARY] ?: item.albumPrimaryImage ?: item.parentImages[ImageType.PRIMARY]
 			else -> null
-		} ?: item.itemImages[ImageType.PRIMARY]
+		} ?: item.itemImages[ImageType.PRIMARY] ?: item.albumPrimaryImage ?: item.parentImages[ImageType.PRIMARY]
 
 		return image?.getUrl(
 			api = api,

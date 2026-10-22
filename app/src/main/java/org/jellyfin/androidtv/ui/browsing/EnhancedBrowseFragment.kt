@@ -93,6 +93,7 @@ import org.jellyfin.androidtv.ui.shared.toolbar.Toolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarButtons
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.apiclient.EmptyResponse
+import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -132,6 +133,7 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 	private val itemLauncher by inject<ItemLauncher>()
 	private val navigationRepository by inject<NavigationRepository>()
 	private val api by inject<ApiClient>()
+	private val playbackHelper by inject<PlaybackHelper>()
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -205,6 +207,7 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 			}
 
 			BaseItemKind.MUSIC_ALBUM -> {
+				gridButtons.add(GridButtonBaseRowItem(GridButton(GRID, getString(R.string.lbl_all_items))))
 				gridButtons.add(GridButtonBaseRowItem(GridButton(ALBUMS, getString(R.string.lbl_albums))))
 				gridButtons.add(GridButtonBaseRowItem(GridButton(ALBUM_ARTISTS, getString(R.string.lbl_album_artists))))
 				gridButtons.add(GridButtonBaseRowItem(GridButton(ARTISTS, getString(R.string.lbl_artists))))
@@ -242,6 +245,7 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 			ALBUMS -> navigationRepository.navigate(Destinations.libraryBrowser(folder, null))
 			ALBUM_ARTISTS -> navigationRepository.navigate(Destinations.libraryBrowser(folder, "AlbumArtist"))
 			ARTISTS -> navigationRepository.navigate(Destinations.libraryBrowser(folder, "Artist"))
+			FAVSONGS -> navigationRepository.navigate(Destinations.musicFavorites(folder.id))
 			RANDOM -> {
 				itemType?.let { type ->
 					BrowsingUtils.getRandomItem(api, viewLifecycleOwner, folder, type) { randomItem ->
@@ -254,6 +258,9 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 						}
 					}
 				}
+			}
+			SHUFFLE_SONGS -> {
+				playbackHelper.retrieveAndPlay(folder.id, true, requireContext())
 			}
 		}
 	}

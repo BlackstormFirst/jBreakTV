@@ -19,6 +19,8 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
+import org.jellyfin.androidtv.ui.navigation.Destinations
+import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.playback.PlaybackController
@@ -37,6 +39,7 @@ import java.util.UUID
 class MusicFavoritesListFragment : Fragment() {
 	private val mediaManager by inject<MediaManager>()
 	private val playbackLauncher by inject<PlaybackLauncher>()
+	private val navigationRepository by inject<NavigationRepository>()
 	private val api by inject<ApiClient>()
 
 	override fun onCreateView(
@@ -139,6 +142,9 @@ class MusicFavoritesListFragment : Fragment() {
 			onOpenArtistClick = null,
 			onItemClick = { _, index ->
 				playItems(items, index, false)
+			},
+			onHomeClick = {
+				navigationRepository.reset(Destinations.home, clearHistory = true)
 			}
 		)
 	}

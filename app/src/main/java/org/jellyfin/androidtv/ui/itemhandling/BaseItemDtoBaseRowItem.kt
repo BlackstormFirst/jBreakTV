@@ -132,9 +132,9 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 				?: baseItem.seriesPrimaryImage
 
 			baseItem?.type == BaseItemKind.PROGRAM -> baseItem.itemImages[ImageType.THUMB]
-			baseItem?.type == BaseItemKind.AUDIO -> baseItem.albumPrimaryImage
+			baseItem?.type == BaseItemKind.AUDIO -> baseItem.itemImages[ImageType.PRIMARY] ?: baseItem.albumPrimaryImage ?: baseItem.parentImages[ImageType.PRIMARY]
 			else -> null
-		} ?: baseItem?.itemImages[ImageType.PRIMARY]
+		} ?: baseItem?.itemImages[ImageType.PRIMARY] ?: baseItem?.albumPrimaryImage ?: baseItem?.parentImages[ImageType.PRIMARY]
 
 		return when (imageType) {
 			BaseRowImageType.BANNER -> baseItem?.itemImages[ImageType.BANNER] ?: primaryImage
