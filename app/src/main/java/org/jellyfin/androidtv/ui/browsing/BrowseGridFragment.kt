@@ -97,6 +97,7 @@ import org.jellyfin.androidtv.ui.settings.routes
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.apiclient.EmptyResponse
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
@@ -421,6 +422,7 @@ fun BrowseGridScreen(
 	var availableTypes by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
 
 	val api = koinInject<ApiClient>()
+	val userRepository = koinInject<UserRepository>()
 
 	val displayPrefsId = remember(folder) { folder?.displayPreferencesId ?: folder?.id?.toString() }
 	val libraryPreferences = remember(displayPrefsId) {
@@ -460,18 +462,61 @@ fun BrowseGridScreen(
 		}
 	}
 
-	LaunchedEffect(folder) {
-		val folderId = folder?.id ?: return@LaunchedEffect
-		FilterLoader.loadGenres(api, folderId) { genresMap ->
-			availableGenres = genresMap
-		}
-		FilterLoader.loadAudioLanguages(api, folderId) { audioMap ->
-			availableAudio = audioMap
-		}
-		if (folder?.collectionType == CollectionType.MOVIES) {
-			FilterLoader.loadResolutionCounts(api, folderId) { countsMap ->
-				availableTypes = countsMap
-			}
+	LaunchedEffect(folder, isUnwatchedOnly, isFavoritesOnly, selectedGenre, selectedAudio, selectedType) {
+		val activeFolder = folder ?: return@LaunchedEffect
+		val folderId = activeFolder.id
+		val userId = userRepository.currentUser.value?.id
+		val baseRequest = BrowsingUtils.createBrowseGridItemsRequest(activeFolder)
+		val includeItemTypes = baseRequest.includeItemTypes?.toList()
+
+		val filterSet = mutableSetOf<ItemFilter>()
+		if (isUnwatchedOnly) filterSet.add(ItemFilter.IS_UNPLAYED)
+		if (isFavoritesOnly) filterSet.add(ItemFilter.IS_FAVORITE)
+		val itemFilters = if (filterSet.isNotEmpty()) filterSet.toList() else null
+
+		val currentGenres = listOfNotNull(selectedGenre)
+		val currentAudio = listOfNotNull(selectedAudio)
+		val is4k = if (selectedType == "4K") true else null
+		val isHd = if (selectedType == "HD") true else null
+		val is3d = if (selectedType == "3D") true else null
+
+		FilterLoader.loadGenres(
+			apiClient = api,
+			parentId = folderId,
+			userId = userId,
+			includeItemTypes = includeItemTypes,
+			audioLanguages = currentAudio,
+			is4k = is4k,
+			isHd = isHd,
+			is3d = is3d,
+			itemFilters = itemFilters,
+			callback = { genresMap -> availableGenres = genresMap }
+		)
+
+		FilterLoader.loadAudioLanguages(
+			apiClient = api,
+			parentId = folderId,
+			userId = userId,
+			includeItemTypes = includeItemTypes,
+			genres = currentGenres,
+			is4k = is4k,
+			isHd = isHd,
+			is3d = is3d,
+			itemFilters = itemFilters,
+			callback = { audioMap -> availableAudio = audioMap }
+		)
+
+		if (activeFolder.collectionType == CollectionType.MOVIES) {
+			FilterLoader.loadResolutionCounts(
+				apiClient = api,
+				parentId = folderId,
+				userId = userId,
+				includeItemTypes = includeItemTypes,
+				genres = currentGenres,
+				audioLanguages = currentAudio,
+				itemFilters = itemFilters,
+				callback = { countsMap -> availableTypes = countsMap }
+			)
 		}
 	}
 
