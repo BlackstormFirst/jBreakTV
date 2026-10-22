@@ -30,9 +30,12 @@ object ItemRepository {
 	val browseFields = setOf(
 		ItemFields.CAN_DELETE,
 		ItemFields.CHILD_COUNT,
+		ItemFields.CUMULATIVE_RUN_TIME_TICKS,
 		ItemFields.DATE_CREATED,
+		ItemFields.GENRES,
 		ItemFields.OVERVIEW,
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
+		ItemFields.TAGLINES,
 	)
 
 	// Light field set for Android TV background channel worker (LeanbackChannelWorker).

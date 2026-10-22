@@ -426,7 +426,7 @@ fun BrowseFolderScreen(
 								override fun onResponse() {
 									val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
 									rowData[rowIndex] = loaded
-									if (rowIndex == 0 && selectedItem == null && loaded.isNotEmpty()) {
+									if (selectedItem == null && loaded.isNotEmpty()) {
 										selectedItem = loaded.first()
 										onItemFocused(loaded.first())
 									}
@@ -452,7 +452,7 @@ fun BrowseFolderScreen(
 									itemsIndexed(itemsState, key = { index, item -> "${rowIndex}_${item.baseItem?.id}_$index" }) { index, item ->
 										var isFocused by remember { mutableStateOf(false) }
 										var showContextMenu by remember { mutableStateOf(false) }
-										val isSelectedItem = (item == selectedItem || (selectedItem == null && rowIndex == 0 && index == 0))
+										val isSelectedItem = (item == selectedItem)
 
 										if (isSelectedItem) {
 											LaunchedEffect(itemsState.isNotEmpty()) {
