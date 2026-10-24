@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.data.repository.UserViewsRepository
+import org.jellyfin.androidtv.ui.livetv.TvManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userApi
 import timber.log.Timber
@@ -16,6 +18,7 @@ class PreferencesRepository(
 	private val api: ApiClient,
 	private val liveTvPreferences: LiveTvPreferences,
 	private val userSettingPreferences: UserSettingPreferences,
+	private val userViewsRepository: UserViewsRepository,
 ) {
 	private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 	private val libraryPreferences = mutableMapOf<String, LibraryPreferences>()
@@ -50,12 +53,22 @@ class PreferencesRepository(
 		userSettingPreferences.userServerRemoteSettings(configuration)
 	}
 
+	fun clearCaches() {
+		userViewsRepository.clearCache()
+		TvManager.reset()
+
+		liveTvPreferences.clearCache()
+		userSettingPreferences.clearCache()
+
+		libraryPreferences.clear()
+	}
+
 	suspend fun onSessionChanged() {
+		clearCaches()
+
 		// Note: Do not run parallel as the server can't deal with that
 		// Relevant server issue: https://github.com/jellyfin/jellyfin/issues/5261
 		liveTvPreferences.update()
 		userSettingPreferences.update()
-
-		libraryPreferences.clear()
 	}
 }

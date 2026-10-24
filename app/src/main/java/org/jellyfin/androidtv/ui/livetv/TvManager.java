@@ -64,6 +64,14 @@ public class TvManager {
         return allChannels == null ? Collections.emptyList() : allChannels;
     }
 
+    public static void reset() {
+        allChannels = null;
+        channelIds = null;
+        mProgramsDict = new HashMap<>();
+        needLoadTime = null;
+        forceReload = true;
+    }
+
     public static void forceReload() {
         forceReload = true;
     }

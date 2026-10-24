@@ -120,6 +120,12 @@ class SessionRepositoryImpl(
 		serverRepository.setCurrentServer(null)
 		_currentSession.value = null
 		_state.value = SessionRepositoryState.READY
+
+		try {
+			preferencesRepository.clearCaches()
+		} catch (err: Exception) {
+			Timber.e(err, "Error clearing preferences on session destroy")
+		}
 	}
 
 	private suspend fun setCurrentSession(session: Session?): Boolean {

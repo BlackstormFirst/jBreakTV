@@ -103,17 +103,21 @@ class HomeViewModel(
     private var lastHandledPlayback: Instant? = null
 
     private fun addDirectRowState(rowState: HomeRowState) {
-        val index = _directRowStates.indexOfFirst { it.id == rowState.id }
-        if (index >= 0) {
-            _directRowStates[index] = rowState
-        } else {
-            _directRowStates.add(rowState)
+        synchronized(_directRowStates) {
+            val index = _directRowStates.indexOfFirst { it.id == rowState.id }
+            if (index >= 0) {
+                _directRowStates[index] = rowState
+            } else {
+                _directRowStates.add(rowState)
+            }
         }
         updateUiState()
     }
 
     private fun removeDirectRowState(rowState: HomeRowState) {
-        _directRowStates.removeAll { it.id == rowState.id }
+        synchronized(_directRowStates) {
+            _directRowStates.removeAll { it.id == rowState.id }
+        }
         updateUiState()
     }
 
@@ -153,12 +157,17 @@ class HomeViewModel(
     }
 
     private fun updateUiState() {
-        val rowStates = _directRowStates.sortedBy { it.sectionIndex }
+        val rowStates = synchronized(_directRowStates) {
+            _directRowStates.sortedBy { it.sectionIndex }
+        }
         _uiState.value = HomeUiState.Success(rowStates)
     }
 
     private fun loadHomeSections(cardPresenter: CardPresenter) {
         viewModelScope.launch(Dispatchers.IO) {
+            synchronized(_directRowStates) {
+                _directRowStates.removeAll { it.sectionIndex >= 0 }
+            }
             val currentUser = withTimeout(30.seconds) {
                 userRepository.currentUser.filterNotNull().first()
             }
