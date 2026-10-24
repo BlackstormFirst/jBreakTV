@@ -2,7 +2,6 @@ package org.jellyfin.androidtv.ui.player.video
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +43,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.ImageLoader
 import coil3.compose.rememberAsyncImagePainter
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
@@ -52,8 +52,10 @@ import coil3.request.maxBitmapSize
 import coil3.request.transformations
 import coil3.size.Dimension
 import coil3.size.Size
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.constant.ZoomMode
 import org.jellyfin.androidtv.ui.base.Icon
@@ -93,7 +95,9 @@ fun VideoPlayerOverlay(
 	onZoomSelect: (ZoomMode) -> Unit = {},
 ) {
 	val api = koinInject<ApiClient>()
+	val imageLoader = koinInject<ImageLoader>()
 	val videoQueueManager = koinInject<VideoQueueManager>()
+	val context = LocalContext.current
 	val coroutineScope = rememberCoroutineScope()
 
 	val visibilityState = rememberPlayerOverlayVisibility()
@@ -115,6 +119,64 @@ fun VideoPlayerOverlay(
 
 	val positionInfo by rememberPlayerPositionInfo(playbackManager, precision = 1.seconds)
 	val currentPositionMs = positionInfo.active.inWholeMilliseconds
+
+	val durationMs = item?.runTimeTicks?.let { it / 10000L }?.takeIf { it > 0 }
+		?: positionInfo.duration.inWholeMilliseconds
+
+	LaunchedEffect(item?.id, durationMs) {
+		val currentItem = item ?: return@LaunchedEffect
+		if (LocalVideoManager.isLocalItem(currentItem) || durationMs <= 0) return@LaunchedEffect
+
+		val trickPlayResolutions = currentItem.mediaSources?.firstOrNull()?.id?.let { currentItem.trickplay?.get(it) }
+			?: currentItem.trickplay?.get(currentItem.id.toString())
+			?: currentItem.trickplay?.values?.firstOrNull()
+			?: return@LaunchedEffect
+
+		val trickPlayInfo = trickPlayResolutions.values.firstOrNull() ?: return@LaunchedEffect
+		if (trickPlayInfo.interval <= 0) return@LaunchedEffect
+
+		val mediaSourceId = currentItem.mediaSources?.firstOrNull()?.id?.toUUIDOrNull()
+			?: currentItem.trickplay?.keys?.firstOrNull()?.toUUIDOrNull()
+			?: currentItem.id
+
+		val tileSize = trickPlayInfo.tileWidth * trickPlayInfo.tileHeight
+		if (tileSize <= 0) return@LaunchedEffect
+
+		val maxTileIndex = (durationMs / trickPlayInfo.interval).toInt()
+		val totalSheets = (maxTileIndex / tileSize) + 1
+
+		withContext(Dispatchers.IO) {
+			(0 until totalSheets).forEach { sheetIndex ->
+				launch {
+					val url = api.trickplayApi.getTrickplayTileImageUrl(
+						itemId = currentItem.id,
+						width = trickPlayInfo.width,
+						index = sheetIndex,
+						mediaSourceId = mediaSourceId,
+					)
+					val request = ImageRequest.Builder(context)
+						.data(url)
+						.size(Size.ORIGINAL)
+						.maxBitmapSize(Size(Dimension.Undefined, Dimension.Undefined))
+						.httpHeaders(NetworkHeaders.Builder().apply {
+							set(
+								key = "Authorization",
+								value = AuthorizationHeaderBuilder.buildHeader(
+									api.clientInfo.name,
+									api.clientInfo.version,
+									api.deviceInfo.id,
+									api.deviceInfo.name,
+									api.accessToken
+								)
+							)
+						}.build())
+						.build()
+
+					imageLoader.execute(request)
+				}
+			}
+		}
+	}
 
 	val mediaSegmentRepository = koinInject<MediaSegmentRepository>()
 	val skippableSegment = remember(entry, currentPositionMs, mediaSegmentRepository) {
@@ -402,11 +464,6 @@ private fun TrickplayFilmstripBar(
 							.size(width = tileWidth, height = tileHeight)
 							.clip(RoundedCornerShape(4.dp))
 							.background(Color.Black)
-							.border(
-								width = if (isCenter) 2.dp else 1.dp,
-								color = if (isCenter) Color.White else Color.White.copy(alpha = 0.3f),
-								shape = RoundedCornerShape(4.dp)
-							)
 					) {
 						Image(
 							painter = rememberAsyncImagePainter(imageRequest),
