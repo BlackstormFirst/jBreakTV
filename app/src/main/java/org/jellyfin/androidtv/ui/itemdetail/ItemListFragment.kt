@@ -98,13 +98,24 @@ class ItemListFragment : Fragment() {
 								parentId = loadedItem.id,
 								includeItemTypes = setOf(BaseItemKind.AUDIO),
 								recursive = true,
-								sortBy = setOf(ItemSortBy.SORT_NAME),
+								sortBy = setOf(
+									ItemSortBy.PARENT_INDEX_NUMBER,
+									ItemSortBy.INDEX_NUMBER,
+									ItemSortBy.SORT_NAME
+								),
 								limit = 200,
 								fields = ItemRepository.itemFields,
 							).content.items
 						}
 					}
-					items = loadedItems
+					items = if (loadedItems.all { it.indexNumber == null }) {
+						loadedItems
+					} else {
+						loadedItems.sortedWith(
+							compareBy<BaseItemDto> { it.parentIndexNumber ?: 1 }
+								.thenBy { it.indexNumber ?: Int.MAX_VALUE }
+						)
+					}
 				} catch (t: Throwable) {
 					timber.log.Timber.e(t, "Failed to load item list")
 				}

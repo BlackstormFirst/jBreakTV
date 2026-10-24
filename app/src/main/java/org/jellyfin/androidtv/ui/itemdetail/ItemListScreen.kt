@@ -147,13 +147,24 @@ fun ItemListScreen(
 
 	val configuration = LocalConfiguration.current
 
-	val dynamicTitleWidth = remember(items, headlineStyle, captionStyle, density, context, configuration) {
-		if (items.isEmpty()) return@remember 120.dp
+	val displayItems = remember(items) {
+		if (items.all { it.indexNumber == null }) {
+			items
+		} else {
+			items.sortedWith(
+				compareBy<BaseItemDto> { it.parentIndexNumber ?: 1 }
+					.thenBy { it.indexNumber ?: Int.MAX_VALUE }
+			)
+		}
+	}
+
+	val dynamicTitleWidth = remember(displayItems, headlineStyle, captionStyle, density, context, configuration) {
+		if (displayItems.isEmpty()) return@remember 120.dp
 
 		val boldHeadlineStyle = headlineStyle.copy(fontWeight = FontWeight.Bold)
 
 		var maxPx = 0
-		for (item in items) {
+		for (item in displayItems) {
 			val displayName = if (item.type != BaseItemKind.AUDIO && item.seriesName != null) {
 				item.getFullName(context)
 			} else {
@@ -183,11 +194,11 @@ fun ItemListScreen(
 		(maxDp + 8.dp).coerceIn(120.dp, maxAvailableWidth)
 	}
 
-	val dynamicDurationWidth = remember(items, headlineStyle, density) {
-		if (items.isEmpty()) return@remember 48.dp
+	val dynamicDurationWidth = remember(displayItems, headlineStyle, density) {
+		if (displayItems.isEmpty()) return@remember 48.dp
 
 		var maxPx = 0
-		for (item in items) {
+		for (item in displayItems) {
 			val formattedRunTime = TimeUtils.formatMillis((item.runTimeTicks ?: 0L) / 10000L)
 			val w = textMeasurer.measure(formattedRunTime, style = headlineStyle).size.width
 			if (w > maxPx) {
@@ -401,7 +412,7 @@ fun ItemListScreen(
 
 				// Track List Items
 				itemsIndexed(
-					items = items,
+					items = displayItems,
 					key = { index, item -> item.id ?: index }
 				) { index, item ->
 					var isFocused by remember { mutableStateOf(false) }
@@ -467,11 +478,14 @@ fun ItemListScreen(
 											modifier = Modifier.size(20.dp)
 										)
 									} else {
-										Text(
-											text = (index + 1).toString(),
-											style = JellyfinTheme.typography.listHeadline,
-											color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption
-										)
+										val trackNumberText = item.indexNumber?.toString().orEmpty()
+										if (trackNumberText.isNotEmpty()) {
+											Text(
+												text = trackNumberText,
+												style = JellyfinTheme.typography.listHeadline,
+												color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption
+											)
+										}
 									}
 								}
 
