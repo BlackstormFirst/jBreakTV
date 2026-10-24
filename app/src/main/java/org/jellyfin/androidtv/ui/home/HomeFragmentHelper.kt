@@ -65,7 +65,14 @@ class HomeFragmentHelper(
 			enableTotalRecordCount = false,
 		)
 
-		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_next_up), query, arrayOf(ChangeTriggerType.TvPlayback)))
+		return HomeFragmentBrowseRowDefRow(
+			BrowseRowDef(
+				context.getString(R.string.lbl_next_up),
+				query,
+				userPreferences[UserPreferences.seriesThumbnailsEnabled],
+				arrayOf(ChangeTriggerType.TvPlayback)
+			)
+		)
 	}
 
 	fun loadOnNow(): HomeFragmentRow {

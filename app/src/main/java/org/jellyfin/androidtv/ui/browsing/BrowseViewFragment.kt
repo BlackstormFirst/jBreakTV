@@ -83,6 +83,7 @@ class BrowseViewFragment : EnhancedBrowseFragment() {
 					BrowseRowDef(
 						getString(R.string.lbl_next_up),
 						getNextUpRequest,
+						userPreferences[UserPreferences.seriesThumbnailsEnabled],
 						arrayOf(ChangeTriggerType.TvPlayback)
 					)
 				)

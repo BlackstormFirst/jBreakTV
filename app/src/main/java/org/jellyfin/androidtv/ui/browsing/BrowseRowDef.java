@@ -98,10 +98,15 @@ public class BrowseRowDef {
     }
 
     public BrowseRowDef(String header, GetNextUpRequest query, ChangeTriggerType[] changeTriggers) {
+        this(header, query, false, changeTriggers);
+    }
+
+    public BrowseRowDef(String header, GetNextUpRequest query, boolean preferParentThumb, ChangeTriggerType[] changeTriggers) {
         headerText = header;
         this.nextUpQuery = query;
         this.queryType = QueryType.NextUp;
         this.staticHeight = true;
+        this.preferParentThumb = preferParentThumb;
         this.changeTriggers = changeTriggers;
     }
 
