@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -49,6 +50,7 @@ fun DialogBase(
 	if (transition.currentState || transition.isRunning) {
 		val focusRequester = remember { FocusRequester() }
 		var contentVisible by remember { mutableStateOf(false) }
+		var hasRequestedFocus by remember { mutableStateOf(false) }
 
 		Dialog(
 			onDismissRequest = onDismissRequest,
@@ -64,6 +66,12 @@ fun DialogBase(
 					.fillMaxSize()
 					.background(scrimColor.copy(alpha = scrimColor.alpha * alpha))
 					.focusRequester(focusRequester)
+					.onGloballyPositioned {
+						if (!hasRequestedFocus) {
+							hasRequestedFocus = true
+							try { focusRequester.requestFocus() } catch (e: Exception) {}
+						}
+					}
 					.focusGroup()
 					.interactionTracker(),
 				contentAlignment = contentAlignment,
@@ -74,7 +82,6 @@ fun DialogBase(
 					exit = exitTransition,
 				) {
 					content()
-					LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
 				}
 			}
 		}

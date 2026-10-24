@@ -47,6 +47,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -453,7 +454,9 @@ fun BrowseGridScreen(
 	DisposableEffect(lifecycleOwner) {
 		val observer = LifecycleEventObserver { _, event ->
 			if (event == Lifecycle.Event.ON_RESUME) {
-				try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+				if (hasRequestedFocus) {
+					try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+				}
 			}
 		}
 		lifecycleOwner.lifecycle.addObserver(observer)
@@ -820,14 +823,9 @@ fun BrowseGridScreen(
 
 								if (isFirstCard) {
 									LaunchedEffect(itemsState.isNotEmpty()) {
-										if (itemsState.isNotEmpty() && !hasRequestedFocus) {
-											hasRequestedFocus = true
-											if (selectedItem == null) {
-												selectedItem = itemsState.first()
-												onItemFocused(itemsState.first())
-											}
-											kotlinx.coroutines.delay(100)
-											try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+										if (itemsState.isNotEmpty() && selectedItem == null) {
+											selectedItem = itemsState.first()
+											onItemFocused(itemsState.first())
 										}
 									}
 								}
@@ -835,7 +833,12 @@ fun BrowseGridScreen(
 								Box(
 									modifier = Modifier
 										.zIndex(if (isFocused) 1f else 0f)
-										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
+										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester).onGloballyPositioned {
+											if (!hasRequestedFocus) {
+												hasRequestedFocus = true
+												try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+											}
+										} else Modifier)
 										.onFocusChanged { focusState ->
 											isFocused = focusState.isFocused
 											if (focusState.isFocused) {
@@ -888,14 +891,9 @@ fun BrowseGridScreen(
 
 								if (isFirstCard) {
 									LaunchedEffect(itemsState.isNotEmpty()) {
-										if (itemsState.isNotEmpty() && !hasRequestedFocus) {
-											hasRequestedFocus = true
-											if (selectedItem == null) {
-												selectedItem = itemsState.first()
-												onItemFocused(itemsState.first())
-											}
-											kotlinx.coroutines.delay(100)
-											try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+										if (itemsState.isNotEmpty() && selectedItem == null) {
+											selectedItem = itemsState.first()
+											onItemFocused(itemsState.first())
 										}
 									}
 								}
@@ -903,7 +901,12 @@ fun BrowseGridScreen(
 								Box(
 									modifier = Modifier
 										.zIndex(if (isFocused) 1f else 0f)
-										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester) else Modifier)
+										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester).onGloballyPositioned {
+											if (!hasRequestedFocus) {
+												hasRequestedFocus = true
+												try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+											}
+										} else Modifier)
 										.onFocusChanged { focusState ->
 											isFocused = focusState.isFocused
 											if (focusState.isFocused) {

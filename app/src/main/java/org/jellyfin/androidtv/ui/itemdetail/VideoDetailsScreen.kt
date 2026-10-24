@@ -53,6 +53,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -360,6 +361,15 @@ fun VideoDetailsScreen(
     val initialPlayButtonFocusRequester = remember { FocusRequester() }
     var initialFocusRequested by remember { mutableStateOf(false) }
 
+    val initialFocusModifier = Modifier
+        .focusRequester(initialPlayButtonFocusRequester)
+        .onGloballyPositioned {
+            if (!initialFocusRequested) {
+                initialFocusRequested = true
+                try { initialPlayButtonFocusRequester.requestFocus() } catch (e: Exception) {}
+            }
+        }
+
     val isPerson = remember(item) {
         item.type == BaseItemKind.PERSON
     }
@@ -597,7 +607,7 @@ fun VideoDetailsScreen(
                                                 label = resumeLabel,
                                                 onClick = onResumeClick,
                                                 onFocused = { scrollToHeaderTop() },
-                                                modifier = Modifier.focusRequester(initialPlayButtonFocusRequester)
+                                                modifier = initialFocusModifier
                                             )
                                         }
                                     }
@@ -618,7 +628,7 @@ fun VideoDetailsScreen(
                                                 label = playLabel,
                                                 onClick = onPlayClick,
                                                 onFocused = { scrollToHeaderTop() },
-                                                modifier = if (!state.canResume) Modifier.focusRequester(initialPlayButtonFocusRequester) else Modifier
+                                                modifier = if (!state.canResume) initialFocusModifier else Modifier
                                             )
                                         }
                                     }
@@ -680,7 +690,7 @@ fun VideoDetailsScreen(
                                             onClick = onFavoriteClick,
                                             onFocused = { scrollToHeaderTop() },
                                             isActivated = state.isFavorite,
-                                            modifier = if (isPerson) Modifier.focusRequester(initialPlayButtonFocusRequester) else Modifier
+                                            modifier = if (isPerson) initialFocusModifier else Modifier
                                         )
                                     }
 
@@ -722,13 +732,6 @@ fun VideoDetailsScreen(
                                     }
                                 }
 
-                                LaunchedEffect(Unit) {
-                                    if (!initialFocusRequested) {
-                                        initialFocusRequested = true
-                                        kotlinx.coroutines.delay(100)
-                                        try { initialPlayButtonFocusRequester.requestFocus() } catch (e: Exception) {}
-                                    }
-                                }
                             }
 
                             Spacer(Modifier.width(20.dp))

@@ -51,6 +51,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -110,6 +111,16 @@ fun ItemListScreen(
 	val listState = rememberLazyListState()
 	val pivotBringIntoViewSpec = rememberPivotBringIntoViewSpec()
 	val playButtonFocusRequester = remember { FocusRequester() }
+	var initialFocusRequested by remember { mutableStateOf(false) }
+
+	val playButtonModifier = Modifier
+		.focusRequester(playButtonFocusRequester)
+		.onGloballyPositioned {
+			if (!initialFocusRequested && baseItem != null) {
+				initialFocusRequested = true
+				try { playButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+			}
+		}
 
 	val primaryImageUrl = remember(baseItem) {
 		if (baseItem != null) {
@@ -125,9 +136,7 @@ fun ItemListScreen(
 
 	LaunchedEffect(baseItem) {
 		if (baseItem != null) {
-			try {
-				playButtonFocusRequester.requestFocus()
-			} catch (_: Exception) {}
+			initialFocusRequested = false
 		}
 	}
 
@@ -261,7 +270,7 @@ fun ItemListScreen(
 								if (hasAudioQueue && baseItem?.type == BaseItemKind.MUSIC_ALBUM) {
 									Button(
 										onClick = onAddToQueueClick,
-										modifier = Modifier.focusRequester(playButtonFocusRequester)
+										modifier = playButtonModifier
 									) {
 										Icon(
 											painter = painterResource(id = R.drawable.ic_add),
@@ -273,7 +282,7 @@ fun ItemListScreen(
 								} else {
 									Button(
 										onClick = onPlayAllClick,
-										modifier = Modifier.focusRequester(playButtonFocusRequester)
+										modifier = playButtonModifier
 									) {
 										Icon(
 											painter = painterResource(id = R.drawable.ic_play),

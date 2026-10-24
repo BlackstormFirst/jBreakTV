@@ -58,6 +58,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -324,7 +325,9 @@ fun BrowseFolderScreen(
 	DisposableEffect(lifecycleOwner) {
 		val observer = LifecycleEventObserver { _, event ->
 			if (event == Lifecycle.Event.ON_RESUME) {
-				try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+				if (hasRequestedFocus) {
+					try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+				}
 			}
 		}
 		lifecycleOwner.lifecycle.addObserver(observer)
@@ -456,14 +459,9 @@ fun BrowseFolderScreen(
 
 										if (isSelectedItem) {
 											LaunchedEffect(itemsState.isNotEmpty()) {
-												if (itemsState.isNotEmpty() && !hasRequestedFocus) {
-													hasRequestedFocus = true
-													if (selectedItem == null) {
-														selectedItem = itemsState.first()
-														onItemFocused(itemsState.first())
-													}
-													kotlinx.coroutines.delay(100)
-													try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+												if (itemsState.isNotEmpty() && selectedItem == null) {
+													selectedItem = itemsState.first()
+													onItemFocused(itemsState.first())
 												}
 											}
 										}
@@ -471,7 +469,12 @@ fun BrowseFolderScreen(
 										Box(
 											modifier = Modifier
 												.zIndex(if (isFocused) 1f else 0f)
-												.then(if (isSelectedItem) Modifier.focusRequester(selectedItemFocusRequester) else Modifier)
+												.then(if (isSelectedItem) Modifier.focusRequester(selectedItemFocusRequester).onGloballyPositioned {
+													if (!hasRequestedFocus) {
+														hasRequestedFocus = true
+														try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+													}
+												} else Modifier)
 												.onFocusChanged { focusState ->
 													isFocused = focusState.isFocused
 													if (focusState.isFocused) {
