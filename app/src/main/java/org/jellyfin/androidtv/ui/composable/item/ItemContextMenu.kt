@@ -20,6 +20,7 @@ import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.popover.Popover
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenu
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenuItem
+import org.jellyfin.androidtv.ui.itemhandling.AudioQueueBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.util.PlaybackHelper
@@ -116,100 +117,154 @@ fun ItemContextMenu(
 		modifier = keyModifier.then(modifier),
 	) {
 		PopoverMenu {
-			// 1. Play / Play All / Play First Unwatched
-			if (itemCanPlay) {
-				if (isFolder &&
-					baseItem.type != BaseItemKind.MUSIC_ALBUM &&
-					baseItem.type != BaseItemKind.PLAYLIST &&
-					baseItem.type != BaseItemKind.MUSIC_ARTIST &&
-					userData?.unplayedItemCount != null &&
-					userData.unplayedItemCount!! > 0
-				) {
+			val queueEntry = (item as? AudioQueueBaseRowItem)?.queueEntry
+
+			if (queueEntry != null) {
+				// Queue-specific actions
+				if (baseItem.id != mediaManager.currentAudioItem?.id) {
 					PopoverMenuItem(onClick = {
 						handleMenuAction {
-							activity?.playFirstUnwatchedItem(baseItem.id)
+							mediaManager.playFrom(queueEntry)
 						}
 					}) {
-						Text(stringResource(R.string.lbl_play_first_unwatched))
+						Text(stringResource(R.string.lbl_play_from_here))
+					}
+				}
+
+				if (mediaManager.currentAudioQueueSize > 1) {
+					PopoverMenuItem(onClick = {
+						handleMenuAction {
+							mediaManager.shuffleAudioQueue()
+						}
+					}) {
+						Text(stringResource(R.string.lbl_shuffle_queue))
 					}
 				}
 
 				PopoverMenuItem(onClick = {
 					handleMenuAction {
-						if (activity != null) {
-							playbackHelper.retrieveAndPlay(baseItem.id, false, activity)
-						}
+						mediaManager.removeFromAudioQueue(queueEntry)
 					}
 				}) {
-					Text(stringResource(if (isFolder) R.string.lbl_play_all else R.string.lbl_play))
+					Text(stringResource(R.string.lbl_remove_from_queue))
 				}
 
-				if (isFolder) {
+				if (mediaManager.hasAudioQueueItems()) {
 					PopoverMenuItem(onClick = {
 						handleMenuAction {
-							if (activity != null) {
-								playbackHelper.retrieveAndPlay(baseItem.id, true, activity)
-							}
+							mediaManager.clearAudioQueue()
 						}
 					}) {
-						Text(stringResource(R.string.lbl_shuffle_all))
+						Text(stringResource(R.string.lbl_clear_queue))
 					}
 				}
-			}
 
-			// 2. Music Actions
-			if (isMusic) {
 				PopoverMenuItem(onClick = {
 					handleMenuAction {
-						if (activity != null) {
-							playbackHelper.getItemsToPlay(activity, baseItem, false, false, object : Response<List<BaseItemDto>>(activity.lifecycle) {
-								override fun onResponse(response: List<BaseItemDto>) {
-									mediaManager.addToAudioQueue(response)
-								}
-
-								override fun onError(exception: Exception) {
-									Toast.makeText(activity, R.string.msg_cannot_play_time, Toast.LENGTH_SHORT).show()
-								}
-							})
-						}
-					}
-				}) {
-					Text(stringResource(R.string.lbl_add_to_queue))
-				}
-
-				if (baseItem.type != BaseItemKind.PLAYLIST) {
-					PopoverMenuItem(onClick = {
-						handleMenuAction {
-							if (activity != null) {
-								playbackHelper.playInstantMix(activity, baseItem)
-							}
-						}
-					}) {
-						Text(stringResource(R.string.lbl_instant_mix))
-					}
-				}
-			} else {
-				// 3. Mark as Played / Unplayed
-				PopoverMenuItem(onClick = {
-					handleMenuAction {
-						togglePlayed(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isPlayed) { userData ->
+						toggleFavorite(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isFavorite) { userData ->
 							onItemUpdated?.invoke(updateItemWithUserData(item, userData))
 						}
 					}
 				}) {
-					Text(stringResource(if (isPlayed) R.string.lbl_mark_unplayed else R.string.lbl_mark_played))
+					Text(stringResource(if (isFavorite) R.string.lbl_remove_favorite else R.string.lbl_add_favorite))
 				}
-			}
+			} else {
+				// Standard actions
+				// 1. Play / Play All / Play First Unwatched
+				if (itemCanPlay) {
+					if (isFolder &&
+						baseItem.type != BaseItemKind.MUSIC_ALBUM &&
+						baseItem.type != BaseItemKind.PLAYLIST &&
+						baseItem.type != BaseItemKind.MUSIC_ARTIST &&
+						userData?.unplayedItemCount != null &&
+						userData.unplayedItemCount!! > 0
+					) {
+						PopoverMenuItem(onClick = {
+							handleMenuAction {
+								activity?.playFirstUnwatchedItem(baseItem.id)
+							}
+						}) {
+							Text(stringResource(R.string.lbl_play_first_unwatched))
+						}
+					}
 
-			// 4. Toggle Favorite
-			PopoverMenuItem(onClick = {
-				handleMenuAction {
-					toggleFavorite(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isFavorite) { userData ->
-						onItemUpdated?.invoke(updateItemWithUserData(item, userData))
+					PopoverMenuItem(onClick = {
+						handleMenuAction {
+							if (activity != null) {
+								playbackHelper.retrieveAndPlay(baseItem.id, false, activity)
+							}
+						}
+					}) {
+						Text(stringResource(if (isFolder) R.string.lbl_play_all else R.string.lbl_play))
+					}
+
+					if (isFolder) {
+						PopoverMenuItem(onClick = {
+							handleMenuAction {
+								if (activity != null) {
+									playbackHelper.retrieveAndPlay(baseItem.id, true, activity)
+								}
+							}
+						}) {
+							Text(stringResource(R.string.lbl_shuffle_all))
+						}
 					}
 				}
-			}) {
-				Text(stringResource(if (isFavorite) R.string.lbl_remove_favorite else R.string.lbl_add_favorite))
+
+				// 2. Music Actions
+				if (isMusic) {
+					PopoverMenuItem(onClick = {
+						handleMenuAction {
+							if (activity != null) {
+								playbackHelper.getItemsToPlay(activity, baseItem, false, false, object : Response<List<BaseItemDto>>(activity.lifecycle) {
+									override fun onResponse(response: List<BaseItemDto>) {
+										mediaManager.addToAudioQueue(response)
+									}
+
+									override fun onError(exception: Exception) {
+										Toast.makeText(activity, R.string.msg_cannot_play_time, Toast.LENGTH_SHORT).show()
+									}
+								})
+							}
+						}
+					}) {
+						Text(stringResource(R.string.lbl_add_to_queue))
+					}
+
+					if (baseItem.type != BaseItemKind.PLAYLIST) {
+						PopoverMenuItem(onClick = {
+							handleMenuAction {
+								if (activity != null) {
+									playbackHelper.playInstantMix(activity, baseItem)
+								}
+							}
+						}) {
+							Text(stringResource(R.string.lbl_instant_mix))
+						}
+					}
+				} else {
+					// 3. Mark as Played / Unplayed
+					PopoverMenuItem(onClick = {
+						handleMenuAction {
+							togglePlayed(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isPlayed) { userData ->
+								onItemUpdated?.invoke(updateItemWithUserData(item, userData))
+							}
+						}
+					}) {
+						Text(stringResource(if (isPlayed) R.string.lbl_mark_unplayed else R.string.lbl_mark_played))
+					}
+				}
+
+				// 4. Toggle Favorite
+				PopoverMenuItem(onClick = {
+					handleMenuAction {
+						toggleFavorite(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isFavorite) { userData ->
+							onItemUpdated?.invoke(updateItemWithUserData(item, userData))
+						}
+					}
+				}) {
+					Text(stringResource(if (isFavorite) R.string.lbl_remove_favorite else R.string.lbl_add_favorite))
+				}
 			}
 		}
 	}

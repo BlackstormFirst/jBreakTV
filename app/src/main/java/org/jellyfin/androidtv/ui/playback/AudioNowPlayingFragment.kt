@@ -5,8 +5,9 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
+import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -53,7 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentActivity
 import androidx.fragment.compose.content
 import coil3.compose.AsyncImage
 import org.jellyfin.androidtv.R
@@ -71,7 +71,6 @@ import org.jellyfin.androidtv.ui.player.base.PlayerSeekbar
 import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.ImageHelper
-import org.jellyfin.androidtv.util.KeyProcessor
 import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.model.PlayState
@@ -91,7 +90,6 @@ class AudioNowPlayingFragment : Fragment() {
 		val playbackManager = koinInject<PlaybackManager>()
 		val backgroundService = koinInject<BackgroundService>()
 		val navigationRepository = koinInject<NavigationRepository>()
-		val keyProcessor = koinInject<KeyProcessor>()
 
 		JellyfinTheme {
 			AudioNowPlayingScreen(
@@ -99,8 +97,6 @@ class AudioNowPlayingFragment : Fragment() {
 				playbackManager = playbackManager,
 				backgroundService = backgroundService,
 				navigationRepository = navigationRepository,
-				keyProcessor = keyProcessor,
-				activity = requireActivity()
 			)
 		}
 	}
@@ -112,8 +108,6 @@ fun AudioNowPlayingScreen(
 	playbackManager: PlaybackManager,
 	backgroundService: BackgroundService,
 	navigationRepository: NavigationRepository,
-	keyProcessor: KeyProcessor,
-	activity: FragmentActivity
 ) {
 	val playState by playbackManager.state.playState.collectAsState()
 	val isPlaying = playState == PlayState.PLAYING
@@ -361,6 +355,11 @@ fun AudioNowPlayingScreen(
 				)
 
 				val queueEntries by playbackManager.queue.entries.collectAsState(initial = emptyList())
+				val validQueueEntries = remember(queueEntries) {
+					queueEntries.filter { it.baseItem != null }
+				}
+				var showContextMenu by remember { mutableStateOf(false) }
+				var selectedQueueItem by remember { mutableStateOf<AudioQueueBaseRowItem?>(null) }
 
 				LazyRow(
 					modifier = Modifier
@@ -370,7 +369,10 @@ fun AudioNowPlayingScreen(
 					contentPadding = PaddingValues(horizontal = 56.dp, vertical = 16.dp),
 					horizontalArrangement = Arrangement.spacedBy(16.dp)
 				) {
-					itemsIndexed(queueEntries, key = { index, entry -> entry.baseItem?.id ?: index }) { index, entry ->
+					itemsIndexed(
+						items = validQueueEntries,
+						key = { index, entry -> "${entry.baseItem?.id ?: index}_$index" }
+					) { index, entry ->
 						val rowItem = remember(entry) { AudioQueueBaseRowItem(entry) }
 						val interactionSource = remember { MutableInteractionSource() }
 						val isFocusedState by interactionSource.collectIsFocusedAsState()
@@ -383,16 +385,16 @@ fun AudioNowPlayingScreen(
 								.onFocusChanged { focusState ->
 									isFocusedInternal = focusState.isFocused
 								}
-								.clickable(
+								.itemCardClickable(
 									interactionSource = interactionSource,
-									indication = null
-								) {
-									keyProcessor.createItemMenu(
-										rowItem,
-										rowItem.baseItem?.userData,
-										activity
-									)
-								}
+									onClick = {
+										mediaManager.playFrom(entry)
+									},
+									onLongClick = {
+										selectedQueueItem = rowItem
+										showContextMenu = true
+									}
+								)
 						) {
 							BaseRowItemCard(
 								item = rowItem,
@@ -400,6 +402,17 @@ fun AudioNowPlayingScreen(
 							)
 						}
 					}
+				}
+
+				if (showContextMenu && selectedQueueItem != null) {
+					ItemContextMenu(
+						item = selectedQueueItem,
+						expanded = showContextMenu,
+						onDismissRequest = {
+							showContextMenu = false
+							selectedQueueItem = null
+						}
+					)
 				}
 			}
 		}
