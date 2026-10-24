@@ -3,6 +3,7 @@ package org.jellyfin.androidtv.ui.itemdetail
 import android.view.KeyEvent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -55,6 +56,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -136,6 +138,65 @@ fun ItemListScreen(
 	}
 
 	val isFavorite = baseItem?.userData?.isFavorite == true
+
+	val textMeasurer = rememberTextMeasurer()
+	val density = LocalDensity.current
+	val headlineStyle = JellyfinTheme.typography.listHeadline
+	val captionStyle = JellyfinTheme.typography.listCaption
+
+	val configuration = LocalConfiguration.current
+
+	val dynamicTitleWidth = remember(items, headlineStyle, captionStyle, density, context, configuration) {
+		if (items.isEmpty()) return@remember 120.dp
+
+		val boldHeadlineStyle = headlineStyle.copy(fontWeight = FontWeight.Bold)
+
+		var maxPx = 0
+		for (item in items) {
+			val displayName = if (item.type != BaseItemKind.AUDIO && item.seriesName != null) {
+				item.getFullName(context)
+			} else {
+				item.name
+			} ?: ""
+
+			val artistList = item.artists
+			val artistName = if (!artistList.isNullOrEmpty()) artistList.first()
+			else if (!item.albumArtist.isNullOrBlank()) item.albumArtist
+			else null
+
+			val titleWidth = textMeasurer.measure(displayName, style = boldHeadlineStyle).size.width
+			val artistWidth = if (!artistName.isNullOrBlank()) {
+				textMeasurer.measure(artistName, style = captionStyle).size.width
+			} else 0
+
+			val itemMax = maxOf(titleWidth, artistWidth)
+			if (itemMax > maxPx) {
+				maxPx = itemMax
+			}
+		}
+
+		val maxDp = with(density) { maxPx.toDp() }
+		val screenWidthDp = configuration.screenWidthDp.dp
+		val maxAvailableWidth = (screenWidthDp * 0.5f).coerceAtLeast(120.dp)
+
+		(maxDp + 8.dp).coerceIn(120.dp, maxAvailableWidth)
+	}
+
+	val dynamicDurationWidth = remember(items, headlineStyle, density) {
+		if (items.isEmpty()) return@remember 48.dp
+
+		var maxPx = 0
+		for (item in items) {
+			val formattedRunTime = TimeUtils.formatMillis((item.runTimeTicks ?: 0L) / 10000L)
+			val w = textMeasurer.measure(formattedRunTime, style = headlineStyle).size.width
+			if (w > maxPx) {
+				maxPx = w
+			}
+		}
+
+		val maxDp = with(density) { maxPx.toDp() }
+		(maxDp + 4.dp).coerceAtLeast(40.dp)
+	}
 
 	LaunchedEffect(baseItem) {
 		if (baseItem != null) {
@@ -369,81 +430,90 @@ fun ItemListScreen(
 					var showContextMenu by remember { mutableStateOf(false) }
 
 					Box(
-						modifier = Modifier
-							.fillMaxWidth()
-							.clip(RoundedCornerShape(6.dp))
-							.background(
-								when {
-									isFocused -> JellyfinTheme.colorScheme.buttonFocused
-									isCurrentlyPlaying -> JellyfinTheme.colorScheme.buttonActive
-									else -> Color.Transparent
-								}
-							)
-							.onFocusChanged { isFocused = it.isFocused }
-							.itemCardClickable(
-								onClick = { onItemClick(item, index) },
-								onLongClick = { showContextMenu = true }
-							)
-							.padding(horizontal = 16.dp, vertical = 12.dp)
+						modifier = Modifier.fillMaxWidth(),
+						contentAlignment = Alignment.Center
 					) {
-						Row(
-							modifier = Modifier.fillMaxWidth(),
-							verticalAlignment = Alignment.CenterVertically
-						) {
-							// Index / Playing Icon
-							Box(
-								modifier = Modifier.size(32.dp),
-								contentAlignment = Alignment.Center
-							) {
-								if (isCurrentlyPlaying) {
-									Icon(
-										painter = painterResource(id = R.drawable.ic_play),
-										contentDescription = null,
-										tint = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.onBackground,
-										modifier = Modifier.size(20.dp)
-									)
-								} else {
-									Text(
-										text = (index + 1).toString(),
-										style = JellyfinTheme.typography.listHeadline,
-										color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption
-									)
-								}
-							}
-
-							Spacer(modifier = Modifier.width(16.dp))
-
-							// Track Name & Artist
-							Column(modifier = Modifier.weight(1f)) {
-								Text(
-									text = displayName ?: "",
-									style = JellyfinTheme.typography.listHeadline.copy(
-										fontWeight = if (isCurrentlyPlaying) FontWeight.Bold else FontWeight.Normal
-									),
-									color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listHeadline,
-									maxLines = 1,
-									overflow = TextOverflow.Ellipsis
+						Box(
+							modifier = Modifier
+								.clip(RoundedCornerShape(6.dp))
+								.background(
+									when {
+										isFocused -> JellyfinTheme.colorScheme.buttonFocused
+										isCurrentlyPlaying -> JellyfinTheme.colorScheme.buttonActive
+										else -> Color.Transparent
+									}
 								)
-
-								if (!artistName.isNullOrBlank()) {
-									Text(
-										text = artistName,
-										style = JellyfinTheme.typography.listCaption,
-										color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
-										maxLines = 1,
-										overflow = TextOverflow.Ellipsis
-									)
+								.onFocusChanged { isFocused = it.isFocused }
+								.itemCardClickable(
+									onClick = { onItemClick(item, index) },
+									onLongClick = { showContextMenu = true }
+								)
+								.padding(horizontal = 16.dp, vertical = 12.dp)
+						) {
+							Row(
+								verticalAlignment = Alignment.CenterVertically
+							) {
+								// Index / Playing Icon
+								Box(
+									modifier = Modifier.size(32.dp),
+									contentAlignment = Alignment.Center
+								) {
+									if (isCurrentlyPlaying) {
+										Icon(
+											painter = painterResource(id = R.drawable.ic_play),
+											contentDescription = null,
+											tint = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.onBackground,
+											modifier = Modifier.size(20.dp)
+										)
+									} else {
+										Text(
+											text = (index + 1).toString(),
+											style = JellyfinTheme.typography.listHeadline,
+											color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption
+										)
+									}
 								}
+
+								Spacer(modifier = Modifier.width(16.dp))
+
+								// Track Name & Artist
+								Column(
+									modifier = Modifier.width(dynamicTitleWidth),
+									horizontalAlignment = Alignment.Start
+								) {
+									Text(
+										text = displayName ?: "",
+										style = JellyfinTheme.typography.listHeadline.copy(
+											fontWeight = if (isCurrentlyPlaying) FontWeight.Bold else FontWeight.Normal
+										),
+										color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listHeadline,
+										maxLines = 1,
+										overflow = TextOverflow.Ellipsis,
+										modifier = if (isFocused) Modifier.basicMarquee() else Modifier
+									)
+
+									if (!artistName.isNullOrBlank()) {
+										Text(
+											text = artistName,
+											style = JellyfinTheme.typography.listCaption,
+											color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
+											maxLines = 1,
+											overflow = TextOverflow.Ellipsis,
+											modifier = if (isFocused) Modifier.basicMarquee() else Modifier
+										)
+									}
+								}
+
+								Spacer(modifier = Modifier.width(16.dp))
+
+								// Track Runtime
+								Text(
+									text = formattedRunTime,
+									style = JellyfinTheme.typography.listHeadline,
+									color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
+									modifier = Modifier.width(dynamicDurationWidth)
+								)
 							}
-
-							Spacer(modifier = Modifier.width(16.dp))
-
-							// Track Runtime
-							Text(
-								text = formattedRunTime,
-								style = JellyfinTheme.typography.listHeadline,
-								color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption
-							)
 						}
 
 						if (showContextMenu) {
