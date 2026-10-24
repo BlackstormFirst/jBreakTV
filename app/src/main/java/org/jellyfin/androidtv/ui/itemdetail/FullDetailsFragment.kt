@@ -59,7 +59,7 @@ class FullDetailsFragment : Fragment() {
                         state = state,
                         onPlayClick = {
                             state.item?.let { item ->
-                                playbackHelper.retrieveAndPlay(item.id, false, requireContext())
+                                playbackHelper.retrieveAndPlay(item.id, false, requireContext(), 0L)
                             }
                         },
                         onResumeClick = {

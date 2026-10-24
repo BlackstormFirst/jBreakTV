@@ -18,6 +18,8 @@ interface PlaybackHelper {
 
 	fun retrieveAndPlay(itemId: UUID, shuffle: Boolean, context: Context)
 
+	fun retrieveAndPlay(itemId: UUID, shuffle: Boolean, context: Context, startPosition: Long?)
+
 	fun retrieveAndPlay(itemIds: List<UUID>, shuffle: Boolean, position: Long?, index: Int?, context: Context)
 
 	fun playInstantMix(context: Context, item: BaseItemDto)

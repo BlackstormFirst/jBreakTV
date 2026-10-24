@@ -308,6 +308,10 @@ class SdkPlaybackHelper(
 	}
 
 	override fun retrieveAndPlay(itemId: UUID, shuffle: Boolean, context: Context) {
+		retrieveAndPlay(itemId, shuffle, context, null)
+	}
+
+	override fun retrieveAndPlay(itemId: UUID, shuffle: Boolean, context: Context, startPosition: Long?) {
 		val loadingDialog = showLoadingDialog(context)
 		getScope(context).launch {
 			runCatching {
@@ -329,7 +333,7 @@ class SdkPlaybackHelper(
 				}
 
 				val targetItem = items.getOrNull(targetIndex) ?: item
-				val pos = targetItem.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration)?.coerceAtLeast(Duration.ZERO) ?: Duration.ZERO
+				val pos = startPosition?.ticks ?: targetItem.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration)?.coerceAtLeast(Duration.ZERO) ?: Duration.ZERO
 
 				Triple(items, pos, targetIndex)
 			}.fold(
