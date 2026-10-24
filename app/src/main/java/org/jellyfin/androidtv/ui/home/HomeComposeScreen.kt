@@ -118,6 +118,9 @@ fun HomeComposeScreen(
             }
             if (foundKey != null) {
                 foundKey to foundRowIdx
+            } else if (initialFocusedRowIndex in rows.indices && rows[initialFocusedRowIndex].items.isNotEmpty()) {
+                val firstInRow = rows[initialFocusedRowIndex].items.first()
+                getItemKey(firstInRow) to initialFocusedRowIndex
             } else {
                 findFirstLibraryItemKey(rows)
             }

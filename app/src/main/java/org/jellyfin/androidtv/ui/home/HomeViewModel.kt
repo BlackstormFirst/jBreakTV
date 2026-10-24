@@ -147,6 +147,7 @@ class HomeViewModel(
             .onEach { action ->
                 if (action is NavigationAction.NavigateFragment && action.destination.fragment == HomeFragment::class) {
                     resetLastFocusedItem()
+                    refreshRows(force = true, delayed = false)
                 }
             }
             .launchIn(viewModelScope)
@@ -163,11 +164,11 @@ class HomeViewModel(
         _uiState.value = HomeUiState.Success(rowStates)
     }
 
-    private fun loadHomeSections(cardPresenter: CardPresenter) {
+    private var lastHandledRefresh: Instant? = null
+    private var refreshJob: Job? = null
+
+    private fun loadHomeSections(cardPresenter: CardPresenter = CardPresenter()) {
         viewModelScope.launch(Dispatchers.IO) {
-            synchronized(_directRowStates) {
-                _directRowStates.removeAll { it.sectionIndex >= 0 }
-            }
             val currentUser = withTimeout(30.seconds) {
                 userRepository.currentUser.filterNotNull().first()
             }
@@ -176,6 +177,7 @@ class HomeViewModel(
             if (!isActive) return@launch
 
             val homesections = userSettingPreferences.activeHomesections
+            val newSectionRows = mutableListOf<HomeRowState>()
 
             suspend fun loadSectionRows(section: HomeSectionType, sIndex: Int) {
                 val baseSectionIndex = sIndex * 100
@@ -184,47 +186,82 @@ class HomeViewModel(
                     HomeSectionType.LIBRARY_TILES_SMALL -> {
                         val r = HomeFragmentViewsRow(small = false)
                         val state = r.createRowState(context, userViewsRepository)
-                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                        if (state != null) {
+                            synchronized(newSectionRows) {
+                                newSectionRows.add(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                            }
+                        }
                     }
                     HomeSectionType.LIBRARY_BUTTONS -> {
                         val r = HomeFragmentViewsRow(small = true)
                         val state = r.createRowState(context, userViewsRepository)
-                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                        if (state != null) {
+                            synchronized(newSectionRows) {
+                                newSectionRows.add(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                            }
+                        }
                     }
                     HomeSectionType.RESUME -> {
                         val r = helper.loadResumeVideo() as HomeFragmentBrowseRowDefRow
                         val state = r.prepareRowState(context, api)
-                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                        if (state != null) {
+                            synchronized(newSectionRows) {
+                                newSectionRows.add(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                            }
+                        }
                     }
                     HomeSectionType.RESUME_AUDIO -> {
                         val r = helper.loadResumeAudio() as HomeFragmentBrowseRowDefRow
                         val state = r.prepareRowState(context, api)
-                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                        if (state != null) {
+                            synchronized(newSectionRows) {
+                                newSectionRows.add(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                            }
+                        }
                     }
                     HomeSectionType.ACTIVE_RECORDINGS -> {
                         val r = helper.loadLatestLiveTvRecordings() as HomeFragmentBrowseRowDefRow
                         val state = r.prepareRowState(context, api)
-                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                        if (state != null) {
+                            synchronized(newSectionRows) {
+                                newSectionRows.add(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                            }
+                        }
                     }
                     HomeSectionType.NEXT_UP -> {
                         val r = helper.loadNextUp() as HomeFragmentBrowseRowDefRow
                         val state = r.prepareRowState(context, api)
-                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                        if (state != null) {
+                            synchronized(newSectionRows) {
+                                newSectionRows.add(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                            }
+                        }
                     }
                     HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
                         val liveTvRow = HomeFragmentLiveTVRow(context, userRepository)
                         liveTvRow.addRowStates(context, cardPresenter,
-                            onRowStateAdded = { addDirectRowState(it.copy(sectionIndex = baseSectionIndex, sectionType = section)) },
-                            onRowStateRemoved = { removeDirectRowState(it) }
+                            onRowStateAdded = { state ->
+                                synchronized(newSectionRows) {
+                                    newSectionRows.add(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
+                                }
+                            },
+                            onRowStateRemoved = { }
                         )
                         val r = helper.loadOnNow() as HomeFragmentBrowseRowDefRow
                         val state = r.prepareRowState(context, api)
-                        if (state != null) addDirectRowState(state.copy(sectionIndex = baseSectionIndex + 10, sectionType = section))
+                        if (state != null) {
+                            synchronized(newSectionRows) {
+                                newSectionRows.add(state.copy(sectionIndex = baseSectionIndex + 10, sectionType = section))
+                            }
+                        }
                     }
                     HomeSectionType.LATEST_MEDIA -> {
                         val latestRow = helper.loadRecentlyAdded(userViews) as HomeFragmentLatestRow
-                        latestRow.prepareRowStates(context, api).forEachIndexed { vIdx, state ->
-                            addDirectRowState(state.copy(sectionIndex = baseSectionIndex + vIdx, sectionType = section))
+                        val states = latestRow.prepareRowStates(context, api)
+                        synchronized(newSectionRows) {
+                            states.forEachIndexed { vIdx, state ->
+                                newSectionRows.add(state.copy(sectionIndex = baseSectionIndex + vIdx, sectionType = section))
+                            }
                         }
                     }
                     HomeSectionType.NONE, HomeSectionType.RESUME_BOOK -> Unit
@@ -234,6 +271,15 @@ class HomeViewModel(
             homesections.mapIndexed { idx, section ->
                 async { loadSectionRows(section, idx) }
             }.awaitAll()
+
+            if (!isActive) return@launch
+
+            synchronized(_directRowStates) {
+                _directRowStates.removeAll { it.sectionIndex >= 0 }
+                _directRowStates.addAll(newSectionRows)
+            }
+            lastHandledRefresh = Instant.now()
+            updateUiState()
         }
     }
 
@@ -271,10 +317,17 @@ class HomeViewModel(
 
     fun onResume() {
         requestFocus()
-        val lastPlayback = dataRefreshService.lastPlayback
-        val playbackChanged = lastPlayback != null && (lastHandledPlayback == null || lastPlayback.isAfter(lastHandledPlayback))
-        if (playbackChanged) {
-            lastHandledPlayback = lastPlayback
+        val maxDataTimestamp = listOfNotNull(
+            dataRefreshService.lastPlayback,
+            dataRefreshService.lastMoviePlayback,
+            dataRefreshService.lastTvPlayback,
+            dataRefreshService.lastLibraryChange,
+            dataRefreshService.lastFavoriteUpdate
+        ).maxOrNull()
+
+        val dataChanged = maxDataTimestamp != null && (lastHandledRefresh == null || maxDataTimestamp.isAfter(lastHandledRefresh))
+        if (dataChanged) {
+            refreshRows(force = true, delayed = false)
         }
 
         nowPlaying.update()
@@ -285,15 +338,21 @@ class HomeViewModel(
     }
 
     fun refreshRows(force: Boolean = false, delayed: Boolean = true) {
-        // Compose handles UI refresh via flow updates
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch(Dispatchers.IO) {
+            if (delayed) {
+                delay(300)
+            }
+            loadHomeSections()
+        }
     }
 
     fun refreshItemById(itemId: UUID) {
-        // Compose handles UI refresh via flow updates
+        refreshRows(force = false, delayed = true)
     }
 
     fun refreshCurrentItem() {
-        // Compose handles UI refresh via flow updates
+        refreshRows(force = true, delayed = false)
     }
 
     fun onItemClicked(item: Any, rowIndex: Int) {
