@@ -81,7 +81,13 @@ class HomeFragmentBrowseRowDefRow(
 					if (filteredItems.isEmpty()) false
 					else {
 						rowAdapter.setInitialItems(filteredItems) { item, _ ->
-							BaseItemDtoBaseRowItem(item, userPreferences[UserPreferences.seriesThumbnailsEnabled], browseRowDef.isStaticHeight, BaseRowItemSelectAction.ShowDetails, userPreferences[UserPreferences.seriesThumbnailsEnabled])
+							BaseItemDtoBaseRowItem(
+								item = item,
+								preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled],
+								staticHeight = browseRowDef.isStaticHeight,
+								selectAction = BaseRowItemSelectAction.ShowDetails,
+								preferSeriesPoster = true,
+							)
 						}
 						true
 					}
@@ -156,11 +162,11 @@ class HomeFragmentBrowseRowDefRow(
 					val response = api.userLibraryApi.getLatestMedia(browseRowDef.latestItemsQuery).content
 					response.filter { it.isRealAvailableMedia() }.map { item ->
 						BaseItemDtoBaseRowItem(
-							item,
-							userPreferences[UserPreferences.seriesThumbnailsEnabled],
-							browseRowDef.isStaticHeight,
-							BaseRowItemSelectAction.ShowDetails,
-							userPreferences[UserPreferences.seriesThumbnailsEnabled]
+							item = item,
+							preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled],
+							staticHeight = browseRowDef.isStaticHeight,
+							selectAction = BaseRowItemSelectAction.ShowDetails,
+							preferSeriesPoster = true,
 						)
 					}
 				}
