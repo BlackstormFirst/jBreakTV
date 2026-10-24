@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import coil3.ImageLoader
 import coil3.request.ImageRequest
+import coil3.request.bitmapConfig
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -170,12 +171,18 @@ class BackgroundService(
 					try {
 						val request = ImageRequest.Builder(context)
 							.data(url)
+							.memoryCacheKey(url)
+							.diskCacheKey(url)
+							.bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
 							.apply {
 								// On Android versions older than 12 (API 31), Modifier.blur() is not supported in Compose.
 								// As a workaround, we downscale the image significantly during loading.
 								// When scaled back up to fill the screen, the bilinear filtering creates a natural blur effect.
 								if (android.os.Build.VERSION.SDK_INT < 31 && _blurBackground.value) {
 									size(240, 135)
+								} else {
+									// Limit max backdrop resolution to 1080p to prevent high memory usage on 4K backdrops
+									size(1920, 1080)
 								}
 							}
 							.build()
