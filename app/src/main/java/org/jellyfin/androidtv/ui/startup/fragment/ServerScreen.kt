@@ -41,7 +41,6 @@ import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.ProfilePicture
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.Button
-import org.jellyfin.androidtv.ui.base.button.ButtonDefaults
 import org.jellyfin.androidtv.ui.base.popover.Popover
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenu
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenuItem
@@ -49,11 +48,15 @@ import org.jellyfin.androidtv.ui.card.UserCard
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.yield
+import java.util.UUID
 
 @Composable
 fun ServerScreen(
     server: Server,
     users: List<User>,
+    lastUserId: UUID? = null,
     getUserImage: (User) -> String?,
     onUserClick: (User) -> Unit,
     onUserLogout: (User) -> Unit,
@@ -62,13 +65,34 @@ fun ServerScreen(
     onEditServer: () -> Unit,
     disclaimerText: CharSequence?
 ) {
-    val focusRequester = remember { FocusRequester() }
+    val userFocusRequester = remember { FocusRequester() }
+    val addUserFocusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(users) {
-        if (users.isNotEmpty()) {
-            try {
-                focusRequester.requestFocus()
-            } catch (_: Exception) {}
+    val targetUser = remember(users, lastUserId) {
+        users.find { it.id == lastUserId } ?: users.firstOrNull()
+    }
+
+    LaunchedEffect(users, targetUser) {
+        if (users.isNotEmpty() && targetUser != null) {
+            yield()
+            repeat(10) {
+                try {
+                    userFocusRequester.requestFocus()
+                    return@LaunchedEffect
+                } catch (_: Exception) {
+                    delay(30)
+                }
+            }
+        } else {
+            yield()
+            repeat(10) {
+                try {
+                    addUserFocusRequester.requestFocus()
+                    return@LaunchedEffect
+                } catch (_: Exception) {
+                    delay(30)
+                }
+            }
         }
     }
 
@@ -128,7 +152,7 @@ fun ServerScreen(
                             .focusRestorer()
                     ) {
                         items(users, key = { it.id }) { user ->
-                            val isFirst = users.first() == user
+                            val isTargetUser = user.id == targetUser?.id
                             var showMenu by remember { mutableStateOf(false) }
 
                             Box {
@@ -146,7 +170,7 @@ fun ServerScreen(
                                     modifier = Modifier
                                         .width(110.dp)
                                         .padding(vertical = 8.dp)
-                                        .then(if (isFirst) Modifier.focusRequester(focusRequester) else Modifier)
+                                        .then(if (isTargetUser) Modifier.focusRequester(userFocusRequester) else Modifier)
                                 )
 
                                 if (showMenu && user is PrivateUser) {
@@ -192,6 +216,7 @@ fun ServerScreen(
                         .padding(8.dp)
                         .weight(1f)
                         .height(51.dp)
+                        .focusRequester(addUserFocusRequester)
                 ) {
                     Icon(
                         imageVector = ImageVector.vectorResource(R.drawable.ic_user_add),

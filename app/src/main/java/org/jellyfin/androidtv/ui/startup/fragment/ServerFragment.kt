@@ -65,6 +65,7 @@ class ServerFragment : Fragment() {
 			ServerScreen(
 				server = server,
 				users = users,
+				lastUserId = startupViewModel.lastUserId,
 				getUserImage = { user -> startupViewModel.getUserImage(server, user) },
 				onUserClick = { user ->
 					startupViewModel.authenticate(server, user).onEach { state ->

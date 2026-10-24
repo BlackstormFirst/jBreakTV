@@ -19,6 +19,7 @@ import org.jellyfin.androidtv.auth.repository.AuthenticationRepository
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.ServerUserRepository
 import org.jellyfin.androidtv.auth.store.AuthenticationPreferences
+import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import timber.log.Timber
 import java.util.UUID
 
@@ -30,6 +31,9 @@ class StartupViewModel(
 ) : ViewModel() {
 	val storedServers = serverRepository.storedServers
 	val discoveredServers = serverRepository.discoveredServers
+
+	val lastUserId: UUID?
+		get() = authenticationPreferences[AuthenticationPreferences.lastUserId].toUUIDOrNull()
 
 	private val _users = MutableStateFlow<List<User>>(emptyList())
 	val users = _users.asStateFlow()
