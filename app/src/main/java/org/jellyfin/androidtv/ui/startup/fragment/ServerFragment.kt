@@ -106,12 +106,17 @@ class ServerFragment : Fragment() {
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 		super.onViewCreated(view, savedInstanceState)
 
+		// Request focus on root view so ComposeView receives Android Window focus
+		view.post {
+			view.requestFocus()
+		}
+
 		val server = serverIdArgument?.let(startupViewModel::getServer)
 		if (server != null) {
 			startupViewModel.loadUsers(server)
 
-			lifecycleScope.launch {
-				lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+			viewLifecycleOwner.lifecycleScope.launch {
+				viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
 					val updated = startupViewModel.updateServer(server)
 					if (updated) {
 						startupViewModel.getServer(server.id)

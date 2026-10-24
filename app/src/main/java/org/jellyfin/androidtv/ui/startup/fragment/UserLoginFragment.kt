@@ -77,6 +77,10 @@ class UserLoginFragment : Fragment() {
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 		super.onViewCreated(view, savedInstanceState)
 
+		view.post {
+			view.requestFocus()
+		}
+
 		userLoginViewModel.clearLoginState()
 
 		lifecycleScope.launch {

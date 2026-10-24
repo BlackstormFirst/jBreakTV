@@ -32,10 +32,12 @@ import androidx.compose.ui.unit.dp
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.model.PrivateUser
 import org.jellyfin.androidtv.auth.model.Server
+import androidx.compose.ui.layout.onGloballyPositioned
 import org.jellyfin.androidtv.auth.model.User
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.ui.ExpandableTextView
 import org.jellyfin.androidtv.ui.ServerButton
+import org.jellyfin.androidtv.ui.base.BaseScreen
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.ProfilePicture
@@ -72,6 +74,9 @@ fun ServerScreen(
         users.find { it.id == lastUserId } ?: users.firstOrNull()
     }
 
+    var hasRequestedUserFocus by remember(targetUser) { mutableStateOf(false) }
+    var hasRequestedAddUserFocus by remember(users.isEmpty()) { mutableStateOf(false) }
+
     LaunchedEffect(users, targetUser) {
         if (users.isNotEmpty() && targetUser != null) {
             yield()
@@ -96,102 +101,115 @@ fun ServerScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            // Notification Area
-            if (!server.versionSupported) {
-                Box(modifier = Modifier.fillMaxWidth().background(Color(0xFFE53935)).padding(16.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.server_unsupported_notification, server.version ?: "", ServerRepository.recommendedServerVersion.toString()),
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else if (!server.setupCompleted) {
-                Box(modifier = Modifier.fillMaxWidth().background(Color(0xFFE53935)).padding(16.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(R.string.server_setup_incomplete),
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Text(
-                text = stringResource(R.string.who_is_watching),
-                style = JellyfinTheme.typography.listHeader,
-                color = JellyfinTheme.colorScheme.onBackground
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Users Row
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp),
-                contentAlignment = Alignment.Center
+    BaseScreen {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (users.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.no_user_warning),
-                        color = JellyfinTheme.colorScheme.onBackground
-                    )
-                } else {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRestorer()
-                    ) {
-                        items(users, key = { it.id }) { user ->
-                            val isTargetUser = user.id == targetUser?.id
-                            var showMenu by remember { mutableStateOf(false) }
 
-                            Box {
-                                UserCard(
-                                    image = {
-                                        ProfilePicture(
-                                            url = getUserImage(user),
-                                            iconPadding = PaddingValues(24.dp),
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    },
-                                    name = { Text(text = user.name, maxLines = 1) },
-                                    onClick = { onUserClick(user) },
-                                    onLongClick = { showMenu = true },
-                                    modifier = Modifier
-                                        .width(110.dp)
-                                        .padding(vertical = 8.dp)
-                                        .then(if (isTargetUser) Modifier.focusRequester(userFocusRequester) else Modifier)
-                                )
+                // Notification Area
+                if (!server.versionSupported) {
+                    Box(modifier = Modifier.fillMaxWidth().background(Color(0xFFE53935)).padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.server_unsupported_notification, server.version ?: "", ServerRepository.recommendedServerVersion.toString()),
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else if (!server.setupCompleted) {
+                    Box(modifier = Modifier.fillMaxWidth().background(Color(0xFFE53935)).padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = stringResource(R.string.server_setup_incomplete),
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
 
-                                if (showMenu && user is PrivateUser) {
-                                    Popover(
-                                        expanded = showMenu,
-                                        onDismissRequest = { showMenu = false }
-                                    ) {
-                                        PopoverMenu {
-                                            if (user.accessToken != null) {
+                Spacer(modifier = Modifier.weight(1f))
+
+                Text(
+                    text = stringResource(R.string.who_is_watching),
+                    style = JellyfinTheme.typography.listHeader,
+                    color = JellyfinTheme.colorScheme.onBackground
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Users Row
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (users.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.no_user_warning),
+                            color = JellyfinTheme.colorScheme.onBackground
+                        )
+                    } else {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 48.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRestorer()
+                        ) {
+                            items(users, key = { it.id }) { user ->
+                                val isTargetUser = user.id == targetUser?.id
+                                var showMenu by remember { mutableStateOf(false) }
+
+                                Box {
+                                    UserCard(
+                                        image = {
+                                            ProfilePicture(
+                                                url = getUserImage(user),
+                                                iconPadding = PaddingValues(24.dp),
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        },
+                                        name = { Text(text = user.name, maxLines = 1) },
+                                        onClick = { onUserClick(user) },
+                                        onLongClick = { showMenu = true },
+                                        modifier = Modifier
+                                            .width(110.dp)
+                                            .padding(vertical = 8.dp)
+                                            .then(
+                                                if (isTargetUser) {
+                                                    Modifier
+                                                        .focusRequester(userFocusRequester)
+                                                        .onGloballyPositioned {
+                                                            if (!hasRequestedUserFocus) {
+                                                                hasRequestedUserFocus = true
+                                                                try { userFocusRequester.requestFocus() } catch (_: Exception) {}
+                                                            }
+                                                        }
+                                                } else Modifier
+                                            )
+                                    )
+
+                                    if (showMenu && user is PrivateUser) {
+                                        Popover(
+                                            expanded = showMenu,
+                                            onDismissRequest = { showMenu = false }
+                                        ) {
+                                            PopoverMenu {
+                                                if (user.accessToken != null) {
+                                                    PopoverMenuItem(onClick = {
+                                                        showMenu = false
+                                                        onUserLogout(user)
+                                                    }) {
+                                                        Text(stringResource(R.string.lbl_sign_out))
+                                                    }
+                                                }
                                                 PopoverMenuItem(onClick = {
                                                     showMenu = false
-                                                    onUserLogout(user)
+                                                    onUserRemove(user)
                                                 }) {
-                                                    Text(stringResource(R.string.lbl_sign_out))
+                                                    Text(stringResource(R.string.lbl_remove))
                                                 }
-                                            }
-                                            PopoverMenuItem(onClick = {
-                                                showMenu = false
-                                                onUserRemove(user)
-                                            }) {
-                                                Text(stringResource(R.string.lbl_remove))
                                             }
                                         }
                                     }
@@ -200,72 +218,83 @@ fun ServerScreen(
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-            // Actions Container
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.width(500.dp)
-            ) {
-                Button(
-                    onClick = onAddUser,
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .weight(1f)
-                        .height(51.dp)
-                        .focusRequester(addUserFocusRequester)
+                // Actions Container
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.width(500.dp)
                 ) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(R.drawable.ic_user_add),
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 8.dp)
+                    Button(
+                        onClick = onAddUser,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .weight(1f)
+                            .height(51.dp)
+                            .then(
+                                if (users.isEmpty()) {
+                                    Modifier
+                                        .focusRequester(addUserFocusRequester)
+                                        .onGloballyPositioned {
+                                            if (!hasRequestedAddUserFocus) {
+                                                hasRequestedAddUserFocus = true
+                                                try { addUserFocusRequester.requestFocus() } catch (_: Exception) {}
+                                            }
+                                        }
+                                } else Modifier.focusRequester(addUserFocusRequester)
+                            )
+                    ) {
+                        Icon(
+                            imageVector = ImageVector.vectorResource(R.drawable.ic_user_add),
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text(text = stringResource(R.string.add_user))
+                    }
+
+                    ServerButton(
+                        icon = {
+                            Icon(
+                                imageVector = ImageVector.vectorResource(R.drawable.ic_house_edit),
+                                contentDescription = null,
+                            )
+                        },
+                        name = { Text(server.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        address = { Text(server.address, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        version = { Text(server.version.orEmpty(), maxLines = 1) },
+                        onClick = onEditServer,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .weight(1f)
+                            .height(51.dp)
                     )
-                    Text(text = stringResource(R.string.add_user))
                 }
 
-                ServerButton(
-                    icon = {
-                        Icon(
-                            imageVector = ImageVector.vectorResource(R.drawable.ic_house_edit),
-                            contentDescription = null,
-                        )
-                    },
-                    name = { Text(server.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    address = { Text(server.address, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    version = { Text(server.version.orEmpty(), maxLines = 1) },
-                    onClick = onEditServer,
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .weight(1f)
-                        .height(51.dp)
-                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Disclaimer
+                if (!disclaimerText.isNullOrBlank()) {
+                    // Using AndroidView to wrap ExpandableTextView since it has specific span rendering
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { context ->
+                            ExpandableTextView(context).apply {
+                                gravity = android.view.Gravity.CENTER
+                                maxLines = 3
+                                setPadding(8, 8, 8, 8)
+                                text = disclaimerText
+                            }
+                        },
+                        update = { view ->
+                            view.text = disclaimerText
+                        },
+                        modifier = Modifier.width(500.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Disclaimer
-            if (!disclaimerText.isNullOrBlank()) {
-                // Using AndroidView to wrap ExpandableTextView since it has specific span rendering
-                androidx.compose.ui.viewinterop.AndroidView(
-                    factory = { context ->
-                        ExpandableTextView(context).apply {
-                            gravity = android.view.Gravity.CENTER
-                            maxLines = 3
-                            setPadding(8, 8, 8, 8)
-                            text = disclaimerText
-                        }
-                    },
-                    update = { view ->
-                        view.text = disclaimerText
-                    },
-                    modifier = Modifier.width(500.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }
