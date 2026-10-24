@@ -370,7 +370,10 @@ fun BrowseFolderScreen(
 					horizontalArrangement = Arrangement.spacedBy(12.dp),
 					verticalAlignment = Alignment.CenterVertically
 				) {
-					IconButton(onClick = onHomeClick) {
+					IconButton(
+						onClick = onHomeClick,
+						modifier = Modifier.onFocusChanged { if (it.isFocused) userHasInteracted = true }
+					) {
 						Icon(
 							painter = painterResource(R.drawable.ic_house),
 							contentDescription = stringResource(R.string.lbl_home)
