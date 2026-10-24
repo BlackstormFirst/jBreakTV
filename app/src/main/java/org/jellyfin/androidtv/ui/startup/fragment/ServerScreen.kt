@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
@@ -28,6 +27,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.model.PrivateUser
@@ -36,7 +36,6 @@ import org.jellyfin.androidtv.auth.model.User
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.ui.ExpandableTextView
 import org.jellyfin.androidtv.ui.ServerButton
-import org.jellyfin.androidtv.ui.ServerButtonView
 import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.ProfilePicture
@@ -189,7 +188,10 @@ fun ServerScreen(
             ) {
                 Button(
                     onClick = onAddUser,
-                    modifier = Modifier.padding(8.dp).weight(1f)
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .weight(1f)
+                        .height(51.dp)
                 ) {
                     Icon(
                         imageVector = ImageVector.vectorResource(R.drawable.ic_user_add),
@@ -200,12 +202,20 @@ fun ServerScreen(
                 }
 
                 ServerButton(
-                    icon = { Icon(imageVector = ImageVector.vectorResource(R.drawable.ic_house), contentDescription = null, modifier = Modifier.size(24.dp)) },
-                    name = { Text(server.name) },
-                    address = { Text(server.address) },
-                    version = { Text(server.version ?: "") },
+                    icon = {
+                        Icon(
+                            imageVector = ImageVector.vectorResource(R.drawable.ic_house_edit),
+                            contentDescription = null,
+                        )
+                    },
+                    name = { Text(server.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    address = { Text(server.address, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    version = { Text(server.version.orEmpty(), maxLines = 1) },
                     onClick = onEditServer,
-                    modifier = Modifier.padding(8.dp).weight(1f)
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .weight(1f)
+                        .height(51.dp)
                 )
             }
 

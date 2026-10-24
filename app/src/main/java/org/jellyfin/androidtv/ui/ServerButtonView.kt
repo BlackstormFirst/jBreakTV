@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jellyfin.androidtv.R
@@ -38,9 +39,9 @@ import org.jellyfin.androidtv.ui.base.ProvideTextStyle
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.ButtonBase
 import org.jellyfin.androidtv.ui.base.button.ButtonDefaults
+import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.MenuBuilder
 import org.jellyfin.androidtv.util.popupMenu
-import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.showIfNotEmpty
 
 @Composable
@@ -56,37 +57,41 @@ fun ServerButton(
 ) {
 	ButtonBase(
 		onClick = onClick,
-		modifier = modifier,
+		modifier = modifier.defaultMinSize(minHeight = 51.dp),
 		interactionSource = interactionSource,
 		shape = shape,
 	) {
 		Row(
-			horizontalArrangement = Arrangement.spacedBy(8.dp),
+			horizontalArrangement = Arrangement.spacedBy(12.dp),
 			verticalAlignment = Alignment.CenterVertically,
 			modifier = Modifier
-				.fillMaxSize()
-				.padding(horizontal = 16.dp, vertical = 8.dp)
+				.fillMaxWidth()
+				.padding(horizontal = 16.dp, vertical = 6.dp),
 		) {
 			icon()
 
 			Column(
-				modifier = Modifier
-					.weight(1f)
-					.fillMaxHeight(),
-				verticalArrangement = Arrangement.SpaceBetween,
+				modifier = Modifier.weight(1f),
+				verticalArrangement = Arrangement.Center,
 			) {
 				ProvideTextStyle(LocalTextStyle.current.copy(fontSize = 14.sp)) {
 					name()
 				}
 
-				ProvideTextStyle(LocalTextStyle.current.copy(fontSize = 12.sp)) {
-					address()
-				}
-			}
+				Row(
+					modifier = Modifier.fillMaxWidth(),
+					horizontalArrangement = Arrangement.SpaceBetween,
+					verticalAlignment = Alignment.CenterVertically,
+				) {
+					Box(modifier = Modifier.weight(1f, fill = false)) {
+						ProvideTextStyle(LocalTextStyle.current.copy(fontSize = 12.sp)) {
+							address()
+						}
+					}
 
-			Box(modifier = Modifier.align(Alignment.Bottom)) {
-				ProvideTextStyle(LocalTextStyle.current.copy(fontSize = 12.sp)) {
-					version()
+					ProvideTextStyle(LocalTextStyle.current.copy(fontSize = 12.sp)) {
+						version()
+					}
 				}
 			}
 		}
@@ -165,9 +170,9 @@ class ServerButtonView @JvmOverloads constructor(
 					)
 				}
 			},
-			name = { Text(name) },
-			address = { Text(address) },
-			version = { Text(version.orEmpty()) },
+			name = { Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+			address = { Text(address, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+			version = { Text(version.orEmpty(), maxLines = 1) },
 			interactionSource = interactionSource,
 			// Use the old shape as the Android View implementation is only used in legacy UI
 			shape = RoundedCornerShape(3.dp),
