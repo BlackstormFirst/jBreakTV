@@ -27,12 +27,29 @@ import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.androidtv.util.getActivity
 import org.jellyfin.androidtv.util.playFirstUnwatchedItem
 import org.jellyfin.androidtv.util.sdk.canPlay
+import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
 import org.jellyfin.androidtv.util.toggleFavorite
 import org.jellyfin.androidtv.util.togglePlayed
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
+import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.koin.compose.koinInject
+
+fun updateItemWithUserData(item: BaseRowItem, userData: UserItemDataDto): BaseRowItem {
+	val baseItem = item.baseItem ?: return item
+	val newBaseItem = baseItem.copy(userData = userData)
+	return when (item) {
+		is BaseItemDtoBaseRowItem -> BaseItemDtoBaseRowItem(
+			item = newBaseItem,
+			preferParentThumb = item.preferParentThumb,
+			staticHeight = item.staticHeight,
+			selectAction = item.selectAction,
+			preferSeriesPoster = item.preferSeriesPoster
+		)
+		else -> item
+	}
+}
 
 @Composable
 fun ItemContextMenu(
@@ -40,6 +57,7 @@ fun ItemContextMenu(
 	expanded: Boolean,
 	onDismissRequest: () -> Unit,
 	modifier: Modifier = Modifier,
+	onItemUpdated: ((BaseRowItem) -> Unit)? = null,
 ) {
 	if (!expanded || item == null) return
 
@@ -86,6 +104,7 @@ fun ItemContextMenu(
 
 	fun handleMenuAction(action: () -> Unit) {
 		if (hasReleasedInitialKey) {
+			onDismissRequest()
 			action()
 		}
 	}
@@ -173,7 +192,9 @@ fun ItemContextMenu(
 				// 3. Mark as Played / Unplayed
 				PopoverMenuItem(onClick = {
 					handleMenuAction {
-						togglePlayed(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isPlayed)
+						togglePlayed(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isPlayed) { userData ->
+							onItemUpdated?.invoke(updateItemWithUserData(item, userData))
+						}
 					}
 				}) {
 					Text(stringResource(if (isPlayed) R.string.lbl_mark_unplayed else R.string.lbl_mark_played))
@@ -183,7 +204,9 @@ fun ItemContextMenu(
 			// 4. Toggle Favorite
 			PopoverMenuItem(onClick = {
 				handleMenuAction {
-					toggleFavorite(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isFavorite)
+					toggleFavorite(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isFavorite) { userData ->
+						onItemUpdated?.invoke(updateItemWithUserData(item, userData))
+					}
 				}
 			}) {
 				Text(stringResource(if (isFavorite) R.string.lbl_remove_favorite else R.string.lbl_add_favorite))

@@ -185,7 +185,10 @@ class SearchFragment : Fragment() {
 											ItemContextMenu(
 												item = rowItem,
 												expanded = showContextMenu,
-												onDismissRequest = { showContextMenu = false }
+												onDismissRequest = { showContextMenu = false },
+												onItemUpdated = { _ ->
+													viewModel.searchImmediately(query.text)
+												}
 											)
 										}
 									}

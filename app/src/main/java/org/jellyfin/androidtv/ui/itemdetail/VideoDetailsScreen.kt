@@ -836,7 +836,10 @@ fun VideoDetailsScreen(
                                                 ItemContextMenu(
                                                     item = rowItem,
                                                     expanded = showContextMenu,
-                                                    onDismissRequest = { showContextMenu = false }
+                                                    onDismissRequest = { showContextMenu = false },
+                                                    onItemUpdated = { updatedItem ->
+                                                        rowState.adapter.set(index, updatedItem)
+                                                    }
                                                 )
                                             }
                                         }

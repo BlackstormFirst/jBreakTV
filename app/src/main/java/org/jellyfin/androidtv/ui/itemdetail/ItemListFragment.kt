@@ -173,6 +173,13 @@ class ItemListFragment : Fragment() {
 			},
 			onHomeClick = {
 				navigationRepository.reset(Destinations.home, clearHistory = true)
+			},
+			onItemUpdated = { index, updatedItem ->
+				val currentList = items.toMutableList()
+				if (index in currentList.indices) {
+					currentList[index] = updatedItem
+					items = currentList
+				}
 			}
 		)
 	}

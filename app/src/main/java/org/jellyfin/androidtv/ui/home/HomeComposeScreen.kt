@@ -259,7 +259,13 @@ fun HomeComposeScreen(
                                                 ItemContextMenu(
                                                     item = item,
                                                     expanded = showContextMenu,
-                                                    onDismissRequest = { showContextMenu = false }
+                                                    onDismissRequest = { showContextMenu = false },
+                                                    onItemUpdated = { updatedItem ->
+                                                        val currentItems = rowState.items.toMutableList()
+                                                        if (index in currentItems.indices) {
+                                                            currentItems[index] = updatedItem
+                                                        }
+                                                    }
                                                 )
                                             }
                                         }

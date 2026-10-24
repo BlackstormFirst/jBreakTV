@@ -16,6 +16,7 @@ import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.model.api.ItemFilter
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
+import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.koin.android.ext.android.inject
 import timber.log.Timber
 import java.util.UUID
@@ -63,17 +64,21 @@ fun FragmentActivity.playFirstUnwatchedItem(parentId: UUID) {
 	}
 }
 
+
+@JvmOverloads
 fun togglePlayed(
 	lifecycleOwner: LifecycleOwner,
 	itemMutationRepository: ItemMutationRepository,
 	customMessageRepository: CustomMessageRepository,
 	itemId: UUID,
 	played: Boolean,
+	onSuccess: ((UserItemDataDto) -> Unit)? = null,
 ) {
 	lifecycleOwner.lifecycleScope.launch {
 		runCatching {
 			itemMutationRepository.setPlayed(itemId, played)
-		}.onSuccess {
+		}.onSuccess { userData ->
+			onSuccess?.invoke(userData)
 			customMessageRepository.pushMessage(CustomMessage.RefreshCurrentItem)
 		}.onFailure { e ->
 			Timber.e(e, "Failed to toggle played state for item $itemId")
@@ -81,17 +86,20 @@ fun togglePlayed(
 	}
 }
 
+@JvmOverloads
 fun toggleFavorite(
 	lifecycleOwner: LifecycleOwner,
 	itemMutationRepository: ItemMutationRepository,
 	customMessageRepository: CustomMessageRepository,
 	itemId: UUID,
 	favorite: Boolean,
+	onSuccess: ((UserItemDataDto) -> Unit)? = null,
 ) {
 	lifecycleOwner.lifecycleScope.launch {
 		runCatching {
 			itemMutationRepository.setFavorite(itemId, favorite)
-		}.onSuccess {
+		}.onSuccess { userData ->
+			onSuccess?.invoke(userData)
 			customMessageRepository.pushMessage(CustomMessage.RefreshCurrentItem)
 		}.onFailure { e ->
 			Timber.e(e, "Failed to toggle favorite state for item $itemId")

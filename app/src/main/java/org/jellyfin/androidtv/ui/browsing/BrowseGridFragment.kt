@@ -97,6 +97,10 @@ import org.jellyfin.androidtv.ui.settings.composable.SettingsDialog
 import org.jellyfin.androidtv.ui.settings.composable.SettingsRouterContent
 import org.jellyfin.androidtv.ui.settings.routes
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
+import org.jellyfin.androidtv.constant.CustomMessage
+import org.jellyfin.androidtv.data.model.DataRefreshService
+import org.jellyfin.androidtv.data.repository.CustomMessageRepository
+import org.jellyfin.androidtv.ui.itemhandling.refreshItem
 import org.jellyfin.androidtv.util.apiclient.EmptyResponse
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.androidtv.auth.repository.UserRepository
@@ -109,6 +113,7 @@ import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import org.koin.android.ext.android.inject
 import org.koin.compose.koinInject
+import java.time.Instant
 
 class BrowseGridFragment : Fragment() {
 	private var folder: BaseItemDto? = null
@@ -425,6 +430,8 @@ fun BrowseGridScreen(
 
 	val api = koinInject<ApiClient>()
 	val userRepository = koinInject<UserRepository>()
+	val customMessageRepository = koinInject<CustomMessageRepository>()
+	val dataRefreshService = koinInject<DataRefreshService>()
 
 	val displayPrefsId = remember(folder) { folder?.displayPreferencesId ?: folder?.id?.toString() }
 	val libraryPreferences = remember(displayPrefsId) {
@@ -452,9 +459,53 @@ fun BrowseGridScreen(
 	val gridDirection = libraryPreferences?.get(LibraryPreferences.gridDirection) ?: GridDirection.VERTICAL
 
 	val lifecycleOwner = LocalLifecycleOwner.current
+
+	LaunchedEffect(Unit) {
+		customMessageRepository.message.collect { message ->
+			if (message == CustomMessage.RefreshCurrentItem) {
+				val currentAdapter = adapterRef.value
+				val currentSelectedItem = selectedItem
+				if (currentAdapter != null && currentSelectedItem != null) {
+					currentAdapter.refreshItem(api, lifecycleOwner, currentSelectedItem) {
+						val loaded = (0 until currentAdapter.size()).mapNotNull { currentAdapter.get(it) as? BaseRowItem }
+						itemsState.clear()
+						itemsState.addAll(loaded)
+					}
+				} else {
+					currentAdapter?.Retrieve()
+				}
+			}
+		}
+	}
+
+	var lastHandledRefresh by remember { mutableStateOf<Instant?>(null) }
 	DisposableEffect(lifecycleOwner) {
 		val observer = LifecycleEventObserver { _, event ->
 			if (event == Lifecycle.Event.ON_RESUME) {
+				val maxDataTimestamp = listOfNotNull(
+					dataRefreshService.lastPlayback,
+					dataRefreshService.lastMoviePlayback,
+					dataRefreshService.lastTvPlayback,
+					dataRefreshService.lastLibraryChange,
+					dataRefreshService.lastFavoriteUpdate
+				).maxOrNull()
+
+				val dataChanged = maxDataTimestamp != null && (lastHandledRefresh == null || maxDataTimestamp.isAfter(lastHandledRefresh))
+				if (dataChanged) {
+					lastHandledRefresh = Instant.now()
+					val currentAdapter = adapterRef.value
+					val currentSelectedItem = selectedItem
+					if (currentAdapter != null && currentSelectedItem != null) {
+						currentAdapter.refreshItem(api, lifecycleOwner, currentSelectedItem) {
+							val loaded = (0 until currentAdapter.size()).mapNotNull { currentAdapter.get(it) as? BaseRowItem }
+							itemsState.clear()
+							itemsState.addAll(loaded)
+						}
+					} else {
+						currentAdapter?.Retrieve()
+					}
+				}
+
 				if (hasRequestedFocus) {
 					try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
 				}
@@ -873,7 +924,17 @@ fun BrowseGridScreen(
 										ItemContextMenu(
 											item = item,
 											expanded = showContextMenu,
-											onDismissRequest = { showContextMenu = false }
+											onDismissRequest = { showContextMenu = false },
+											onItemUpdated = { updatedItem ->
+												if (index in itemsState.indices) {
+													itemsState[index] = updatedItem
+												}
+												adapterRef.value?.let { adapter ->
+													if (index in 0 until adapter.size()) {
+														adapter.set(index, updatedItem)
+													}
+												}
+											}
 										)
 									}
 								}
@@ -946,7 +1007,17 @@ fun BrowseGridScreen(
 										ItemContextMenu(
 											item = item,
 											expanded = showContextMenu,
-											onDismissRequest = { showContextMenu = false }
+											onDismissRequest = { showContextMenu = false },
+											onItemUpdated = { updatedItem ->
+												if (index in itemsState.indices) {
+													itemsState[index] = updatedItem
+												}
+												adapterRef.value?.let { adapter ->
+													if (index in 0 until adapter.size()) {
+														adapter.set(index, updatedItem)
+													}
+												}
+											}
 										)
 									}
 								}

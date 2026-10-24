@@ -562,7 +562,14 @@ fun EnhancedBrowseScreen(
 												ItemContextMenu(
 													item = item,
 													expanded = showContextMenu,
-													onDismissRequest = { showContextMenu = false }
+													onDismissRequest = { showContextMenu = false },
+													onItemUpdated = { updatedItem ->
+														val currentList = rowData[rowIndex]?.toMutableList()
+														if (currentList != null && index in currentList.indices) {
+															currentList[index] = updatedItem
+															rowData[rowIndex] = currentList
+														}
+													}
 												)
 											}
 										}

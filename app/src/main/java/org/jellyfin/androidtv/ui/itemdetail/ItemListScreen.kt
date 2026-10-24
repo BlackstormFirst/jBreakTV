@@ -109,6 +109,7 @@ fun ItemListScreen(
 	onOpenArtistClick: (() -> Unit)?,
 	onItemClick: (item: BaseItemDto, index: Int) -> Unit,
 	onHomeClick: (() -> Unit)? = null,
+	onItemUpdated: ((index: Int, updatedItem: BaseItemDto) -> Unit)? = null,
 	modifier: Modifier = Modifier
 ) {
 	val context = LocalContext.current
@@ -521,7 +522,12 @@ fun ItemListScreen(
 							ItemContextMenu(
 								item = rowItem,
 								expanded = showContextMenu,
-								onDismissRequest = { showContextMenu = false }
+								onDismissRequest = { showContextMenu = false },
+								onItemUpdated = { updatedItem ->
+									updatedItem.baseItem?.let { updatedBaseItem ->
+										onItemUpdated?.invoke(index, updatedBaseItem)
+									}
+								}
 							)
 						}
 					}
