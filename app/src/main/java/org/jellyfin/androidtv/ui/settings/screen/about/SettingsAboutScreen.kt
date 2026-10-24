@@ -63,6 +63,18 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 		}
 
 		item {
+			val heading = stringResource(R.string.pref_device_model)
+			val caption = "${Build.MANUFACTURER} ${Build.MODEL}"
+			ListButton(
+				leadingContent = { Icon(painterResource(R.drawable.ic_tv), contentDescription = null) },
+				headingContent = { Text(heading) },
+				captionContent = { Text(caption) },
+				onClick = copyAction(ClipData.newPlainText(heading, caption)),
+				modifier = Modifier.focusKey("device_model")
+			)
+		}
+
+		item {
 			val heading = "jBreakTV app version"
 			val caption = "jBreakTV ${BuildConfig.VERSION_NAME} ${BuildConfig.BUILD_TYPE}"
 			ListButton(
@@ -160,18 +172,6 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 					}
 				)
 			}
-		}
-
-		item {
-			val heading = stringResource(R.string.pref_device_model)
-			val caption = "${Build.MANUFACTURER} ${Build.MODEL}"
-			ListButton(
-				leadingContent = { Icon(painterResource(R.drawable.ic_tv), contentDescription = null) },
-				headingContent = { Text(heading) },
-				captionContent = { Text(caption) },
-				onClick = copyAction(ClipData.newPlainText(heading, caption)),
-				modifier = Modifier.focusKey("device_model")
-			)
 		}
 
 		item {
