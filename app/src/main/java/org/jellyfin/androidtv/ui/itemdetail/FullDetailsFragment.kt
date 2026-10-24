@@ -59,13 +59,18 @@ class FullDetailsFragment : Fragment() {
                         state = state,
                         onPlayClick = {
                             state.item?.let { item ->
-                                playbackHelper.retrieveAndPlay(item.id, false, requireContext(), 0L)
+                                val targetId = state.selectedMediaSource?.id?.let { Utils.uuidOrNull(it) } ?: item.id
+                                playbackHelper.retrieveAndPlay(targetId, false, requireContext(), 0L)
                             }
                         },
                         onResumeClick = {
                             state.item?.let { item ->
-                                playbackHelper.retrieveAndPlay(item.id, false, requireContext())
+                                val targetId = state.selectedMediaSource?.id?.let { Utils.uuidOrNull(it) } ?: item.id
+                                playbackHelper.retrieveAndPlay(targetId, false, requireContext())
                             }
+                        },
+                        onSelectVersion = { mediaSource ->
+                            viewModel.selectMediaSource(requireContext(), mediaSource)
                         },
                         onFavoriteClick = {
                             viewModel.toggleFavorite()

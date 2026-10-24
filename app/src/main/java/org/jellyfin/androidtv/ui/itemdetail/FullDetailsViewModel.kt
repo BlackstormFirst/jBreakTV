@@ -32,6 +32,7 @@ import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.getTimeFormatter
 import org.jellyfin.androidtv.util.sdk.buildChapterItems
 import org.jellyfin.androidtv.util.sdk.compat.canResume
+import org.jellyfin.androidtv.util.Utils
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
@@ -42,6 +43,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
+import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.PersonKind
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
@@ -61,6 +63,7 @@ data class DetailsRowState(
 data class FullDetailsUiState(
     val isLoading: Boolean = true,
     val item: BaseItemDto? = null,
+    val selectedMediaSource: MediaSourceInfo? = null,
     val isFavorite: Boolean = false,
     val isPlayed: Boolean = false,
     val canResume: Boolean = false,
@@ -210,9 +213,14 @@ class FullDetailsViewModel(
                 }
             } else null
 
+            val currentSelectedSource = _uiState.value.selectedMediaSource
+            val selectedSource = baseItem.mediaSources?.firstOrNull { it.id == currentSelectedSource?.id }
+                ?: baseItem.mediaSources?.firstOrNull()
+
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 item = baseItem,
+                selectedMediaSource = selectedSource,
                 isFavorite = isFav,
                 isPlayed = isPl,
                 canResume = canRes,
@@ -226,6 +234,15 @@ class FullDetailsViewModel(
             )
 
             loadAdditionalRows(context, baseItem, userId)
+        }
+    }
+
+    fun selectMediaSource(context: Context, mediaSource: MediaSourceInfo) {
+        _uiState.value = _uiState.value.copy(selectedMediaSource = mediaSource)
+        val mediaSourceId = mediaSource.id?.let { Utils.uuidOrNull(it) } ?: return
+        if (mediaSourceId != currentItemId) {
+            currentItemId = mediaSourceId
+            fetchItem(context, mediaSourceId, showLoading = false)
         }
     }
 

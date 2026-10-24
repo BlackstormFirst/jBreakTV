@@ -78,6 +78,9 @@ import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.IconButton
+import org.jellyfin.androidtv.ui.base.popover.Popover
+import org.jellyfin.androidtv.ui.base.popover.PopoverMenu
+import org.jellyfin.androidtv.ui.base.popover.PopoverMenuCheckboxItem
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
 import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
@@ -87,6 +90,7 @@ import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.koin.compose.koinInject
 import java.util.UUID
 
@@ -360,10 +364,13 @@ fun VideoDetailsScreen(
     onGoToSeriesClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onHomeClick: () -> Unit,
-    onItemClick: (BaseRowItem) -> Unit
+    onItemClick: (BaseRowItem) -> Unit,
+    onSelectVersion: (MediaSourceInfo) -> Unit = {}
 ) {
     val imageHelper = koinInject<ImageHelper>()
     val item = state.item ?: return
+
+    var showVersionPicker by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -510,7 +517,7 @@ fun VideoDetailsScreen(
 
                                     BaseItemInfoRow(
                                         item = item,
-                                        mediaSource = null,
+                                        mediaSource = state.selectedMediaSource,
                                         includeRuntime = true
                                     )
 
@@ -668,6 +675,19 @@ fun VideoDetailsScreen(
                                                 iconRes = R.drawable.ic_shuffle,
                                                 label = stringResource(R.string.lbl_shuffle_all),
                                                 onClick = onShuffleClick,
+                                                onFocused = { scrollToHeaderTop() }
+                                            )
+                                        }
+                                    }
+
+                                    // Version Selection (shown when item has multiple versions/media sources)
+                                    val versions = item.mediaSources
+                                    if (!isPerson && !versions.isNullOrEmpty() && versions.size > 1) {
+                                        item {
+                                            TextUnderButton(
+                                                iconRes = R.drawable.ic_control_select,
+                                                label = stringResource(R.string.select_version),
+                                                onClick = { showVersionPicker = true },
                                                 onFocused = { scrollToHeaderTop() }
                                             )
                                         }
@@ -846,6 +866,47 @@ fun VideoDetailsScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showVersionPicker && !item.mediaSources.isNullOrEmpty()) {
+            val versionsList = item.mediaSources!!
+            val selectedIndex = versionsList.indexOfFirst {
+                it.id == (state.selectedMediaSource?.id ?: versionsList.firstOrNull()?.id)
+            }.coerceAtLeast(0)
+
+            Popover(
+                expanded = showVersionPicker,
+                onDismissRequest = { showVersionPicker = false },
+                alignment = Alignment.Center
+            ) {
+                PopoverMenu {
+                    Text(
+                        text = stringResource(R.string.select_version),
+                        style = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        ),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+
+                    versionsList.forEachIndexed { index, mediaSource ->
+                        val isSelected = index == selectedIndex
+                        PopoverMenuCheckboxItem(
+                            selected = isSelected,
+                            onClick = {
+                                showVersionPicker = false
+                                onSelectVersion(mediaSource)
+                            }
+                        ) {
+                            Text(
+                                text = mediaSource.name ?: item.name ?: "",
+                                style = TextStyle(color = Color.White, fontSize = 14.sp)
+                            )
                         }
                     }
                 }
