@@ -96,37 +96,22 @@ import java.util.UUID
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun rememberTvPivotBringIntoViewSpec(listState: LazyListState): BringIntoViewSpec {
-    return remember(listState) {
+private fun rememberTvPivotBringIntoViewSpec(): BringIntoViewSpec {
+    return remember {
         object : BringIntoViewSpec {
             override fun calculateScrollDistance(
                 offset: Float,
                 size: Float,
                 containerSize: Float
             ): Float {
-                // Do NOT scroll if currently at top offset 0 and focusing header/buttons
-                if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 && offset < containerSize * 0.45f) {
-                    return 0f
+                val topPivot = containerSize * 0.35f
+                val bottomPivot = containerSize * 0.65f
+
+                return when {
+                    offset < topPivot -> offset - topPivot
+                    offset > bottomPivot -> offset - bottomPivot
+                    else -> 0f
                 }
-
-                // Align content rows (Seasons, Episodes, Cast/Crew) at ideal Leanback pivot (35% from bottom of screen)
-                // targetPivot is the offset from the top of the screen where the item should be placed.
-                // 65% from the top == 35% from the bottom.
-                val targetPivot = containerSize * 0.65f
-                val scrollDistance = offset - targetPivot
-
-                // If focusing something in the header (item 0) and the ideal scroll would push us past the top,
-                // just align minimally so we can see the top of the page.
-                if (listState.firstVisibleItemIndex == 0 && scrollDistance < 0f) {
-                    val trailingEdge = offset + size
-                    return when {
-                        offset < 0f -> offset
-                        trailingEdge > containerSize -> trailingEdge - containerSize
-                        else -> 0f
-                    }
-                }
-
-                return scrollDistance
             }
         }
     }
@@ -383,7 +368,7 @@ fun VideoDetailsScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val tvPivotBringIntoViewSpec = rememberTvPivotBringIntoViewSpec(listState)
+    val tvPivotBringIntoViewSpec = rememberTvPivotBringIntoViewSpec()
     val actionButtonsBringIntoViewSpec = rememberHorizontalBringIntoViewSpec(paddingPx = with(density) { 75.dp.toPx() })
     val contentRowsBringIntoViewSpec = rememberHorizontalBringIntoViewSpec(paddingPx = with(density) { 56.dp.toPx() })
 

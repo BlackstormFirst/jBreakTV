@@ -49,6 +49,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -75,12 +76,17 @@ import java.util.UUID
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun rememberPivotBringIntoViewSpec(): BringIntoViewSpec {
-	val density = LocalDensity.current
-	val headerHeightPx = with(density) { 64.dp.toPx() }
-	return remember(headerHeightPx) {
+	return remember {
 		object : BringIntoViewSpec {
 			override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-				return offset - headerHeightPx
+				val topPivot = containerSize * 0.35f
+				val bottomPivot = containerSize * 0.65f
+
+				return when {
+					offset < topPivot -> offset - topPivot
+					offset > bottomPivot -> offset - bottomPivot
+					else -> 0f
+				}
 			}
 		}
 	}
