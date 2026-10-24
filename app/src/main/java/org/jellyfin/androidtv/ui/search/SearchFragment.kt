@@ -5,6 +5,8 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -149,19 +151,23 @@ class SearchFragment : Fragment() {
 							) {
 								items(group.items.toList(), key = { it.id }) { baseItem ->
 									val rowItem = remember(baseItem) { BaseItemDtoBaseRowItem(baseItem) }
-									var isFocused by remember { mutableStateOf(false) }
+									val interactionSource = remember { MutableInteractionSource() }
+									val isFocusedState by interactionSource.collectIsFocusedAsState()
+									var isFocusedInternal by remember { mutableStateOf(false) }
+									val isFocused = isFocusedState || isFocusedInternal
 									var showContextMenu by remember { mutableStateOf(false) }
 
 									Box(
 										modifier = Modifier
 											.zIndex(if (isFocused) 1f else 0f)
 											.onFocusChanged { focusState ->
-												isFocused = focusState.isFocused
+												isFocusedInternal = focusState.isFocused
 												if (focusState.isFocused) {
 													backgroundService.setBackground(baseItem)
 												}
 											}
 											.itemCardClickable(
+												interactionSource = interactionSource,
 												onClick = {
 													itemLauncher.launch(rowItem, null, context)
 												},

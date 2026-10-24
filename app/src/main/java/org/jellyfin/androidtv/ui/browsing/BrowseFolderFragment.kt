@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -222,10 +223,10 @@ fun GridButtonCard(
 		horizontalArrangement = Arrangement.spacedBy(8.dp),
 		verticalAlignment = Alignment.CenterVertically,
 		modifier = modifier
-			.graphicsLayer {
-				scaleX = animatedScale
+			.graphicsLayer(
+				scaleX = animatedScale,
 				scaleY = animatedScale
-			}
+			)
 			.width(140.dp)
 			.height(40.dp)
 			.clip(RoundedCornerShape(8.dp))
@@ -453,7 +454,10 @@ fun BrowseFolderScreen(
 									horizontalArrangement = Arrangement.spacedBy(12.dp)
 								) {
 									itemsIndexed(itemsState, key = { index, item -> "${rowIndex}_${item.baseItem?.id}_$index" }) { index, item ->
-										var isFocused by remember { mutableStateOf(false) }
+										val interactionSource = remember { MutableInteractionSource() }
+										val isFocusedState by interactionSource.collectIsFocusedAsState()
+										var isFocusedInternal by remember { mutableStateOf(false) }
+										val isFocused = isFocusedState || isFocusedInternal
 										var showContextMenu by remember { mutableStateOf(false) }
 										val isSelectedItem = (item == selectedItem)
 
@@ -476,7 +480,7 @@ fun BrowseFolderScreen(
 													}
 												} else Modifier)
 												.onFocusChanged { focusState ->
-													isFocused = focusState.isFocused
+													isFocusedInternal = focusState.isFocused
 													if (focusState.isFocused) {
 														selectedItem = item
 														if (focusedRowIndex != rowIndex) {
@@ -492,6 +496,7 @@ fun BrowseFolderScreen(
 													}
 												}
 												.itemCardClickable(
+													interactionSource = interactionSource,
 													onClick = {
 														rowAdapters[rowIndex]?.let { adapter ->
 															onItemClick(item, adapter)

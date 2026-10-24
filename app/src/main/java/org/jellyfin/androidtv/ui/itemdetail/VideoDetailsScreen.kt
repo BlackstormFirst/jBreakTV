@@ -9,6 +9,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +56,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -89,45 +91,70 @@ import org.koin.compose.koinInject
 import java.util.UUID
 
 /**
- * Unified BringIntoViewSpec for 10-foot TV navigation matching Leanback VerticalGridView & HorizontalGridView:
- * - For horizontal pass (containerSize > 1200px): keeps focused cards within horizontal padding bounds.
- * - For vertical pass (Header at offset 0): anchors offset at 0 while focus is on action buttons.
- * - For vertical pass (Content Rows): aligns focused row at fixed ideal pivot (35% from top of screen).
+ * BringIntoViewSpec for 10-foot TV vertical LazyColumn navigation matching Leanback VerticalGridView:
+ * - Aligns focused row at fixed ideal pivot (35% from bottom of screen).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun rememberTvPivotBringIntoViewSpec(listState: LazyListState): BringIntoViewSpec {
-    val density = LocalDensity.current
-    val horizontalPaddingPx = with(density) { 56.dp.toPx() }
-
-    return remember(listState, horizontalPaddingPx) {
+    return remember(listState) {
         object : BringIntoViewSpec {
             override fun calculateScrollDistance(
                 offset: Float,
                 size: Float,
                 containerSize: Float
             ): Float {
-                // Horizontal LazyRow scroll distance pass
-                if (containerSize > 1200f) {
-                    val trailingEdge = offset + size
-                    val minVisible = horizontalPaddingPx
-                    val maxVisible = containerSize - horizontalPaddingPx
-                    return when {
-                        offset < minVisible -> offset - minVisible
-                        trailingEdge > maxVisible -> trailingEdge - maxVisible
-                        else -> 0f
-                    }
-                }
-
-                // Vertical LazyColumn scroll distance pass for Item 0 (Header / Action Buttons when at top):
                 // Do NOT scroll if currently at top offset 0 and focusing header/buttons
                 if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 && offset < containerSize * 0.45f) {
                     return 0f
                 }
 
-                // Align content rows (Seasons, Episodes, Cast/Crew) at ideal Leanback pivot (35% from top of screen)
-                val targetPivot = containerSize * 0.35f
-                return offset - targetPivot
+                // Align content rows (Seasons, Episodes, Cast/Crew) at ideal Leanback pivot (35% from bottom of screen)
+                // targetPivot is the offset from the top of the screen where the item should be placed.
+                // 65% from the top == 35% from the bottom.
+                val targetPivot = containerSize * 0.65f
+                val scrollDistance = offset - targetPivot
+
+                // If focusing something in the header (item 0) and the ideal scroll would push us past the top,
+                // just align minimally so we can see the top of the page.
+                if (listState.firstVisibleItemIndex == 0 && scrollDistance < 0f) {
+                    val trailingEdge = offset + size
+                    return when {
+                        offset < 0f -> offset
+                        trailingEdge > containerSize -> trailingEdge - containerSize
+                        else -> 0f
+                    }
+                }
+
+                return scrollDistance
+            }
+        }
+    }
+}
+
+/**
+ * BringIntoViewSpec for 10-foot TV horizontal LazyRow navigation matching Leanback HorizontalGridView:
+ * - Keeps focused items within specified padding bounds during horizontal scrolling (both left-to-right and right-to-left).
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun rememberHorizontalBringIntoViewSpec(paddingPx: Float = 0f): BringIntoViewSpec {
+    return remember(paddingPx) {
+        object : BringIntoViewSpec {
+            override fun calculateScrollDistance(
+                offset: Float,
+                size: Float,
+                containerSize: Float
+            ): Float {
+                val trailingEdge = offset + size
+                val minVisible = paddingPx
+                val maxVisible = containerSize - paddingPx
+
+                return when {
+                    offset < minVisible -> offset - minVisible
+                    trailingEdge > maxVisible -> trailingEdge - maxVisible
+                    else -> 0f
+                }
             }
         }
     }
@@ -355,7 +382,10 @@ fun VideoDetailsScreen(
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
     val tvPivotBringIntoViewSpec = rememberTvPivotBringIntoViewSpec(listState)
+    val actionButtonsBringIntoViewSpec = rememberHorizontalBringIntoViewSpec(paddingPx = with(density) { 75.dp.toPx() })
+    val contentRowsBringIntoViewSpec = rememberHorizontalBringIntoViewSpec(paddingPx = with(density) { 56.dp.toPx() })
 
     val actionButtonsFocusRequester = remember { FocusRequester() }
     val initialPlayButtonFocusRequester = remember { FocusRequester() }
@@ -585,14 +615,15 @@ fun VideoDetailsScreen(
 
                                 // Action Buttons Row using TextUnderButton in exact Leanback order:
                                 // 1. Resume -> 2. Play -> 3. Queue -> 4. Shuffle -> 5. Trailers -> 6. Watched -> 7. Favorite -> 8. Previous Episode -> 9. GoToSeries -> 10. Delete
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    verticalAlignment = Alignment.Top,
-                                    modifier = Modifier
-                                        .focusRequester(actionButtonsFocusRequester)
-                                        .focusGroup()
-                                        .focusRestorer()
-                                ) {
+                                CompositionLocalProvider(LocalBringIntoViewSpec provides actionButtonsBringIntoViewSpec) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.Top,
+                                        modifier = Modifier
+                                            .focusRequester(actionButtonsFocusRequester)
+                                            .focusGroup()
+                                            .focusRestorer()
+                                    ) {
                                     // 1. Resume
                                     if (state.canResume && !isPerson) {
                                         item {
@@ -731,6 +762,7 @@ fun VideoDetailsScreen(
                                         }
                                     }
                                 }
+                            }
 
                             }
 
@@ -769,13 +801,17 @@ fun VideoDetailsScreen(
                                 modifier = Modifier.padding(start = 56.dp, end = 56.dp, bottom = 12.dp)
                             )
 
-                            LazyRow(
-                                modifier = Modifier.focusRestorer(),
-                                contentPadding = PaddingValues(horizontal = 56.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
+                            CompositionLocalProvider(LocalBringIntoViewSpec provides contentRowsBringIntoViewSpec) {
+                                LazyRow(
+                                    modifier = Modifier.focusRestorer(),
+                                    contentPadding = PaddingValues(horizontal = 56.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
                                 itemsIndexed(items, key = { index, item -> "${rowIndex}_${item.hashCode()}_$index" }) { index: Int, rowItem: Any ->
-                                        var isFocused by remember { mutableStateOf(false) }
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val isFocusedState by interactionSource.collectIsFocusedAsState()
+                                    var isFocusedInternal by remember { mutableStateOf(false) }
+                                    val isFocused = isFocusedState || isFocusedInternal
                                     var showContextMenu by remember { mutableStateOf(false) }
 
                                     val cardBringIntoViewRequester = remember { BringIntoViewRequester() }
@@ -785,7 +821,7 @@ fun VideoDetailsScreen(
                                             .zIndex(if (isFocused) 1f else 0f)
                                             .bringIntoViewRequester(cardBringIntoViewRequester)
                                             .onFocusChanged { focusState ->
-                                                isFocused = focusState.isFocused
+                                                isFocusedInternal = focusState.isFocused
                                                 if (focusState.isFocused) {
                                                     coroutineScope.launch {
                                                         try { cardBringIntoViewRequester.bringIntoView() } catch (e: Exception) {}
@@ -793,6 +829,7 @@ fun VideoDetailsScreen(
                                                 }
                                             }
                                             .itemCardClickable(
+                                                interactionSource = interactionSource,
                                                 onClick = {
                                                     if (rowItem is BaseRowItem) onItemClick(rowItem)
                                                 },
@@ -827,4 +864,5 @@ fun VideoDetailsScreen(
             }
         }
     }
+}
 }

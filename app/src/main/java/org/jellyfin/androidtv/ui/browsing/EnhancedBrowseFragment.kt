@@ -11,6 +11,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -481,7 +482,10 @@ fun EnhancedBrowseScreen(
 									horizontalArrangement = Arrangement.spacedBy(12.dp)
 								) {
 									itemsIndexed(itemsState, key = { index, item -> "${rowIndex}_${item.baseItem?.id}_$index" }) { index, item ->
-										var isFocused by remember { mutableStateOf(false) }
+										val interactionSource = remember { MutableInteractionSource() }
+										val isFocusedState by interactionSource.collectIsFocusedAsState()
+										var isFocusedInternal by remember { mutableStateOf(false) }
+										val isFocused = isFocusedState || isFocusedInternal
 										var showContextMenu by remember { mutableStateOf(false) }
 										val isSelectedItem = (item == selectedItem)
 
@@ -504,7 +508,7 @@ fun EnhancedBrowseScreen(
 													}
 												} else Modifier)
 												.onFocusChanged { focusState ->
-													isFocused = focusState.isFocused
+													isFocusedInternal = focusState.isFocused
 													if (focusState.isFocused) {
 														selectedItem = item
 														if (focusedRowIndex != rowIndex) {
@@ -520,6 +524,7 @@ fun EnhancedBrowseScreen(
 													}
 												}
 												.itemCardClickable(
+													interactionSource = interactionSource,
 													onClick = {
 														rowAdapters[rowIndex]?.let { adapter ->
 															onItemClick(item, adapter)

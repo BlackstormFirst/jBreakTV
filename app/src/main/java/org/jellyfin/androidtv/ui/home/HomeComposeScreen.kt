@@ -6,6 +6,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -187,7 +188,10 @@ fun HomeComposeScreen(
                                     itemsIndexed(items, key = { _, item ->
                                         getItemKey(item)
                                     }) { index, item ->
-                                        var isFocused by remember { mutableStateOf(false) }
+                                        val interactionSource = remember { MutableInteractionSource() }
+                                        val isFocusedState by interactionSource.collectIsFocusedAsState()
+                                        var isFocusedInternal by remember { mutableStateOf(false) }
+                                        val isFocused = isFocusedState || isFocusedInternal
                                         var showContextMenu by remember { mutableStateOf(false) }
                                         val itemKey = remember(item) { getItemKey(item) }
 
@@ -209,7 +213,7 @@ fun HomeComposeScreen(
                                                 .focusRequester(focusRequester)
                                                 .zIndex(if (isFocused) 1f else 0f)
                                                 .onFocusChanged { focusState ->
-                                                    isFocused = focusState.isFocused
+                                                    isFocusedInternal = focusState.isFocused
                                                     if (focusState.isFocused) {
                                                         selectedItem = item
                                                         if (focusedRowIndex != rowIndex) {
@@ -219,6 +223,7 @@ fun HomeComposeScreen(
                                                     }
                                                 }
                                                 .itemCardClickable(
+                                                    interactionSource = interactionSource,
                                                     onClick = {
                                                         onItemClick(item, rowIndex)
                                                     },

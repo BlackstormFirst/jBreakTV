@@ -12,9 +12,11 @@ import androidx.compose.ui.input.key.onKeyEvent
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.itemCardClickable(
+	interactionSource: MutableInteractionSource? = null,
 	onClick: () -> Unit,
 	onLongClick: (() -> Unit)? = null,
 ): Modifier {
+	val source = interactionSource ?: remember { MutableInteractionSource() }
 	return this
 		.onKeyEvent { keyEvent ->
 			val nativeEvent = keyEvent.nativeKeyEvent
@@ -34,7 +36,7 @@ fun Modifier.itemCardClickable(
 			}
 		}
 		.combinedClickable(
-			interactionSource = remember { MutableInteractionSource() },
+			interactionSource = source,
 			indication = null,
 			onClick = onClick,
 			onLongClick = onLongClick

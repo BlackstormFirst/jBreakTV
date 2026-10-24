@@ -7,6 +7,8 @@ import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -370,15 +372,21 @@ fun AudioNowPlayingScreen(
 				) {
 					itemsIndexed(queueEntries, key = { index, entry -> entry.baseItem?.id ?: index }) { index, entry ->
 						val rowItem = remember(entry) { AudioQueueBaseRowItem(entry) }
-						var isFocused by remember { mutableStateOf(false) }
+						val interactionSource = remember { MutableInteractionSource() }
+						val isFocusedState by interactionSource.collectIsFocusedAsState()
+						var isFocusedInternal by remember { mutableStateOf(false) }
+						val isFocused = isFocusedState || isFocusedInternal
 
 						Box(
 							modifier = Modifier
 								.zIndex(if (isFocused) 10f else 1f)
 								.onFocusChanged { focusState ->
-									isFocused = focusState.isFocused
+									isFocusedInternal = focusState.isFocused
 								}
-								.clickable {
+								.clickable(
+									interactionSource = interactionSource,
+									indication = null
+								) {
 									keyProcessor.createItemMenu(
 										rowItem,
 										rowItem.baseItem?.userData,

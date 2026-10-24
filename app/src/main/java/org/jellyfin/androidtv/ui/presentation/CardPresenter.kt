@@ -531,11 +531,11 @@ private fun CardViewHolderContent(
 				}
 			},
 			modifier = Modifier
-				.graphicsLayer {
-					this.shadowElevation = shadowElevation.toPx()
-					this.shape = cardShape
-					this.clip = false
-				}
+				.graphicsLayer(
+					shadowElevation = with(localDensity) { shadowElevation.toPx() },
+					shape = cardShape,
+					clip = false
+				)
 				.then(cardSizeModifier)
 				.then(if (isCircular) Modifier.clip(CircleShape) else Modifier)
 		)
@@ -551,10 +551,10 @@ private fun CardViewHolderContent(
 			card = { card() },
 			modifier = Modifier
 				.zIndex(if (focused) 1f else 0f)
-				.graphicsLayer {
-					scaleX = animatedScale
+				.graphicsLayer(
+					scaleX = animatedScale,
 					scaleY = animatedScale
-				},
+				),
 			title = title?.let { text ->
 				{
 					Text(
@@ -583,10 +583,10 @@ private fun CardViewHolderContent(
 		Box(
 			modifier = Modifier
 				.zIndex(if (focused) 1f else 0f)
-				.graphicsLayer {
-					scaleX = animatedScale
+				.graphicsLayer(
+					scaleX = animatedScale,
 					scaleY = animatedScale
-				}
+				)
 		) {
 			card()
 		}

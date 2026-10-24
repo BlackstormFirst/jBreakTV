@@ -45,6 +45,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -817,7 +818,10 @@ fun BrowseGridScreen(
 							modifier = Modifier.fillMaxSize()
 						) {
 							itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
-								var isFocused by remember { mutableStateOf(false) }
+								val interactionSource = remember { MutableInteractionSource() }
+								val isFocusedState by interactionSource.collectIsFocusedAsState()
+								var isFocusedInternal by remember { mutableStateOf(false) }
+								val isFocused = isFocusedState || isFocusedInternal
 								var showContextMenu by remember { mutableStateOf(false) }
 								val isFirstCard = index == 0
 
@@ -840,7 +844,7 @@ fun BrowseGridScreen(
 											}
 										} else Modifier)
 										.onFocusChanged { focusState ->
-											isFocused = focusState.isFocused
+											isFocusedInternal = focusState.isFocused
 											if (focusState.isFocused) {
 												selectedItem = item
 												selectedIndex = index
@@ -849,6 +853,7 @@ fun BrowseGridScreen(
 											}
 										}
 										.itemCardClickable(
+											interactionSource = interactionSource,
 											onClick = {
 												adapterRef.value?.let { adapter ->
 													onItemClick(item, adapter)
@@ -885,7 +890,10 @@ fun BrowseGridScreen(
 							modifier = Modifier.fillMaxSize()
 						) {
 							itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
-								var isFocused by remember { mutableStateOf(false) }
+								val interactionSource = remember { MutableInteractionSource() }
+								val isFocusedState by interactionSource.collectIsFocusedAsState()
+								var isFocusedInternal by remember { mutableStateOf(false) }
+								val isFocused = isFocusedState || isFocusedInternal
 								var showContextMenu by remember { mutableStateOf(false) }
 								val isFirstCard = index == 0
 
@@ -908,7 +916,7 @@ fun BrowseGridScreen(
 											}
 										} else Modifier)
 										.onFocusChanged { focusState ->
-											isFocused = focusState.isFocused
+											isFocusedInternal = focusState.isFocused
 											if (focusState.isFocused) {
 												selectedItem = item
 												selectedIndex = index
@@ -917,6 +925,7 @@ fun BrowseGridScreen(
 											}
 										}
 										.itemCardClickable(
+											interactionSource = interactionSource,
 											onClick = {
 												adapterRef.value?.let { adapter ->
 													onItemClick(item, adapter)
