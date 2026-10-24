@@ -3,11 +3,9 @@ package org.jellyfin.androidtv.ui.itemdetail
 import android.view.KeyEvent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -183,7 +180,7 @@ fun ItemListScreen(
 					.clipToBounds()
 					.focusGroup()
 					.focusRestorer(),
-				contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 24.dp, bottom = 64.dp),
+				contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 64.dp, bottom = 64.dp),
 				verticalArrangement = Arrangement.spacedBy(16.dp)
 			) {
 				// Header Row
@@ -367,8 +364,7 @@ fun ItemListScreen(
 
 					Box(
 						modifier = Modifier
-							.fillMaxWidth(0.75f)
-							.widthIn(max = 850.dp)
+							.fillMaxWidth()
 							.clip(RoundedCornerShape(6.dp))
 							.background(
 								when {
