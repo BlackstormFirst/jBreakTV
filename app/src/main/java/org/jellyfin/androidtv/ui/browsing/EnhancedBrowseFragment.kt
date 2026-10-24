@@ -554,7 +554,7 @@ fun EnhancedBrowseScreen(
 												BaseRowItemCard(
 													item = item,
 													focused = isFocused,
-													showInfo = false
+													showInfo = true
 												)
 											}
 
