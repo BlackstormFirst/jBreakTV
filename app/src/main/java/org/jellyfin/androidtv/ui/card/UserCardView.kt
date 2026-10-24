@@ -8,7 +8,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.FocusInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -70,7 +69,6 @@ fun UserCard(
 		modifier = modifier
 			.zIndex(if (focused) 1f else 0f)
 			.scale(scale)
-			.focusable(interactionSource = interactionSource)
 			.combinedClickable(
 				interactionSource = interactionSource,
 				onClick = onClick,
