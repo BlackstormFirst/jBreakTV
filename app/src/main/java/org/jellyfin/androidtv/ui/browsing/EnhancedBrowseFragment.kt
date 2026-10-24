@@ -338,8 +338,9 @@ fun EnhancedBrowseScreen(
 ) {
 	val context = LocalContext.current
 	var selectedItem by remember { mutableStateOf<BaseRowItem?>(null) }
+	var selectedRowIndex by remember { mutableStateOf<Int?>(null) }
+	var userHasInteracted by remember { mutableStateOf(false) }
 	val selectedItemFocusRequester = remember { FocusRequester() }
-	var hasRequestedFocus by remember { mutableStateOf(false) }
 
 	val listState = rememberLazyListState()
 	val coroutineScope = rememberCoroutineScope()
@@ -354,7 +355,7 @@ fun EnhancedBrowseScreen(
 	DisposableEffect(lifecycleOwner) {
 		val observer = LifecycleEventObserver { _, event ->
 			if (event == Lifecycle.Event.ON_RESUME) {
-				if (hasRequestedFocus) {
+				if (selectedItem != null) {
 					try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
 				}
 			}
@@ -362,6 +363,12 @@ fun EnhancedBrowseScreen(
 		lifecycleOwner.lifecycle.addObserver(observer)
 		onDispose {
 			lifecycleOwner.lifecycle.removeObserver(observer)
+		}
+	}
+
+	LaunchedEffect(selectedItem) {
+		if (selectedItem != null && !userHasInteracted) {
+			try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
 		}
 	}
 
@@ -458,9 +465,13 @@ fun EnhancedBrowseScreen(
 									override fun onResponse() {
 										val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
 										rowData[rowIndex] = loaded
-										if (selectedItem == null && loaded.isNotEmpty()) {
-											selectedItem = loaded.first()
-											onItemFocused(loaded.first())
+										if (!userHasInteracted && loaded.isNotEmpty()) {
+											val currentSelectedRow = selectedRowIndex
+											if (currentSelectedRow == null || rowIndex < currentSelectedRow) {
+												selectedRowIndex = rowIndex
+												selectedItem = loaded.first()
+												onItemFocused(loaded.first())
+											}
 										}
 									}
 								})
@@ -489,28 +500,25 @@ fun EnhancedBrowseScreen(
 										var showContextMenu by remember { mutableStateOf(false) }
 										val isSelectedItem = (item == selectedItem)
 
-										if (isSelectedItem) {
-											LaunchedEffect(itemsState.isNotEmpty()) {
-												if (itemsState.isNotEmpty() && selectedItem == null) {
-													selectedItem = itemsState.first()
-													onItemFocused(itemsState.first())
-												}
-											}
-										}
-
 										Box(
 											modifier = Modifier
 												.zIndex(if (isFocused) 1f else 0f)
-												.then(if (isSelectedItem) Modifier.focusRequester(selectedItemFocusRequester).onGloballyPositioned {
-													if (!hasRequestedFocus) {
-														hasRequestedFocus = true
-														try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
-													}
+												.then(if (isSelectedItem) {
+													Modifier
+														.focusRequester(selectedItemFocusRequester)
+														.onGloballyPositioned {
+															if (!userHasInteracted) {
+																try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+															}
+														}
 												} else Modifier)
 												.onFocusChanged { focusState ->
 													isFocusedInternal = focusState.isFocused
 													if (focusState.isFocused) {
-														selectedItem = item
+														if (selectedItem != item) {
+															selectedItem = item
+															userHasInteracted = true
+														}
 														if (focusedRowIndex != rowIndex) {
 															focusedRowIndex = rowIndex
 															coroutineScope.launch {
