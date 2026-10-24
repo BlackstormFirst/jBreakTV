@@ -76,7 +76,7 @@ import java.util.UUID
 @Composable
 private fun rememberPivotBringIntoViewSpec(): BringIntoViewSpec {
 	val density = LocalDensity.current
-	val headerHeightPx = with(density) { 38.dp.toPx() }
+	val headerHeightPx = with(density) { 64.dp.toPx() }
 	return remember(headerHeightPx) {
 		object : BringIntoViewSpec {
 			override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {

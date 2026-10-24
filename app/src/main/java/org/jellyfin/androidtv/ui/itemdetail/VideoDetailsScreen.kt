@@ -492,7 +492,7 @@ fun VideoDetailsScreen(
                     .clipToBounds()
                     .focusGroup()
                     .focusRestorer(),
-                contentPadding = PaddingValues(top = 80.dp, bottom = 64.dp),
+                contentPadding = PaddingValues(top = 64.dp, bottom = 64.dp),
                 verticalArrangement = Arrangement.spacedBy(28.dp)
             ) {
                 // Main Details Row Item matching view_row_details.xml
