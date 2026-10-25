@@ -61,10 +61,11 @@ import kotlin.math.min
 fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 10) {
 	val api = runCatching { get<ApiClient>(ApiClient::class.java) }.getOrNull() ?: return
 	val imageLoader = runCatching { get<ImageLoader>(ImageLoader::class.java) }.getOrNull() ?: return
-	val density = context.resources.displayMetrics.density
+	val density = context?.resources?.displayMetrics?.density ?: 1f
 	val cardStaticHeight = (items.firstOrNull()?.let { getPresenter(it) } as? org.jellyfin.androidtv.ui.presentation.CardPresenter)?.staticHeight ?: 150
 
 	ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
+		val ctx = context ?: return@launch
 		val baseItems = items.filterIsInstance<BaseRowItem>().take(maxCount)
 		for (item in baseItems) {
 			val image = item.getImage(org.jellyfin.androidtv.constant.ImageType.POSTER)
@@ -88,7 +89,7 @@ fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 10) {
 				maxHeight = maxHeightPx,
 			)
 
-			val request = ImageRequest.Builder(context)
+			val request = ImageRequest.Builder(ctx)
 				.data(url)
 				.memoryCacheKey(url)
 				.build()
@@ -140,7 +141,7 @@ fun <T : Any> ItemRowAdapter.setItems(
 		}
 	}
 
-	replaceAll(allItems)
+	replaceAll(allItems.filterNotNull())
 	itemsLoaded = allItems.size
 	preloadRowImages(allItems)
 }
@@ -343,10 +344,11 @@ fun ItemRowAdapter.retrieveNextEpisodes(api: ApiClient, query: GetNextEpisodesRe
 }
 
 fun ItemRowAdapter.ensureUsbTilePresent() {
+	val ctx = context ?: return
 	val userPreferences = get<UserPreferences>(UserPreferences::class.java)
 	val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
 
-	val usbVolumes = UsbStorageManager.getMountedVolumes(context)
+	val usbVolumes = UsbStorageManager.getMountedVolumes(ctx)
 	val hasUsb = isLocalPlayerUsbEnabled && usbVolumes.isNotEmpty()
 
 	if (hasUsb) {
@@ -385,6 +387,7 @@ fun ItemRowAdapter.ensureUsbTilePresent() {
 }
 
 fun ItemRowAdapter.retrieveUserViews(api: ApiClient, userViewsRepository: UserViewsRepository) {
+	val ctx = context ?: return
 	ProcessLifecycleOwner.get().lifecycleScope.launch {
 		runCatching {
 			Timber.d("USB_DEBUG: 1. retrieveUserViews started")
@@ -398,7 +401,7 @@ fun ItemRowAdapter.retrieveUserViews(api: ApiClient, userViewsRepository: UserVi
 			val userPreferences = get<UserPreferences>(UserPreferences::class.java)
 			val isLocalPlayerUsbEnabled = userPreferences[UserPreferences.localPlayerUsbEnabled]
 
-			val usbVolumes = UsbStorageManager.getMountedVolumes(context)
+			val usbVolumes = UsbStorageManager.getMountedVolumes(ctx)
 			val hasUsb = isLocalPlayerUsbEnabled && usbVolumes.isNotEmpty()
 
 			Timber.d("USB_DEBUG: 2. retrieveUserViews hasUsb=$hasUsb (volumesCount=${usbVolumes.size})")

@@ -37,24 +37,24 @@ class HomeFragmentBrowseRowDefRow(
 		val preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled]
 
 		val rowAdapter = when (browseRowDef.queryType) {
-			QueryType.NextUp -> ItemRowAdapter(context, browseRowDef.nextUpQuery, preferParentThumb, cardPresenter, rowsAdapter)
-			QueryType.LatestItems -> ItemRowAdapter(context, browseRowDef.latestItemsQuery, userPreferences[UserPreferences.seriesThumbnailsEnabled], cardPresenter, rowsAdapter)
+			QueryType.NextUp -> ItemRowAdapter(context, browseRowDef.nextUpQuery!!, preferParentThumb, cardPresenter, rowsAdapter)
+			QueryType.LatestItems -> ItemRowAdapter(context, browseRowDef.latestItemsQuery!!, userPreferences[UserPreferences.seriesThumbnailsEnabled], cardPresenter, rowsAdapter)
 			QueryType.Views -> ItemRowAdapter(context, GetUserViewsRequest, cardPresenter, rowsAdapter)
-			QueryType.SimilarSeries -> ItemRowAdapter(context, browseRowDef.similarQuery, QueryType.SimilarSeries, cardPresenter, rowsAdapter)
-			QueryType.SimilarMovies -> ItemRowAdapter(context, browseRowDef.similarQuery, QueryType.SimilarMovies, cardPresenter, rowsAdapter)
-			QueryType.LiveTvChannel -> ItemRowAdapter(context, browseRowDef.tvChannelQuery, 40, cardPresenter, rowsAdapter)
-			QueryType.LiveTvProgram -> ItemRowAdapter(context, browseRowDef.programQuery, cardPresenter, rowsAdapter)
-			QueryType.LiveTvRecording -> ItemRowAdapter(context, browseRowDef.recordingQuery, browseRowDef.chunkSize, cardPresenter, rowsAdapter)
-			QueryType.Resume -> ItemRowAdapter(context, browseRowDef.resumeQuery, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, cardPresenter, rowsAdapter)
-			else -> ItemRowAdapter(context, browseRowDef.query, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, cardPresenter, rowsAdapter, browseRowDef.queryType)
+			QueryType.SimilarSeries -> ItemRowAdapter(context, browseRowDef.similarQuery!!, QueryType.SimilarSeries, cardPresenter, rowsAdapter)
+			QueryType.SimilarMovies -> ItemRowAdapter(context, browseRowDef.similarQuery!!, QueryType.SimilarMovies, cardPresenter, rowsAdapter)
+			QueryType.LiveTvChannel -> ItemRowAdapter(context, browseRowDef.tvChannelQuery!!, 40, cardPresenter, rowsAdapter)
+			QueryType.LiveTvProgram -> ItemRowAdapter(context, browseRowDef.programQuery!!, cardPresenter, rowsAdapter)
+			QueryType.LiveTvRecording -> ItemRowAdapter(context, browseRowDef.recordingQuery!!, browseRowDef.chunkSize, cardPresenter, rowsAdapter)
+			QueryType.Resume -> ItemRowAdapter(context, browseRowDef.resumeQuery!!, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, cardPresenter, rowsAdapter)
+			else -> ItemRowAdapter(context, browseRowDef.query!!, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, cardPresenter, rowsAdapter, browseRowDef.queryType ?: QueryType.Items)
 		}
 
-		rowAdapter.setReRetrieveTriggers(browseRowDef.changeTriggers)
+		rowAdapter.reRetrieveTriggers = browseRowDef.changeTriggers
 
 		val hasData = runCatching {
 			when (browseRowDef.queryType) {
 				QueryType.Resume -> {
-					val response = api.itemsApi.getResumeItems(browseRowDef.resumeQuery).content
+					val response = api.itemsApi.getResumeItems(browseRowDef.resumeQuery!!).content
 					val filteredItems = response.items.filter { it.isRealAvailableMedia() }
 					if (filteredItems.isEmpty()) false
 					else {
@@ -65,7 +65,7 @@ class HomeFragmentBrowseRowDefRow(
 					}
 				}
 				QueryType.NextUp -> {
-					val response = api.tvShowsApi.getNextUp(browseRowDef.nextUpQuery).content
+					val response = api.tvShowsApi.getNextUp(browseRowDef.nextUpQuery!!).content
 					val nextUpItems = response.items.filter { it.isRealAvailableMedia() }
 					if (nextUpItems.isEmpty()) false
 					else {
@@ -76,7 +76,7 @@ class HomeFragmentBrowseRowDefRow(
 					}
 				}
 				QueryType.LatestItems -> {
-					val response = api.userLibraryApi.getLatestMedia(browseRowDef.latestItemsQuery).content
+					val response = api.userLibraryApi.getLatestMedia(browseRowDef.latestItemsQuery!!).content
 					val filteredItems = response.filter { it.isRealAvailableMedia() }
 					if (filteredItems.isEmpty()) false
 					else {
@@ -93,7 +93,7 @@ class HomeFragmentBrowseRowDefRow(
 					}
 				}
 				QueryType.LiveTvRecording -> {
-					val response = api.liveTvApi.getRecordings(browseRowDef.recordingQuery).content
+					val response = api.liveTvApi.getRecordings(browseRowDef.recordingQuery!!).content
 					val filteredItems = response.items.filter { it.isRealAvailableMedia() }
 					if (filteredItems.isEmpty()) false
 					else {
@@ -104,7 +104,7 @@ class HomeFragmentBrowseRowDefRow(
 					}
 				}
 				QueryType.LiveTvProgram -> {
-					val response = api.liveTvApi.getRecommendedPrograms(browseRowDef.programQuery).content
+					val response = api.liveTvApi.getRecommendedPrograms(browseRowDef.programQuery!!).content
 					if (response.items.isEmpty()) false
 					else {
 						rowAdapter.setInitialItems(response.items) { item, _ ->
@@ -134,7 +134,7 @@ class HomeFragmentBrowseRowDefRow(
 
 		val header = HeaderItem(browseRowDef.headerText)
 		val row = ListRow(header, rowAdapter)
-		rowAdapter.setRow(row)
+		rowAdapter.row = row
 		return row
 	}
 
@@ -147,19 +147,19 @@ class HomeFragmentBrowseRowDefRow(
 		val items: List<Any> = runCatching {
 			when (browseRowDef.queryType) {
 				QueryType.Resume -> {
-					val response = api.itemsApi.getResumeItems(browseRowDef.resumeQuery).content
+					val response = api.itemsApi.getResumeItems(browseRowDef.resumeQuery!!).content
 					response.items.filter { it.isRealAvailableMedia() }.map { item ->
 						BaseItemDtoBaseRowItem(item, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight)
 					}
 				}
 				QueryType.NextUp -> {
-					val response = api.tvShowsApi.getNextUp(browseRowDef.nextUpQuery).content
+					val response = api.tvShowsApi.getNextUp(browseRowDef.nextUpQuery!!).content
 					response.items.filter { it.isRealAvailableMedia() }.map { item ->
 						BaseItemDtoBaseRowItem(item, preferParentThumb, browseRowDef.isStaticHeight)
 					}
 				}
 				QueryType.LatestItems -> {
-					val response = api.userLibraryApi.getLatestMedia(browseRowDef.latestItemsQuery).content
+					val response = api.userLibraryApi.getLatestMedia(browseRowDef.latestItemsQuery!!).content
 					response.filter { it.isRealAvailableMedia() }.map { item ->
 						BaseItemDtoBaseRowItem(
 							item = item,
@@ -171,13 +171,13 @@ class HomeFragmentBrowseRowDefRow(
 					}
 				}
 				QueryType.LiveTvRecording -> {
-					val response = api.liveTvApi.getRecordings(browseRowDef.recordingQuery).content
+					val response = api.liveTvApi.getRecordings(browseRowDef.recordingQuery!!).content
 					response.items.filter { it.isRealAvailableMedia() }.map { item ->
 						BaseItemDtoBaseRowItem(item, false, false)
 					}
 				}
 				QueryType.LiveTvProgram -> {
-					val response = api.liveTvApi.getRecommendedPrograms(browseRowDef.programQuery).content
+					val response = api.liveTvApi.getRecommendedPrograms(browseRowDef.programQuery!!).content
 					response.items.map { item ->
 						BaseItemDtoBaseRowItem(item, false, false)
 					}

@@ -34,7 +34,7 @@ class ByGenreFragment : BrowseFolderFragment() {
 				recursive = true,
 				fields = ItemRepository.browseFields,
 			)
-			rows.add(BrowseRowDef(genre.name, itemsRequest, 40))
+			rows.add(BrowseRowDef(genre.name ?: "", itemsRequest, 40))
 		}
 
 		rowLoader.loadRows(rows)

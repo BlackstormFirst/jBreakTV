@@ -70,7 +70,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 			else -> getString(R.string.lbl_by_name)
 		}
 
-		mRows.add(BrowseRowDef(header, byName, 100))
+		mRows.add(BrowseRowDef(header ?: "", byName, 100))
 
 		if (folder.type == BaseItemKind.SEASON) {
 			val specials = GetSpecialsRequest(folder.id)
