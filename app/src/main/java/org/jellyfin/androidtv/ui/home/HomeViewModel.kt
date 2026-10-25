@@ -470,8 +470,6 @@ class HomeViewModel(
     var lastFocusedRowIndex: Int = 0
         private set
 
-    private var backgroundUpdateJob: Job? = null
-
     fun resetLastFocusedItem() {
         lastFocusedItemKey = null
         lastFocusedRowIndex = 0
@@ -494,19 +492,15 @@ class HomeViewModel(
         }
         currentItem = item
 
-        backgroundUpdateJob?.cancel()
-        backgroundUpdateJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(200)
-            val isLibraryRow = isLibraryRow(rowIndex, item)
-            if (item !is BaseRowItem) {
-                if (isLibraryRow) {
-                    backgroundService.setSplashscreenBackground()
-                } else {
-                    backgroundService.clearBackgrounds()
-                }
+        val isLibraryRow = isLibraryRow(rowIndex, item)
+        if (item !is BaseRowItem) {
+            if (isLibraryRow) {
+                backgroundService.setSplashscreenBackground()
             } else {
-                backgroundService.setBackground(item.baseItem, fallbackToSplashscreen = isLibraryRow)
+                backgroundService.clearBackgrounds()
             }
+        } else {
+            backgroundService.setBackground(item.baseItem, fallbackToSplashscreen = isLibraryRow)
         }
     }
 

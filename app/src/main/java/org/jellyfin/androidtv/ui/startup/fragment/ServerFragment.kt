@@ -142,7 +142,7 @@ class ServerFragment : Fragment() {
 		super.onResume()
 
 		startupViewModel.reloadStoredServers()
-		backgroundService.clearBackgrounds()
+		backgroundService.clearBackgrounds(immediate = true)
 
 		val server = serverIdArgument?.let(startupViewModel::getServer)
 		if (server != null) startupViewModel.loadUsers(server)

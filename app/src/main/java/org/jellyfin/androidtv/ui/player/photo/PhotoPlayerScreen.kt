@@ -28,7 +28,7 @@ fun PhotoPlayerScreen() {
 
 	val backgroundService = koinInject<BackgroundService>()
 	LaunchedEffect(backgroundService) {
-		backgroundService.clearBackgrounds()
+		backgroundService.clearBackgrounds(immediate = true)
 	}
 
 	ScreensaverLock(

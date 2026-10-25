@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.auth.model.Server
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.preference.UserPreferences
@@ -41,6 +42,7 @@ class BackgroundService(
 	companion object {
 		val SLIDESHOW_DURATION = 30.seconds
 		val TRANSITION_DURATION = 800.milliseconds
+		const val DEFAULT_DEBOUNCE_MS = 180L
 	}
 
 	// Async
@@ -48,6 +50,12 @@ class BackgroundService(
 	private var loadBackgroundsJob: Job? = null
 	private var updateBackgroundTimerJob: Job? = null
 	private var lastBackgroundTimerUpdate = 0L
+
+	// Tracking current and requested target IDs for centralized debounce
+	@Volatile
+	private var currentRequestedTargetId: String? = null
+	@Volatile
+	private var currentlyLoadedTargetId: String? = null
 
 	// Current background data
 	private var loadedUrls: Set<String> = emptySet()
@@ -65,18 +73,22 @@ class BackgroundService(
 	private var savedBackground: ImageBitmap? = null
 	private var savedBackgrounds: List<ImageBitmap> = emptyList()
 	private var savedLoadedUrls: Set<String> = emptySet()
+	private var savedLoadedTargetId: String? = null
 
 	/**
 	 * Temporarily resets the background to the default theme background,
 	 * while preserving the current background in memory to restore it after the splash screen.
 	 */
 	fun resetToThemeAndSaveExisting() {
+		loadBackgroundsJob?.cancel()
 		if (_currentBackground.value != null) {
 			savedBackground = _currentBackground.value
 			savedBackgrounds = _backgrounds
 			savedLoadedUrls = loadedUrls
+			savedLoadedTargetId = currentlyLoadedTargetId
 		}
 		_currentBackground.value = null
+		currentlyLoadedTargetId = null
 	}
 
 	/**
@@ -86,10 +98,12 @@ class BackgroundService(
 		val saved = savedBackground ?: return
 		_backgrounds = savedBackgrounds
 		loadedUrls = savedLoadedUrls
+		currentlyLoadedTargetId = savedLoadedTargetId
 		_currentBackground.value = saved
 		savedBackground = null
 		savedBackgrounds = emptyList()
 		savedLoadedUrls = emptySet()
+		savedLoadedTargetId = null
 	}
 
 	/**
@@ -98,14 +112,15 @@ class BackgroundService(
 	@JvmOverloads
 	fun setBackground(
 		baseItem: BaseItemDto?,
-		debounceMs: Long = 200L,
+		debounceMs: Long = DEFAULT_DEBOUNCE_MS,
 		fallbackToSplashscreen: Boolean = false,
 	) {
 		val backdropBehavior = userPreferences[UserPreferences.backdropBehavior]
 
 		// Check if backgrounds are enabled
-		if (backdropBehavior == BackdropBehavior.DISABLED)
-			return clearBackgrounds()
+		if (backdropBehavior == BackdropBehavior.DISABLED) {
+			return clearBackgrounds(debounceMs = debounceMs)
+		}
 
 		// Enable blur for backdrops
 		_blurBackground.value = backdropBehavior == BackdropBehavior.BACKDROP_WITH_BLUR
@@ -118,33 +133,46 @@ class BackgroundService(
 		} ?: emptySet()
 
 		if (backdropUrls.isNotEmpty()) {
-			loadBackgrounds(backdropUrls, debounceMs)
+			val itemId = baseItem?.id?.toString() ?: backdropUrls.first()
+			requestBackgroundUpdate(
+				targetId = itemId,
+				backdropUrls = backdropUrls,
+				debounceMs = debounceMs
+			)
 		} else if (fallbackToSplashscreen) {
-			setSplashscreenBackground()
+			setSplashscreenBackground(debounceMs = debounceMs)
 		} else {
-			clearBackgrounds()
+			clearBackgrounds(debounceMs = debounceMs)
 		}
 	}
 
-	fun setSplashscreenBackground(server: Server? = serverRepository.currentServer.value) {
+	@JvmOverloads
+	fun setSplashscreenBackground(
+		server: Server? = serverRepository.currentServer.value,
+		debounceMs: Long = DEFAULT_DEBOUNCE_MS,
+	) {
 		if (server != null) {
-			setBackground(server)
+			setBackground(server, debounceMs = debounceMs)
 		} else {
-			clearBackgrounds()
+			clearBackgrounds(debounceMs = debounceMs)
 		}
 	}
 
 	/**
 	 * Use splashscreen from [server] as background.
 	 */
-	fun setBackground(server: Server) {
+	@JvmOverloads
+	fun setBackground(
+		server: Server,
+		debounceMs: Long = DEFAULT_DEBOUNCE_MS,
+	) {
 		// Check if item is set and backgrounds are enabled
 		if (userPreferences[UserPreferences.backdropBehavior] == BackdropBehavior.DISABLED)
-			return clearBackgrounds()
+			return clearBackgrounds(debounceMs = debounceMs)
 
 		// Check if splashscreen is enabled in (cached) branding options
 		if (!server.splashscreenEnabled)
-			return clearBackgrounds()
+			return clearBackgrounds(debounceMs = debounceMs)
 
 		// Disable blur on splashscreen
 		_blurBackground.value = false
@@ -153,21 +181,44 @@ class BackgroundService(
 			// Manually grab the backdrop URL
 			val api = jellyfin.createApi(baseUrl = server.address)
 			val splashscreenUrl = api.imageApi.getSplashscreenUrl()
+			val targetId = "server_${server.id}"
 
-			loadBackgrounds(setOf(splashscreenUrl))
+			requestBackgroundUpdate(
+				targetId = targetId,
+				backdropUrls = setOf(splashscreenUrl),
+				debounceMs = debounceMs
+			)
 		} catch (err: Exception) {
-			clearBackgrounds()
+			clearBackgrounds(debounceMs = debounceMs)
 		}
 	}
 
-	private fun loadBackgrounds(backdropUrls: Set<String>, debounceMs: Long = 200L) {
-		if (backdropUrls.isEmpty()) return clearBackgrounds()
+	/**
+	 * Request a centralized debounced background update.
+	 *
+	 * Before the debounce: captures the [targetId] and updates [currentRequestedTargetId].
+	 * After the debounce: verifies if [currentRequestedTargetId] still matches [targetId].
+	 * If identical, applies the new background (unless it is similar to the already loaded background).
+	 * If not identical, re-evaluates / restarts the debounce for the new requested target.
+	 */
+	private fun requestBackgroundUpdate(
+		targetId: String,
+		backdropUrls: Set<String>,
+		debounceMs: Long = DEFAULT_DEBOUNCE_MS,
+	) {
+		// Before debounce: capture target item ID and update currentRequestedTargetId
+		currentRequestedTargetId = targetId
+		val capturedTargetId = targetId
 
 		// Re-enable backgrounds if disabled
 		_enabled.value = true
 
-		// If the requested backdrops are already loaded and displayed, do nothing
-		if (backdropUrls == loadedUrls && _backgrounds.isNotEmpty() && _currentBackground.value != null) {
+		// Check "sauf si il est similaire": if the requested target is already loaded and currently displayed
+		if (capturedTargetId == currentlyLoadedTargetId &&
+			_backgrounds.isNotEmpty() &&
+			_currentBackground.value != null &&
+			(backdropUrls.isEmpty() || backdropUrls == loadedUrls)
+		) {
 			if (pendingUrls != null && pendingUrls != loadedUrls) {
 				loadBackgroundsJob?.cancel()
 				pendingUrls = null
@@ -175,56 +226,102 @@ class BackgroundService(
 			return
 		}
 
-		// If a load job is already actively debouncing/loading this exact set of URLs, let it continue
-		if (backdropUrls == pendingUrls && loadBackgroundsJob?.isActive == true) {
+		// If a load job is already active for this exact target and URLs, let it continue
+		if (capturedTargetId == currentRequestedTargetId && backdropUrls == pendingUrls && loadBackgroundsJob?.isActive == true) {
 			return
 		}
 
 		pendingUrls = backdropUrls
 
-		// Cancel current loading job
+		// Cancel previous debounce job
 		loadBackgroundsJob?.cancel()
 		loadBackgroundsJob = scope.launch(Dispatchers.IO) {
 			try {
 				if (debounceMs > 0) {
 					delay(debounceMs.milliseconds)
 				}
-				val loaded = backdropUrls.mapNotNull { url ->
-					try {
-						val request = ImageRequest.Builder(context)
-							.data(url)
-							.memoryCacheKey(url)
-							.diskCacheKey(url)
-							.bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
-							.apply {
-								// On Android versions older than 12 (API 31), Modifier.blur() is not supported in Compose.
-								// As a workaround, we downscale the image significantly during loading.
-								// When scaled back up to fill the screen, the bilinear filtering creates a natural blur effect.
-								if (android.os.Build.VERSION.SDK_INT < 31 && _blurBackground.value) {
-									size(240, 135)
-								} else {
-									// Limit max backdrop resolution to 1080p to prevent high memory usage on 4K backdrops
-									size(1920, 1080)
-								}
-							}
-							.build()
 
-						imageLoader.execute(request).image?.toBitmap()?.asImageBitmap()
-					} catch (err: Exception) {
-						null
-					}
+				// After debounce: verify if target ID is still identical to current requested ID
+				val latestRequestedId = currentRequestedTargetId
+				if (latestRequestedId != capturedTargetId) {
+					// Focus/item changed during debounce delay!
+					// "sinon on relance le debounce" -> latest request handles its own debounce
+					return@launch
 				}
 
-				if (loaded.isNotEmpty()) {
-					_backgrounds = loaded
-					loadedUrls = backdropUrls
+				// Verify again if target is similar / already loaded
+				if (capturedTargetId == currentlyLoadedTargetId &&
+					_backgrounds.isNotEmpty() &&
+					_currentBackground.value != null &&
+					(backdropUrls.isEmpty() || backdropUrls == loadedUrls)
+				) {
+					pendingUrls = null
+					return@launch
+				}
+
+				if (backdropUrls.isEmpty()) {
+					// Empty backdrops requested -> clear background
+					_backgrounds = emptyList()
+					loadedUrls = emptySet()
+					currentlyLoadedTargetId = capturedTargetId
 					pendingUrls = null
 					_currentIndex = 0
-					showImmediateBackground()
+					withContext(Dispatchers.Main) {
+						_currentBackground.value = null
+					}
+					return@launch
+				}
+
+				// Fetch and decode first backdrop image immediately for instant feedback
+				val firstUrl = backdropUrls.firstOrNull() ?: return@launch
+				val firstBitmap = fetchImageBitmap(firstUrl) ?: return@launch
+
+				// Check again after I/O loading if target ID is still the active requested target
+				if (currentRequestedTargetId != capturedTargetId) {
+					return@launch
+				}
+
+				_backgrounds = listOf(firstBitmap)
+				loadedUrls = setOf(firstUrl)
+				currentlyLoadedTargetId = capturedTargetId
+				pendingUrls = null
+				_currentIndex = 0
+				showImmediateBackground()
+
+				// Load remaining backdrop URLs in background if slideshow exists
+				if (backdropUrls.size > 1) {
+					val remainingUrls = backdropUrls.drop(1)
+					val remainingBitmaps = remainingUrls.mapNotNull { url ->
+						if (currentRequestedTargetId == capturedTargetId) fetchImageBitmap(url) else null
+					}
+					if (currentRequestedTargetId == capturedTargetId && remainingBitmaps.isNotEmpty()) {
+						_backgrounds = listOf(firstBitmap) + remainingBitmaps
+						loadedUrls = backdropUrls
+					}
 				}
 			} catch (_: Exception) {
 				// Coroutine cancelled; keep existing background visible until new selection completes
 			}
+		}
+	}
+
+	private suspend fun fetchImageBitmap(url: String): ImageBitmap? {
+		return try {
+			val request = ImageRequest.Builder(context)
+				.data(url)
+				.memoryCacheKey(url)
+				.diskCacheKey(url)
+				.bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+				.apply {
+					if (android.os.Build.VERSION.SDK_INT < 31 && _blurBackground.value) {
+						size(240, 135)
+					}
+				}
+				.build()
+
+			imageLoader.execute(request).image?.toBitmap()?.asImageBitmap()
+		} catch (_: Exception) {
+			null
 		}
 	}
 
@@ -237,18 +334,32 @@ class BackgroundService(
 		else updateBackgroundTimerJob?.cancel()
 	}
 
-	fun clearBackgrounds() {
-		loadBackgroundsJob?.cancel()
-		pendingUrls = null
-		loadedUrls = emptySet()
+	@JvmOverloads
+	fun clearBackgrounds(
+		immediate: Boolean = false,
+		debounceMs: Long = DEFAULT_DEBOUNCE_MS,
+	) {
+		val targetId = "none"
+		currentRequestedTargetId = targetId
 
-		// Re-enable backgrounds if disabled
-		_enabled.value = true
+		if (immediate || debounceMs <= 0L) {
+			loadBackgroundsJob?.cancel()
+			pendingUrls = null
+			loadedUrls = emptySet()
+			currentlyLoadedTargetId = targetId
+			_enabled.value = true
+			if (_backgrounds.isEmpty()) return
 
-		if (_backgrounds.isEmpty()) return
+			_backgrounds = emptyList()
+			update()
+			return
+		}
 
-		_backgrounds = emptyList()
-		update()
+		requestBackgroundUpdate(
+			targetId = targetId,
+			backdropUrls = emptySet(),
+			debounceMs = debounceMs
+		)
 	}
 
 	/**
