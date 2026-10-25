@@ -531,7 +531,7 @@ fun BrowseFolderScreen(
 													}
 												)
 										) {
-											if (item is GridButtonBaseRowItem) {
+											if (item is GridButtonBaseRowItem && item.gridButton.imageRes == null) {
 												GridButtonCard(
 													item = item,
 													focused = isFocused

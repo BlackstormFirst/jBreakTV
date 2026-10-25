@@ -244,7 +244,11 @@ fun HomeComposeScreen(
                                                 )
                                         ) {
                                             when (item) {
-                                                is GridButtonBaseRowItem -> GridButtonCard(item = item, focused = isFocused)
+                                                is GridButtonBaseRowItem -> if (item.gridButton.imageRes == null) {
+                                                    GridButtonCard(item = item, focused = isFocused)
+                                                } else {
+                                                    BaseRowItemCard(item = item, focused = isFocused, showInfo = shouldShowInfo)
+                                                }
                                                 is GridButton -> GridButtonCard(item = GridButtonBaseRowItem(item), focused = isFocused)
                                                 is BaseRowItem -> BaseRowItemCard(item = item, focused = isFocused, showInfo = shouldShowInfo)
                                                 is AppNotification -> {

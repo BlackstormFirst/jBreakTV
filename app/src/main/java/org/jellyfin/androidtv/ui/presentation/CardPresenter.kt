@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -263,7 +264,7 @@ internal fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: B
 		)
 
 		when (baseItem?.type) {
-			BaseItemKind.AUDIO, BaseItemKind.MUSIC_ALBUM -> base.copy(
+			BaseItemKind.AUDIO, BaseItemKind.MUSIC_ALBUM, BaseItemKind.PLAYLIST -> base.copy(
 				iconRes = R.drawable.ic_music_album,
 				aspectRatio = if (uniformAspect || base.aspectRatio < 0.8f) 1f else base.aspectRatio,
 			)
@@ -309,7 +310,7 @@ internal fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: B
 				iconRes = R.drawable.ic_photo
 			)
 
-			BaseItemKind.PHOTO_ALBUM, BaseItemKind.PLAYLIST -> base.copy(
+			BaseItemKind.PHOTO_ALBUM -> base.copy(
 				iconRes = R.drawable.ic_folder
 			)
 
@@ -382,7 +383,7 @@ internal fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: B
 	)
 
 	BaseRowType.GridButton -> BaseRowItemDisplayConfig(
-		aspectRatio = ImageHelper.ASPECT_RATIO_7_9.toFloat(),
+		aspectRatio = if (this is GridButtonBaseRowItem && gridButton.imageRes != null) 1f else ImageHelper.ASPECT_RATIO_7_9.toFloat(),
 		image = getImage(imageType),
 		iconRes = R.drawable.ic_clapperboard,
 	)
@@ -484,6 +485,7 @@ private fun CardViewHolderContent(
 					Image(
 						painter = painterResource(item.gridButton.imageRes),
 						contentDescription = null,
+						contentScale = ContentScale.Crop,
 						modifier = Modifier
 							.fillMaxSize()
 					)
