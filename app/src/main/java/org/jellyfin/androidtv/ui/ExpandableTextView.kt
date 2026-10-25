@@ -2,58 +2,93 @@ package org.jellyfin.androidtv.ui
 
 import android.content.Context
 import android.util.AttributeSet
-import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.ViewGroup
-import android.widget.PopupWindow
-import androidx.appcompat.widget.AppCompatTextView
-import androidx.core.content.ContextCompat
-import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.databinding.PopupExpandableTextViewBinding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.AbstractComposeView
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import org.jellyfin.androidtv.ui.base.JellyfinTheme
+import org.jellyfin.androidtv.ui.base.Text
+import org.jellyfin.androidtv.ui.base.button.Button
 
 class ExpandableTextView @JvmOverloads constructor(
 	context: Context,
 	attrs: AttributeSet? = null,
 	defStyleAttr: Int = 0,
-) : AppCompatTextView(context, attrs, defStyleAttr) {
-	private val popupContentBinding = PopupExpandableTextViewBinding.inflate(
-		LayoutInflater.from(context),
-		null,
-		false
-	)
-	private val popup = PopupWindow(
-		popupContentBinding.root,
-		ViewGroup.LayoutParams.MATCH_PARENT,
-		ViewGroup.LayoutParams.MATCH_PARENT,
-		true
-	).apply {
-		animationStyle = R.style.WindowAnimation_Fade
-	}
+) : AbstractComposeView(context, attrs, defStyleAttr) {
 
-	init {
-		background = ContextCompat.getDrawable(context, R.drawable.expanded_text)
+	private var textContent by mutableStateOf("")
+	private var maxLinesVal by mutableIntStateOf(3)
 
-		popupContentBinding.scrollContainer.setOnClickListener { popup.dismiss() }
-
-		setOnClickListener {
-			// Update text
-			popupContentBinding.content.text = this@ExpandableTextView.text
-
-			// Show popup
-			popup.showAtLocation(rootView, Gravity.CENTER, 0, 0)
-			popup.isOutsideTouchable = true
-
-			// Focus on scroll view
-			popupContentBinding.scrollContainer.requestFocus()
+	var text: CharSequence?
+		get() = textContent
+		set(value) {
+			textContent = value?.toString() ?: ""
 		}
-	}
 
-	override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-		super.onLayout(changed, left, top, right, bottom)
+	var maxLines: Int
+		get() = maxLinesVal
+		set(value) {
+			maxLinesVal = value
+		}
 
-		// Only make focusable when text is ellipsized.
-		val isEllipsized = !text.isNullOrBlank() && lineCount > 0 && layout.getEllipsisCount(lineCount - 1) > 0
-		isFocusable = isEllipsized
-		isClickable = isEllipsized
+	@Composable
+	override fun Content() {
+		JellyfinTheme {
+			var showDialog by remember { mutableStateOf(false) }
+
+			Button(
+				onClick = { showDialog = true },
+			) {
+				Text(
+					text = textContent,
+					maxLines = maxLinesVal,
+					overflow = TextOverflow.Ellipsis
+				)
+			}
+
+			if (showDialog) {
+				Dialog(
+					onDismissRequest = { showDialog = false },
+					properties = DialogProperties(usePlatformDefaultWidth = false)
+				) {
+					Box(
+						modifier = Modifier
+							.fillMaxSize()
+							.background(Color.Black.copy(alpha = 0.8f))
+							.clickable(
+								interactionSource = remember { MutableInteractionSource() },
+								indication = null
+							) {
+								showDialog = false
+							}
+							.padding(40.dp)
+					) {
+						Text(
+							text = textContent,
+							modifier = Modifier
+								.verticalScroll(rememberScrollState())
+								.padding(16.dp),
+						)
+					}
+				}
+			}
+		}
 	}
 }

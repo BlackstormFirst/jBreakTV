@@ -2,43 +2,85 @@ package org.jellyfin.androidtv.ui
 
 import android.content.Context
 import android.util.AttributeSet
-import android.view.LayoutInflater
-import android.widget.FrameLayout
 import androidx.annotation.DrawableRes
-import androidx.core.view.isVisible
-import androidx.core.view.setPadding
-import org.jellyfin.androidtv.databinding.TextUnderButtonBinding
-import org.jellyfin.androidtv.util.AndroidVersion
-import org.jellyfin.androidtv.util.dp
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.AbstractComposeView
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import org.jellyfin.androidtv.ui.base.Icon
+import org.jellyfin.androidtv.ui.base.JellyfinTheme
+import org.jellyfin.androidtv.ui.base.Text
+import org.jellyfin.androidtv.ui.base.button.IconButton
 
 class TextUnderButton @JvmOverloads constructor(
 	context: Context,
 	attrs: AttributeSet? = null,
 	defStyleAttr: Int = 0,
-	defStyleRes: Int = 0,
-) : FrameLayout(context, attrs, defStyleAttr, defStyleRes) {
-	val binding = TextUnderButtonBinding.inflate(LayoutInflater.from(context), this, true)
+) : AbstractComposeView(context, attrs, defStyleAttr) {
+
+	private var labelState by mutableStateOf<String?>(null)
+	private var iconResState by mutableIntStateOf(0)
+	private var paddingValState by mutableIntStateOf(0)
+	private var clickListener: OnClickListener? = null
 
 	init {
 		isFocusable = true
 		isFocusableInTouchMode = true
 		descendantFocusability = FOCUS_BLOCK_DESCENDANTS
-		if (AndroidVersion.isAtLeastO) defaultFocusHighlightEnabled = false
 	}
 
 	fun setLabel(text: String?) {
-		binding.label.isVisible = text != null
-		binding.label.text = text
-		binding.imageButton.contentDescription = text
+		this.labelState = text
 	}
 
 	fun setIcon(@DrawableRes resource: Int, maxHeight: Int? = null) {
-		binding.imageButton.setImageResource(resource)
-		binding.imageButton.maxHeight = maxHeight ?: Int.MAX_VALUE
+		this.iconResState = resource
 	}
 
 	fun setPadding(padding: Int?) {
-		binding.imageButton.setPadding(padding?.dp(context) ?: 0)
+		this.paddingValState = padding ?: 0
+	}
+
+	override fun setOnClickListener(l: OnClickListener?) {
+		super.setOnClickListener(l)
+		clickListener = l
+	}
+
+	@Composable
+	override fun Content() {
+		JellyfinTheme {
+			Column(
+				horizontalAlignment = Alignment.CenterHorizontally,
+				modifier = Modifier.padding(paddingValState.dp)
+			) {
+				if (iconResState != 0) {
+					IconButton(
+						onClick = { clickListener?.onClick(this@TextUnderButton) }
+					) {
+						Icon(painter = painterResource(id = iconResState), contentDescription = labelState)
+					}
+				}
+
+				if (labelState != null) {
+					Spacer(modifier = Modifier.height(4.dp))
+					Text(
+						text = labelState!!,
+						textAlign = TextAlign.Center,
+					)
+				}
+			}
+		}
 	}
 
 	companion object {

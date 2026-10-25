@@ -280,9 +280,7 @@ fun ServerScreen(
                     androidx.compose.ui.viewinterop.AndroidView(
                         factory = { context ->
                             ExpandableTextView(context).apply {
-                                gravity = android.view.Gravity.CENTER
                                 maxLines = 3
-                                setPadding(8, 8, 8, 8)
                                 text = disclaimerText
                             }
                         },
