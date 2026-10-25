@@ -1,9 +1,10 @@
 package org.jellyfin.androidtv.ui.startup.fragment
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,27 +26,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.Border
-import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.Surface
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.model.ApiClientErrorLoginState
 import org.jellyfin.androidtv.auth.model.AuthenticatedState
@@ -63,7 +62,6 @@ import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.ui.base.CircularProgressIndicator
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.LocalTextStyle
-import org.jellyfin.androidtv.ui.base.ProvideTextStyle
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.Button
 
@@ -213,6 +211,13 @@ private fun CredentialsContent(
     val focusRequester = remember { FocusRequester() }
     val passwordFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    val usernameInteractionSource = remember { MutableInteractionSource() }
+    val isUsernameFocused by usernameInteractionSource.collectIsFocusedAsState()
+
+    val passwordInteractionSource = remember { MutableInteractionSource() }
+    val isPasswordFocused by passwordInteractionSource.collectIsFocusedAsState()
 
     val isUsernameFixed = forcedUsername != null
     val isAuthenticating = loginState == AuthenticatingState
@@ -225,36 +230,61 @@ private fun CredentialsContent(
         }
     }
 
+    LaunchedEffect(isUsernameFocused) {
+        if (isUsernameFocused) keyboardController?.show()
+    }
+
+    LaunchedEffect(isPasswordFocused) {
+        if (isPasswordFocused) keyboardController?.show()
+    }
+
     Column {
         Text(
             text = stringResource(R.string.input_username),
             color = JellyfinTheme.colorScheme.onBackground
         )
 
-        Surface(
-            onClick = { if (!isUsernameFixed) focusRequester.requestFocus() },
-            border = ClickableSurfaceDefaults.border(focusedBorder = Border(border = BorderStroke(2.dp, Color.White))),
+        Box(
             modifier = Modifier
                 .fillMaxWidth(0.8f)
                 .padding(top = 8.dp)
-                .run { if (!isUsernameFixed) focusRequester(focusRequester) else this }
+                .background(
+                    color = JellyfinTheme.colorScheme.input,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .border(
+                    border = BorderStroke(
+                        width = 2.dp,
+                        color = if (isUsernameFocused) Color.White else Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
         ) {
             BasicTextField(
                 value = username,
                 onValueChange = { username = it },
                 singleLine = true,
                 enabled = !isUsernameFixed && !isAuthenticating,
-                textStyle = LocalTextStyle.current.copy(color = JellyfinTheme.colorScheme.onInput),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                interactionSource = usernameInteractionSource,
+                textStyle = LocalTextStyle.current.copy(
+                    color = if (isUsernameFocused) JellyfinTheme.colorScheme.onInputFocused else JellyfinTheme.colorScheme.onInput
+                ),
+                cursorBrush = SolidColor(if (isUsernameFocused) Color.White else JellyfinTheme.colorScheme.onInput),
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Next,
+                    showKeyboardOnFocus = true
+                ),
                 keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
+                    .run { if (!isUsernameFixed) focusRequester(focusRequester) else this }
                     .onPreviewKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
-                            passwordFocusRequester.requestFocus()
+                        if (event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)) {
+                            keyboardController?.show()
                             true
                         } else if (event.type == KeyEventType.KeyUp && (event.key == Key.Back || event.key == Key.Escape)) {
+                            keyboardController?.hide()
                             focusManager.clearFocus()
                             true
                         } else false
@@ -268,36 +298,52 @@ private fun CredentialsContent(
             modifier = Modifier.padding(top = 16.dp)
         )
 
-        Surface(
-            onClick = { passwordFocusRequester.requestFocus() },
-            border = ClickableSurfaceDefaults.border(focusedBorder = Border(border = BorderStroke(2.dp, Color.White))),
+        Box(
             modifier = Modifier
                 .fillMaxWidth(0.8f)
                 .padding(top = 8.dp)
-                .focusRequester(passwordFocusRequester)
+                .background(
+                    color = JellyfinTheme.colorScheme.input,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .border(
+                    border = BorderStroke(
+                        width = 2.dp,
+                        color = if (isPasswordFocused) Color.White else Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
         ) {
             BasicTextField(
                 value = password,
                 onValueChange = { password = it },
                 singleLine = true,
                 enabled = !isAuthenticating,
+                interactionSource = passwordInteractionSource,
                 visualTransformation = PasswordVisualTransformation(),
-                textStyle = LocalTextStyle.current.copy(color = JellyfinTheme.colorScheme.onInput),
+                textStyle = LocalTextStyle.current.copy(
+                    color = if (isPasswordFocused) JellyfinTheme.colorScheme.onInputFocused else JellyfinTheme.colorScheme.onInput
+                ),
+                cursorBrush = SolidColor(if (isPasswordFocused) Color.White else JellyfinTheme.colorScheme.onInput),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
+                    imeAction = ImeAction.Done,
+                    showKeyboardOnFocus = true
                 ),
                 keyboardActions = KeyboardActions(onDone = {
+                    keyboardController?.hide()
                     if (username.isNotBlank()) onLogin(username, password)
                 }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
+                    .focusRequester(passwordFocusRequester)
                     .onPreviewKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
-                            if (username.isNotBlank()) onLogin(username, password)
+                        if (event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.NumPadEnter || event.key == Key.DirectionCenter)) {
+                            keyboardController?.show()
                             true
                         } else if (event.type == KeyEventType.KeyUp && (event.key == Key.Back || event.key == Key.Escape)) {
+                            keyboardController?.hide()
                             focusManager.clearFocus()
                             true
                         } else false
@@ -308,7 +354,10 @@ private fun CredentialsContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = { if (username.isNotBlank()) onLogin(username, password) },
+            onClick = {
+                keyboardController?.hide()
+                if (username.isNotBlank()) onLogin(username, password)
+            },
             enabled = !isAuthenticating
         ) {
             Text(stringResource(R.string.lbl_sign_in))
