@@ -180,15 +180,13 @@ class ItemLauncher {
 			BaseRowType.Chapter -> {
 				val chapter = (rowItem as ChapterItemInfoBaseRowItem).chapterInfo
 				val id = rowItem.itemId
-				if (id != null) {
-					ItemLauncherHelper.getItem(id, object : Response<BaseItemDto>() {
-						override fun onResponse(response: BaseItemDto) {
-							if (!isActive) return
-							val start = chapter.startPositionTicks / 10000
-							playbackLauncher.launch(context, listOf(response), start.toInt())
-						}
-					})
-				}
+				ItemLauncherHelper.getItem(id, object : Response<BaseItemDto>() {
+					override fun onResponse(response: BaseItemDto) {
+						if (!isActive) return
+						val start = chapter.startPositionTicks / 10000
+						playbackLauncher.launch(context, listOf(response), start.toInt())
+					}
+				})
 			}
 			BaseRowType.LiveTvProgram -> {
 				val program = rowItem.baseItem ?: return

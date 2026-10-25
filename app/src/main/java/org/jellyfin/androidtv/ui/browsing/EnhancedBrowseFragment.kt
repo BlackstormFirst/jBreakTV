@@ -57,7 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -553,9 +553,7 @@ fun EnhancedBrowseScreen(
 														}
 													},
 													onLongClick = {
-														if (item is BaseRowItem) {
-															showContextMenu = true
-														}
+														showContextMenu = true
 													}
 												)
 										) {
@@ -572,7 +570,7 @@ fun EnhancedBrowseScreen(
 												)
 											}
 
-											if (showContextMenu && item is BaseRowItem) {
+											if (showContextMenu) {
 												ItemContextMenu(
 													item = item,
 													expanded = showContextMenu,

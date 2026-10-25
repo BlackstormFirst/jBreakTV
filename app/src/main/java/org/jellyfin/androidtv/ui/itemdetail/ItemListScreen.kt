@@ -413,7 +413,7 @@ fun ItemListScreen(
 				// Track List Items
 				itemsIndexed(
 					items = displayItems,
-					key = { index, item -> item.id ?: index }
+					key = { _, item -> item.id }
 				) { index, item ->
 					var isFocused by remember { mutableStateOf(false) }
 					val isCurrentlyPlaying = remember(currentlyPlayingItemId, item.id) {
