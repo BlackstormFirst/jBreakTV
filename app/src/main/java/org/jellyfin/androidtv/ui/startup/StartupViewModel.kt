@@ -52,7 +52,7 @@ class StartupViewModel(
 		.find { it.id == id }
 
 	fun loadUsers(server: Server) {
-		viewModelScope.launch {
+		viewModelScope.launch(Dispatchers.IO) {
 			try {
 				val storedUsers = serverUserRepository.getStoredServerUsers(server)
 				_users.value = storedUsers.sortedWith(userComparator)
@@ -70,7 +70,7 @@ class StartupViewModel(
 	fun addServer(address: String) = serverRepository.addServer(address)
 
 	fun deleteServer(serverId: UUID) {
-		viewModelScope.launch { serverRepository.deleteServer(serverId) }
+		viewModelScope.launch(Dispatchers.IO) { serverRepository.deleteServer(serverId) }
 	}
 
 	fun authenticate(server: Server, user: User): Flow<LoginState> =
@@ -95,7 +95,7 @@ class StartupViewModel(
 	}
 
 	fun reloadStoredServers() {
-		viewModelScope.launch {
+		viewModelScope.launch(Dispatchers.IO) {
 			try {
 				serverRepository.loadStoredServers()
 			} catch (err: Exception) {
@@ -111,4 +111,3 @@ class StartupViewModel(
 
 	suspend fun updateServer(server: Server): Boolean = serverRepository.updateServer(server)
 }
-

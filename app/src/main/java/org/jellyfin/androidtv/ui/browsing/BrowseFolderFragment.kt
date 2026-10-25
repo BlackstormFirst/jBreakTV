@@ -135,7 +135,9 @@ abstract class BrowseFolderFragment : Fragment(), RowLoader {
 					val folderId = runCatching { UUID.fromString(folderArg) }.getOrNull()
 					if (folderId != null) {
 						runCatching {
-							folder = api.userLibraryApi.getItem(itemId = folderId).content
+							folder = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+								api.userLibraryApi.getItem(itemId = folderId).content
+							}
 						}.onFailure {
 							timber.log.Timber.e(it, "Failed to fetch folder DTO in BrowseFolderFragment")
 						}

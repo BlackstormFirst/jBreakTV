@@ -285,7 +285,7 @@ class HomeViewModel(
     }
 
     private fun subscribeWebSockets() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             api.webSocket.subscribe<UserDataChangedMessage>()
                 .onEach { message ->
                     val now = Instant.now()
@@ -430,7 +430,7 @@ class HomeViewModel(
         currentItem = item
 
         backgroundUpdateJob?.cancel()
-        backgroundUpdateJob = viewModelScope.launch {
+        backgroundUpdateJob = viewModelScope.launch(Dispatchers.IO) {
             delay(200)
             val isLibraryRow = isLibraryRow(rowIndex, item)
             if (item !is BaseRowItem) {

@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -31,8 +32,8 @@ class UserViewsRepositoryImpl(
 		emit(getCachedOrFetchedViews())
 	}.flowOn(Dispatchers.IO)
 
-	override suspend fun getCachedOrFetchedViews(): Collection<BaseItemDto> {
-		return mutex.withLock {
+	override suspend fun getCachedOrFetchedViews(): Collection<BaseItemDto> = withContext(Dispatchers.IO) {
+		mutex.withLock {
 			cachedViews ?: run {
 				val viewsResponse by api.userViewsApi.getUserViews()
 				val filteredViews = viewsResponse.items

@@ -98,7 +98,7 @@ class UserLoginViewModel(
 		}
 
 		// Update every 5 seconds until QuickConnect is inactive or the view model is cancelled
-		viewModelScope.launch {
+		viewModelScope.launch(Dispatchers.IO) {
 			while (isActive) {
 				delay(5.seconds)
 				if (!updateQuickConnectState()) break
