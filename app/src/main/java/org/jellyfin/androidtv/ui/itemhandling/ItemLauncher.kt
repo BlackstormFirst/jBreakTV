@@ -11,8 +11,6 @@ import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.util.PlaybackHelper
-import org.jellyfin.androidtv.util.Utils
-import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.androidtv.util.sdk.compat.copyWithDisplayPreferencesId
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
@@ -61,7 +59,7 @@ class ItemLauncher {
 
 	@Suppress("LongMethod", "CyclomaticComplexMethod")
 	fun launch(rowItem: BaseRowItem, adapter: Any?, context: Context) {
-		if (rowItem is UsbBaseRowItem || (rowItem.baseItem != null && USB_TILE_UUID == rowItem.baseItem?.id)) {
+		if (rowItem is UsbBaseRowItem || (rowItem.baseItem != null && USB_TILE_UUID == rowItem.baseItem.id)) {
 			UsbHomeDecorator.handleUsbTileClick(context, navigationRepository)
 			return
 		}
@@ -89,7 +87,7 @@ class ItemLauncher {
 						return
 					}
 					BaseItemKind.AUDIO -> {
-						if (mediaManager.hasAudioQueueItems() && rowItem is AudioQueueBaseRowItem && rowItem.baseItem?.id == mediaManager.currentAudioItem?.id) {
+						if (mediaManager.hasAudioQueueItems() && rowItem is AudioQueueBaseRowItem && rowItem.baseItem.id == mediaManager.currentAudioItem?.id) {
 							navigationRepository.navigate(Destinations.nowPlaying)
 						} else if (mediaManager.hasAudioQueueItems() && rowItem is AudioQueueBaseRowItem) {
 							Timber.d("playing audio queue item")
@@ -102,7 +100,7 @@ class ItemLauncher {
 							if (adapter is Iterable<*>) {
 								for (item in adapter) {
 									if (item is BaseRowItem && item.baseItem != null) {
-										audioItemsAsList.add(item.baseItem!!)
+										audioItemsAsList.add(item.baseItem)
 									}
 								}
 							}
@@ -147,15 +145,19 @@ class ItemLauncher {
 						}
 						BaseRowItemSelectAction.Play -> {
 							val targetItem = baseItem
-							playbackHelper.getItemsToPlay(context, targetItem, targetItem.type == BaseItemKind.MOVIE, false, object : Response<List<BaseItemDto>>() {
-								override fun onResponse(response: List<BaseItemDto>) {
-									if (!isActive) return
+							playbackHelper.getItemsToPlay(
+								context = context,
+								mainItem = targetItem,
+								allowIntros = targetItem.type == BaseItemKind.MOVIE,
+								shuffle = false,
+								onSuccess = { response ->
 									var itemsPosition = response.indexOfFirst { it.id == targetItem.id }
 									var finalItems = response
 									if (itemsPosition == -1) {
 										if (targetItem.isFolder != true) {
-											finalItems = ArrayList(response)
-											(finalItems as ArrayList<BaseItemDto>).add(0, targetItem)
+											val list = ArrayList(response)
+											list.add(0, targetItem)
+											finalItems = list
 										}
 										itemsPosition = 0
 									}
@@ -166,7 +168,7 @@ class ItemLauncher {
 									}
 									playbackLauncher.launch(context, finalItems, pos, false, itemsPosition, false)
 								}
-							})
+							)
 						}
 					}
 				}
@@ -180,13 +182,10 @@ class ItemLauncher {
 			BaseRowType.Chapter -> {
 				val chapter = (rowItem as ChapterItemInfoBaseRowItem).chapterInfo
 				val id = rowItem.itemId
-				ItemLauncherHelper.getItem(id, object : Response<BaseItemDto>() {
-					override fun onResponse(response: BaseItemDto) {
-						if (!isActive) return
-						val start = chapter.startPositionTicks / 10000
-						playbackLauncher.launch(context, listOf(response), start.toInt())
-					}
-				})
+				ItemLauncherHelper.getItem(id) { response ->
+					val start = chapter.startPositionTicks / 10000
+					playbackLauncher.launch(context, listOf(response), start.toInt())
+				}
 			}
 			BaseRowType.LiveTvProgram -> {
 				val program = rowItem.baseItem ?: return
@@ -196,28 +195,25 @@ class ItemLauncher {
 					}
 					BaseRowItemSelectAction.Play -> {
 						val channelId = program.channelId ?: return
-						ItemLauncherHelper.getItem(channelId, object : Response<BaseItemDto>() {
-							override fun onResponse(response: BaseItemDto) {
-								if (!isActive) return
-								playbackLauncher.launch(context, listOf(response))
-							}
-						})
+						ItemLauncherHelper.getItem(channelId) { response ->
+							playbackLauncher.launch(context, listOf(response))
+						}
 					}
 				}
 			}
 			BaseRowType.LiveTvChannel -> {
 				val channel = rowItem.baseItem ?: return
-				ItemLauncherHelper.getItem(channel.id, object : Response<BaseItemDto>() {
-					override fun onResponse(response: BaseItemDto) {
-						if (!isActive) return
-						playbackHelper.getItemsToPlay(context, response, false, false, object : Response<List<BaseItemDto>>() {
-							override fun onResponse(response: List<BaseItemDto>) {
-								if (!isActive) return
-								playbackLauncher.launch(context, response)
-							}
-						})
-					}
-				})
+				ItemLauncherHelper.getItem(channel.id) { response ->
+					playbackHelper.getItemsToPlay(
+						context = context,
+						mainItem = response,
+						allowIntros = false,
+						shuffle = false,
+						onSuccess = { items ->
+							playbackLauncher.launch(context, items)
+						}
+					)
+				}
 			}
 			BaseRowType.LiveTvRecording -> {
 				val recording = rowItem.baseItem ?: return
@@ -226,12 +222,9 @@ class ItemLauncher {
 						navigationRepository.navigate(Destinations.itemDetails(recording.id))
 					}
 					BaseRowItemSelectAction.Play -> {
-						ItemLauncherHelper.getItem(recording.id, object : Response<BaseItemDto>() {
-							override fun onResponse(response: BaseItemDto) {
-								if (!isActive) return
-								playbackLauncher.launch(context, listOf(response))
-							}
-						})
+						ItemLauncherHelper.getItem(recording.id) { response ->
+							playbackLauncher.launch(context, listOf(response))
+						}
 					}
 				}
 			}

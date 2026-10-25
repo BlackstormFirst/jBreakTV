@@ -221,6 +221,7 @@ fun CustomPlaybackOverlayFragment.setupToastOverlay() {
 	b.toastOverlay.setTag(R.id.toast_overlay, registry)
 }
 
+@Suppress("EXTENSION_SHADOWED_BY_MEMBER")
 fun CustomPlaybackOverlayFragment.resetPlayStateToast() {
 	val b = binding ?: return
 	val stateKey = R.id.toast_overlay + 1

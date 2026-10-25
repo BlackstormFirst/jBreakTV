@@ -104,7 +104,6 @@ import org.jellyfin.androidtv.constant.CustomMessage
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository
 import org.jellyfin.androidtv.ui.itemhandling.refreshItem
-import org.jellyfin.androidtv.util.apiclient.EmptyResponse
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -627,17 +626,16 @@ fun BrowseGridScreen(
 			QueryType.Items
 		)
 		adapterRef.value = adapter
-		adapter.setRetrieveFinishedListener(object : EmptyResponse(lifecycle) {
-			override fun onResponse() {
-				val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
-				itemsState.clear()
-				itemsState.addAll(loaded)
-				if (selectedItem == null && loaded.isNotEmpty()) {
-					selectedItem = loaded.first()
-					onItemFocused(loaded.first())
-				}
+		adapter.setRetrieveFinishedListener {
+			if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@setRetrieveFinishedListener
+			val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
+			itemsState.clear()
+			itemsState.addAll(loaded)
+			if (selectedItem == null && loaded.isNotEmpty()) {
+				selectedItem = loaded.first()
+				onItemFocused(loaded.first())
 			}
-		})
+		}
 		adapter.Retrieve()
 	}
 

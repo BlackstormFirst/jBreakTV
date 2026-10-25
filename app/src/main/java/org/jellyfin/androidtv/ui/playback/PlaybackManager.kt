@@ -10,7 +10,6 @@ import org.jellyfin.androidtv.data.compat.PlaybackException
 import org.jellyfin.androidtv.data.compat.StreamInfo
 import org.jellyfin.androidtv.data.compat.VideoOptions
 import org.jellyfin.androidtv.preference.UserPreferences
-import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.androidtv.util.profile.createDeviceProfile
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.ServerVersion
@@ -94,25 +93,29 @@ class PlaybackManager(
 	private val serverVersion: ServerVersion,
 	private val context: Context,
 ) {
+	@JvmOverloads
 	fun getVideoStreamInfo(
 		lifecycleOwner: LifecycleOwner,
 		options: VideoOptions,
 		startTimeTicks: Long,
-		callback: Response<StreamInfo>,
+		onSuccess: (StreamInfo) -> Unit,
+		onError: ((Exception) -> Unit)? = null,
 	) = lifecycleOwner.lifecycleScope.launch {
 		Timber.d("PlaybackManager: Requesting stream info for item ${options.itemId} at $startTimeTicks. Video index: ${options.videoStreamIndex}")
 		getVideoStreamInfoInternal(options, startTimeTicks).fold(
-			onSuccess = { callback.onResponse(it) },
-			onFailure = { callback.onError(Exception(it)) },
+			onSuccess = { onSuccess(it) },
+			onFailure = { onError?.invoke(Exception(it)) },
 		)
 	}
 
+	@JvmOverloads
 	fun changeVideoStream(
 		lifecycleOwner: LifecycleOwner,
 		stream: StreamInfo,
 		options: VideoOptions,
 		startTimeTicks: Long,
-		callback: Response<StreamInfo>
+		onSuccess: (StreamInfo) -> Unit,
+		onError: ((Exception) -> Unit)? = null,
 	) = lifecycleOwner.lifecycleScope.launch {
 		Timber.d("PlaybackManager: Refreshing stream due to change. New video index: ${options.videoStreamIndex}")
 		val playSessionId = stream.playSessionId
@@ -123,8 +126,8 @@ class PlaybackManager(
 		}
 
 		getVideoStreamInfoInternal(options, startTimeTicks).fold(
-			onSuccess = { callback.onResponse(it) },
-			onFailure = { callback.onError(Exception(it)) },
+			onSuccess = { onSuccess(it) },
+			onFailure = { onError?.invoke(Exception(it)) },
 		)
 	}
 

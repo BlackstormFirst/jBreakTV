@@ -17,7 +17,6 @@ import org.jellyfin.androidtv.ui.itemhandling.BaseRowType
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
-import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.androidtv.util.sdk.canPlay
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -81,7 +80,7 @@ class KeyProcessor {
                             BaseItemKind.PHOTO -> {
                                 navigationRepository.navigate(
                                     Destinations.photoPlayer(
-                                        rowItem.baseItem!!.id,
+                                        item.id,
                                         true,
                                         ItemSortBy.SORT_NAME,
                                         SortOrder.ASCENDING
@@ -246,7 +245,7 @@ class KeyProcessor {
         val anchorView = activity.currentFocus ?: activity.window.decorView
         val menu = PopupMenu(activity, anchorView, Gravity.END)
         var order = 0
-        if (!isMusic && rowItem.baseItem!!.type != BaseItemKind.PLAYLIST) {
+        if (!isMusic && rowItem.baseItem.type != BaseItemKind.PLAYLIST) {
             menu.menu.add(0, MENU_PLAY_FIRST_UNWATCHED, order++, R.string.lbl_play_first_unwatched)
         }
         menu.menu.add(0, MENU_PLAY, order++, R.string.lbl_play_all)
@@ -278,17 +277,14 @@ class KeyProcessor {
                     return true
                 }
                 MENU_ADD_QUEUE -> {
-                    playbackHelper.getItemsToPlay(activity, item, false, false, object : Response<List<BaseItemDto>>(activity.lifecycle) {
-                        override fun onResponse(response: List<BaseItemDto>) {
-                            if (!isActive) return
-                            mediaManager.addToAudioQueue(response)
-                        }
-
-                        override fun onError(exception: Exception) {
-                            if (!isActive) return
-                            Toast.makeText(activity, R.string.msg_cannot_play_time, Toast.LENGTH_LONG).show()
-                        }
-                    })
+                    playbackHelper.getItemsToPlay(
+                        context = activity,
+                        mainItem = item,
+                        allowIntros = false,
+                        shuffle = false,
+                        onSuccess = { response -> mediaManager.addToAudioQueue(response) },
+                        onError = { Toast.makeText(activity, R.string.msg_cannot_play_time, Toast.LENGTH_LONG).show() }
+                    )
                     return true
                 }
                 MENU_PLAY_FIRST_UNWATCHED -> {

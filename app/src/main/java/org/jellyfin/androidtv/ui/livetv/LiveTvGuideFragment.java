@@ -47,8 +47,6 @@ import org.jellyfin.androidtv.util.PlaybackHelper;
 import org.jellyfin.androidtv.util.TextUtilsKt;
 import org.jellyfin.androidtv.util.TimeUtils;
 import org.jellyfin.androidtv.util.Utils;
-import org.jellyfin.androidtv.util.apiclient.EmptyResponse;
-import org.jellyfin.androidtv.util.apiclient.Response;
 import org.jellyfin.sdk.model.api.BaseItemDto;
 
 import java.time.LocalDateTime;
@@ -335,13 +333,11 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
                     } else if (mSelectedProgramView instanceof GuideChannelHeader) {
                         // Tuning directly to a channel
                         GuideChannelHeader channelHeader = (GuideChannelHeader) mSelectedProgramView;
-                        playbackHelper.getValue().getItemsToPlay(requireContext(), channelHeader.getChannel(), false, false, new Response<List<BaseItemDto>>(getLifecycle()) {
-                            @Override
-                            public void onResponse(List<BaseItemDto> response) {
-                                if (!isActive()) return;
-                                playbackLauncher.getValue().launch(requireContext(), response);
-                            }
-                        });
+                        playbackHelper.getValue().getItemsToPlay(requireContext(), channelHeader.getChannel(), false, false, response -> {
+                            if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return null;
+                            playbackLauncher.getValue().launch(requireContext(), response);
+                            return null;
+                        }, null);
                     }
                 }
                 return false;
@@ -442,12 +438,9 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
     public void showProgramOptions() {
         if (mSelectedProgram == null) return;
         if (mDetailPopup == null) {
-            mDetailPopup = new LiveProgramDetailPopup(requireActivity(), this, this, mSummary.getWidth()+20, new EmptyResponse(getLifecycle()) {
-                @Override
-                public void onResponse() {
-                    if (!isActive()) return;
-                    playbackHelper.getValue().retrieveAndPlay(mSelectedProgram.getChannelId(), false, requireContext());
-                }
+            mDetailPopup = new LiveProgramDetailPopup(requireActivity(), this, this, mSummary.getWidth()+20, () -> {
+                if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
+                playbackHelper.getValue().retrieveAndPlay(mSelectedProgram.getChannelId(), false, requireContext());
             });
         }
 
@@ -480,13 +473,10 @@ public class LiveTvGuideFragment extends Fragment implements LiveTvGuide, View.O
         mChannels.removeAllViews();
         mChannelStatus.setText("");
         mFilterStatus.setText("");
-        TvManager.getProgramsAsync(this, mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, new EmptyResponse(getLifecycle()) {
-            @Override
-            public void onResponse() {
-                if (!isActive()) return;
-                Timber.d("*** Programs response");
-                displayPrograms(mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx);
-            }
+        TvManager.getProgramsAsync(this, mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, () -> {
+            if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
+            Timber.d("*** Programs response");
+            displayPrograms(mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx);
         });
     }
 

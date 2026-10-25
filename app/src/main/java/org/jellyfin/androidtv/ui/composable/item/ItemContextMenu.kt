@@ -24,7 +24,6 @@ import org.jellyfin.androidtv.ui.itemhandling.AudioQueueBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.util.PlaybackHelper
-import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.androidtv.util.getActivity
 import org.jellyfin.androidtv.util.playFirstUnwatchedItem
 import org.jellyfin.androidtv.util.sdk.canPlay
@@ -216,15 +215,14 @@ fun ItemContextMenu(
 					PopoverMenuItem(onClick = {
 						handleMenuAction {
 							if (activity != null) {
-								playbackHelper.getItemsToPlay(activity, baseItem, false, false, object : Response<List<BaseItemDto>>(activity.lifecycle) {
-									override fun onResponse(response: List<BaseItemDto>) {
-										mediaManager.addToAudioQueue(response)
-									}
-
-									override fun onError(exception: Exception) {
-										Toast.makeText(activity, R.string.msg_cannot_play_time, Toast.LENGTH_SHORT).show()
-									}
-								})
+								playbackHelper.getItemsToPlay(
+									context = activity,
+									mainItem = baseItem,
+									allowIntros = false,
+									shuffle = false,
+									onSuccess = { response -> mediaManager.addToAudioQueue(response) },
+									onError = { Toast.makeText(activity, R.string.msg_cannot_play_time, Toast.LENGTH_SHORT).show() }
+								)
 							}
 						}
 					}) {

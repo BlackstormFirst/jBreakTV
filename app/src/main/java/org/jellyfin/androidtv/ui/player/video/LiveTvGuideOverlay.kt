@@ -38,7 +38,6 @@ import org.jellyfin.androidtv.ui.livetv.LiveTvGuide
 import org.jellyfin.androidtv.ui.livetv.TvManager
 import org.jellyfin.androidtv.util.getTimeFormatter
 import org.jellyfin.androidtv.util.Utils
-import org.jellyfin.androidtv.util.apiclient.EmptyResponse
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
@@ -225,11 +224,7 @@ private class ComposeLiveTvGuideController(
 			currentDisplayChannelEndNdx,
 			currentGuideStart,
 			currentGuideEnd,
-			object : EmptyResponse(activity.lifecycle) {
-				override fun onResponse() {
-					renderGuideRows()
-				}
-			}
+			{ renderGuideRows() }
 		)
 	}
 

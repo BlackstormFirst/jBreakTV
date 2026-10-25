@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package org.jellyfin.androidtv.util.sdk
 
 import android.content.Context
@@ -18,7 +16,6 @@ import org.jellyfin.androidtv.ui.playback.PlaybackControllerContainer
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.util.PlaybackHelper
-import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.instantMixApi
 import org.jellyfin.sdk.api.client.extensions.itemsApi
@@ -52,7 +49,8 @@ class SdkPlaybackHelper(
 		mainItem: BaseItemDto,
 		allowIntros: Boolean,
 		shuffle: Boolean,
-		outerResponse: Response<List<BaseItemDto>>
+		onSuccess: (List<BaseItemDto>) -> Unit,
+		onError: ((Exception) -> Unit)?,
 	) {
 		val loadingDialog = showLoadingDialog(context)
 		getScope(context).launch {
@@ -63,14 +61,12 @@ class SdkPlaybackHelper(
 			}.fold(
 				onSuccess = { items ->
 					dismissLoadingDialog(loadingDialog)
-					outerResponse.onResponse(items)
+					onSuccess(items)
 				},
 				onFailure = { exception ->
 					dismissLoadingDialog(loadingDialog)
-					when (exception) {
-						is Exception -> outerResponse.onError(exception)
-						else -> outerResponse.onError(Exception(exception))
-					}
+					val ex = if (exception is Exception) exception else Exception(exception)
+					onError?.invoke(ex)
 				}
 			)
 		}

@@ -17,7 +17,6 @@ import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
 import org.jellyfin.androidtv.util.DateTimeExtensionsKt;
 import org.jellyfin.androidtv.util.TimeUtils;
 import org.jellyfin.androidtv.util.Utils;
-import org.jellyfin.androidtv.util.apiclient.EmptyResponse;
 import org.jellyfin.sdk.model.api.BaseItemDto;
 import org.koin.java.KoinJavaComponent;
 
@@ -129,7 +128,7 @@ public class TvManager {
         return ndx;
     }
 
-    public static void getProgramsAsync(Fragment fragment, int startNdx, int endNdx, final LocalDateTime startTime, LocalDateTime endTime, final EmptyResponse outerResponse) {
+    public static void getProgramsAsync(Fragment fragment, int startNdx, int endNdx, final LocalDateTime startTime, LocalDateTime endTime, final Runnable outerResponse) {
         LocalDateTime startTimeRounded = startTime.withMinute(startTime.getMinute() >= 30 ? 30 : 0).withSecond(0).withNano(0);
         LocalDateTime endTimeRounded = endTime.minusSeconds(1);
 
@@ -140,10 +139,9 @@ public class TvManager {
                 Timber.d("*** About to build dictionary");
                 buildProgramsDict(programs, startTime);
                 Timber.d("*** Programs retrieval finished");
-
-                outerResponse.onResponse();
-            } else {
-                outerResponse.onResponse();
+            }
+            if (outerResponse != null) {
+                outerResponse.run();
             }
 
             return null;

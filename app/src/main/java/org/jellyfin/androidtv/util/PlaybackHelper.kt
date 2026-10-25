@@ -1,9 +1,6 @@
-@file:Suppress("DEPRECATION")
-
 package org.jellyfin.androidtv.util
 
 import android.content.Context
-import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.sdk.model.api.BaseItemDto
 import java.util.UUID
 
@@ -13,7 +10,8 @@ interface PlaybackHelper {
 		mainItem: BaseItemDto,
 		allowIntros: Boolean,
 		shuffle: Boolean,
-		outerResponse: Response<List<BaseItemDto>>,
+		onSuccess: (List<BaseItemDto>) -> Unit,
+		onError: ((Exception) -> Unit)? = null,
 	)
 
 	fun retrieveAndPlay(itemId: UUID, shuffle: Boolean, context: Context)

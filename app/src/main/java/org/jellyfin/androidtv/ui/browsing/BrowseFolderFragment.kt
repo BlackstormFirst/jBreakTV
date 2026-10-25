@@ -99,7 +99,6 @@ import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
 import org.jellyfin.androidtv.ui.shared.toolbar.Toolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarButtons
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
-import org.jellyfin.androidtv.util.apiclient.EmptyResponse
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -449,20 +448,19 @@ fun BrowseFolderScreen(
 						if (rowAdapters[rowIndex] == null) {
 							val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
 							rowAdapters[rowIndex] = adapter
-							adapter.setRetrieveFinishedListener(object : EmptyResponse(lifecycle) {
-								override fun onResponse() {
-									val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
-									rowData[rowIndex] = loaded
-									if (!userHasInteracted && loaded.isNotEmpty()) {
-										val currentSelectedRow = selectedRowIndex
-										if (currentSelectedRow == null || rowIndex < currentSelectedRow) {
-											selectedRowIndex = rowIndex
-											selectedItem = loaded.first()
-											onItemFocused(loaded.first())
-										}
+							adapter.setRetrieveFinishedListener {
+								if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@setRetrieveFinishedListener
+								val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
+								rowData[rowIndex] = loaded
+								if (!userHasInteracted && loaded.isNotEmpty()) {
+									val currentSelectedRow = selectedRowIndex
+									if (currentSelectedRow == null || rowIndex < currentSelectedRow) {
+										selectedRowIndex = rowIndex
+										selectedItem = loaded.first()
+										onItemFocused(loaded.first())
 									}
 								}
-							})
+							}
 							adapter.Retrieve()
 						}
 					}

@@ -29,8 +29,8 @@ import org.jellyfin.androidtv.ui.InteractionTrackerViewModel;
 import org.jellyfin.androidtv.ui.livetv.TvManager;
 import org.jellyfin.androidtv.util.TimeUtils;
 import org.jellyfin.androidtv.util.Utils;
+import androidx.lifecycle.Lifecycle;
 import org.jellyfin.androidtv.util.apiclient.ReportingHelper;
-import org.jellyfin.androidtv.util.apiclient.Response;
 import org.jellyfin.androidtv.util.profile.DeviceProfileKt;
 import org.jellyfin.androidtv.util.sdk.compat.JavaCompat;
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager;
@@ -585,42 +585,30 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             TvManager.setLastLiveTvChannel(item.getId());
             //internal/exo player
             Timber.i("Using internal player for Live TV");
-            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<>(mFragment.getLifecycle()) {
-                @Override
-                public void onResponse(StreamInfo response) {
-                    if (!isActive()) return;
-                    if (mVideoManager == null)
-                        return;
-                    mCurrentOptions = internalOptions;
-                    startItem(item, position, response);
-                }
-
-                @Override
-                public void onError(Exception exception) {
-                    if (!isActive()) return;
-                    handlePlaybackInfoError(exception);
-                }
+            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, response -> {
+                if (!mFragment.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return null;
+                if (mVideoManager == null) return null;
+                mCurrentOptions = internalOptions;
+                startItem(item, position, response);
+                return null;
+            }, exception -> {
+                if (!mFragment.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return null;
+                handlePlaybackInfoError(exception);
+                return null;
             });
         } else {
-            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<>(mFragment.getLifecycle()) {
-                @Override
-                public void onResponse(StreamInfo internalResponse) {
-                    if (!isActive()) return;
-                    Timber.i("Internal player would %s", internalResponse.getPlayMethod().equals(PlayMethod.TRANSCODE) ? "transcode" : "direct stream");
-                    if (mVideoManager == null)
-                        return;
-                    mCurrentOptions = internalOptions;
-                    updateBurningSubs(internalResponse);
-                    startItem(item, position, internalResponse);
-                }
-
-                @Override
-                public void onError(Exception exception) {
-                    if (!isActive()) return;
-                    Timber.e(exception, "Unable to get stream info for internal player");
-                    if (mVideoManager == null)
-                        return;
-                }
+            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, internalResponse -> {
+                if (!mFragment.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return null;
+                Timber.i("Internal player would %s", internalResponse.getPlayMethod().equals(PlayMethod.TRANSCODE) ? "transcode" : "direct stream");
+                if (mVideoManager == null) return null;
+                mCurrentOptions = internalOptions;
+                updateBurningSubs(internalResponse);
+                startItem(item, position, internalResponse);
+                return null;
+            }, exception -> {
+                if (!mFragment.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return null;
+                Timber.e(exception, "Unable to get stream info for internal player");
+                return null;
             });
         }
     }
@@ -1204,29 +1192,24 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             mVideoManager.stopPlayback();
             mPlaybackState = PlaybackState.BUFFERING;
 
-            playbackManager.getValue().changeVideoStream(mFragment, mCurrentStreamInfo, mCurrentOptions, pos * 10000, new Response<StreamInfo>(mFragment.getLifecycle()) {
-                @Override
-                public void onResponse(StreamInfo response) {
-                    if (!isActive()) return;
-                    mCurrentStreamInfo = response;
+            playbackManager.getValue().changeVideoStream(mFragment, mCurrentStreamInfo, mCurrentOptions, pos * 10000, response -> {
+                if (mFragment == null || !mFragment.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return null;
+                mCurrentStreamInfo = response;
 
-                    updateBurningSubs(response);
+                updateBurningSubs(response);
 
-                    if (mVideoManager != null) {
-                        mVideoManager.setMediaStreamInfo(api.getValue(), response);
-                        mVideoManager.start();
-                    }
+                if (mVideoManager != null) {
+                    mVideoManager.setMediaStreamInfo(api.getValue(), response);
+                    mVideoManager.start();
                 }
-
-                @Override
-                public void onError(Exception exception) {
-                    if (!isActive()) return;
-                    if (mFragment != null)
-                        Utils.showToast(mFragment.getContext(), R.string.msg_video_playback_error);
-                    Timber.e(exception, "Error trying to seek transcoded stream");
-                    // call stop so playback can be retried by the user
-                    stop();
-                }
+                return null;
+            }, exception -> {
+                if (mFragment == null || !mFragment.getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return null;
+                Utils.showToast(mFragment.getContext(), R.string.msg_video_playback_error);
+                Timber.e(exception, "Error trying to seek transcoded stream");
+                // call stop so playback can be retried by the user
+                stop();
+                return null;
             });
         } else {
             // use the same approach to directplay seeking as setOnProgressListener

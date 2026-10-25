@@ -28,7 +28,6 @@ import org.jellyfin.androidtv.ui.browsing.SortOption
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.ui.presentation.TextItemPresenter
 import org.jellyfin.androidtv.util.Utils
-import org.jellyfin.androidtv.util.apiclient.EmptyResponse
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemPerson
@@ -76,7 +75,7 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
     var sortOrder: SortOrder? = null
     var filters: FilterOptions? = null
 
-    private var retrieveFinishedListener: EmptyResponse? = null
+    private var retrieveFinishedListener: (() -> Unit)? = null
 
     var reRetrieveTriggers: Array<ChangeTriggerType>? = null
     var lastFullRetrieve: Instant? = null
@@ -587,15 +586,13 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
         if (exception != null) Timber.w(exception, "Failed to retrieve items")
 
         setCurrentlyRetrieving(false)
-        val listener = retrieveFinishedListener
-        if (listener != null) {
-            if (exception == null) listener.onResponse()
-            else listener.onError(exception)
+        if (exception == null) {
+            retrieveFinishedListener?.invoke()
         }
     }
 
-    fun setRetrieveFinishedListener(response: EmptyResponse?) {
-        this.retrieveFinishedListener = response
+    fun setRetrieveFinishedListener(listener: (() -> Unit)?) {
+        this.retrieveFinishedListener = listener
     }
 
     private fun notifyRetrieveStarted() {
