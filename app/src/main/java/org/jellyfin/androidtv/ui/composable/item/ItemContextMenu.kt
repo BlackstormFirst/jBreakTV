@@ -83,7 +83,7 @@ fun ItemContextMenu(
 	val isPlayed = userData?.played == true
 	val isFavorite = userData?.isFavorite == true
 
-	var hasReleasedInitialKey by remember(item) { mutableStateOf(false) }
+	var hasReleasedInitialKey by remember { mutableStateOf(false) }
 
 	val keyModifier = Modifier.onPreviewKeyEvent { keyEvent ->
 		val nativeEvent = keyEvent.nativeKeyEvent
@@ -93,10 +93,15 @@ fun ItemContextMenu(
 			keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER
 
 		if (!hasReleasedInitialKey && isEnterKey) {
-			if (nativeEvent.action == android.view.KeyEvent.ACTION_UP) {
+			if (nativeEvent.action == android.view.KeyEvent.ACTION_DOWN && nativeEvent.repeatCount == 0) {
 				hasReleasedInitialKey = true
+				false
+			} else {
+				if (nativeEvent.action == android.view.KeyEvent.ACTION_UP) {
+					hasReleasedInitialKey = true
+				}
+				true
 			}
-			true
 		} else {
 			false
 		}

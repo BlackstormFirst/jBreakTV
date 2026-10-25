@@ -79,7 +79,11 @@ fun Modifier.itemCardClickable(
 		.combinedClickable(
 			interactionSource = source,
 			indication = null,
-			onClick = onClick,
-			onLongClick = onLongClick
+			onClick = {
+				if (!isLongPressHandled) {
+					onClick()
+				}
+			},
+			onLongClick = null
 		)
 }
