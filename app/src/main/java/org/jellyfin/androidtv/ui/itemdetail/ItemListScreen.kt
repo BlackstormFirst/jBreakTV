@@ -439,6 +439,10 @@ fun ItemListScreen(
 						}
 					}
 
+					val isTrackFavorite = remember(item.userData?.isFavorite) {
+						item.userData?.isFavorite == true
+					}
+
 					var showContextMenu by remember { mutableStateOf(false) }
 
 					Box(
@@ -528,6 +532,23 @@ fun ItemListScreen(
 									color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
 									modifier = Modifier.width(dynamicDurationWidth)
 								)
+
+								Spacer(modifier = Modifier.width(12.dp))
+
+								// Favorite Icon Column (Fixed width)
+								Box(
+									modifier = Modifier.size(24.dp),
+									contentAlignment = Alignment.Center
+								) {
+									if (isTrackFavorite) {
+										Icon(
+											painter = painterResource(id = R.drawable.ic_heart),
+											contentDescription = stringResource(id = R.string.lbl_favorite),
+											tint = Color.Red,
+											modifier = Modifier.size(18.dp)
+										)
+									}
+								}
 							}
 						}
 
