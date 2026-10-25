@@ -138,15 +138,21 @@ fun HomeComposeScreen(
             if (targetRowIndex > 0) {
                 try { listState.scrollToItem(targetRowIndex) } catch (_: Exception) {}
             }
-            delay(150)
-            val requester = focusRequesters[targetItemKey]
-            if (requester != null) {
-                try {
-                    requester.requestFocus()
-                    Timber.d("HomeComposeScreen: focus set on $targetItemKey (trigger=$focusTrigger)")
-                } catch (e: Exception) {
-                    Timber.e(e, "HomeComposeScreen: failed initial focus on $targetItemKey")
+            delay(100)
+            var attempts = 0
+            while (attempts < 5) {
+                val requester = focusRequesters[targetItemKey]
+                if (requester != null) {
+                    try {
+                        requester.requestFocus()
+                        Timber.d("HomeComposeScreen: focus set on $targetItemKey (trigger=$focusTrigger)")
+                        break
+                    } catch (e: Exception) {
+                        Timber.d("HomeComposeScreen: attempt ${attempts + 1} failed for $targetItemKey: ${e.message}")
+                    }
                 }
+                attempts++
+                delay(100)
             }
         }
     }

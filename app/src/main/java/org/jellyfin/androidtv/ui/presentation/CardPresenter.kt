@@ -232,7 +232,7 @@ fun BaseRowItemCard(
 	}
 }
 
-private data class BaseRowItemDisplayConfig(
+internal data class BaseRowItemDisplayConfig(
 	val image: JellyfinImage?,
 	val iconRes: Int,
 	val aspectRatio: Float,
@@ -240,7 +240,7 @@ private data class BaseRowItemDisplayConfig(
 	val scaleType: ImageView.ScaleType? = null,
 )
 
-private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean, displayCirclePersonCards: Boolean): BaseRowItemDisplayConfig = when (baseRowType) {
+internal fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean, displayCirclePersonCards: Boolean): BaseRowItemDisplayConfig = when (baseRowType) {
 	BaseRowType.BaseItem -> {
 		val preferSeriesPoster = this is BaseItemDtoBaseRowItem && preferSeriesPoster
 		val primaryAspectRatio = baseItem?.primaryImageAspectRatio?.toFloat()
