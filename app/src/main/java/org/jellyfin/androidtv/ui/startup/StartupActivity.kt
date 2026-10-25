@@ -4,10 +4,16 @@ import android.Manifest
 import android.app.SearchManager
 import android.content.Intent
 import android.os.Bundle
+import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.view.isVisible
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.add
 import androidx.fragment.app.commit
 import androidx.fragment.app.replace
@@ -33,9 +39,9 @@ import org.jellyfin.androidtv.auth.repository.SessionRepositoryState
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.data.eventhandling.SocketHandler
 import org.jellyfin.androidtv.data.service.BackgroundService
-import org.jellyfin.androidtv.databinding.ActivityStartupBinding
 import org.jellyfin.androidtv.integration.LeanbackChannelWorker
 import org.jellyfin.androidtv.ui.background.AppBackground
+import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.browsing.MainActivity
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.Destinations
@@ -73,8 +79,6 @@ class StartupActivity : FragmentActivity() {
 	private val socketListener: SocketHandler by inject()
 	private val backgroundService: BackgroundService by inject()
 
-	private lateinit var binding: ActivityStartupBinding
-
 	private val networkPermissionsRequester = registerForActivityResult(
 		ActivityResultContracts.RequestMultiplePermissions()
 	) { grants ->
@@ -96,12 +100,30 @@ class StartupActivity : FragmentActivity() {
 
 		backgroundService.resetToThemeAndSaveExisting()
 
-		binding = ActivityStartupBinding.inflate(layoutInflater)
-		binding.background.setContent { AppBackground() }
-		binding.screensaver.isVisible = false
-		setContentView(binding.root)
-
-		if (!intent.getBooleanExtra(EXTRA_HIDE_SPLASH, false)) showSplash()
+		setContent {
+			JellyfinTheme {
+				Box(modifier = Modifier.fillMaxSize()) {
+					AppBackground()
+					AndroidView(
+						factory = { ctx ->
+							FragmentContainerView(ctx).apply {
+								id = R.id.content_view
+								layoutParams = ViewGroup.LayoutParams(
+									ViewGroup.LayoutParams.MATCH_PARENT,
+									ViewGroup.LayoutParams.MATCH_PARENT
+								)
+								post {
+									if (!intent.getBooleanExtra(EXTRA_HIDE_SPLASH, false)) {
+										showSplash()
+									}
+								}
+							}
+						},
+						modifier = Modifier.fillMaxSize()
+					)
+				}
+			}
+		}
 
 		// Ensure basic permissions
 		networkPermissionsRequester.launch(arrayOf(Manifest.permission.INTERNET, Manifest.permission.ACCESS_NETWORK_STATE))
