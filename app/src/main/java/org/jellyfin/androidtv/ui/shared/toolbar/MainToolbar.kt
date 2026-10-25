@@ -4,6 +4,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -109,6 +110,7 @@ private fun MainToolbar(
 					},
 					colors = if (activeButton == MainToolbarActiveButton.User) activeButtonColors else ButtonDefaults.colors(),
 					contentPadding = if (userImageVisible) PaddingValues(3.dp) else IconButtonDefaults.ContentPadding,
+					modifier = Modifier.height(40.dp),
 				) {
 					ProfilePicture(
 						url = userImage,

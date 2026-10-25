@@ -30,7 +30,7 @@ fun StartupToolbar(
 
 	Toolbar(
 		start = {
-			Logo(modifier = Modifier.height(32.dp))
+			Logo(modifier = Modifier.height(90.dp))
 		},
 		end = {
 			ToolbarButtons {

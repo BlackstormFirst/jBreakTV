@@ -5,7 +5,9 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,7 +22,6 @@ import androidx.compose.ui.unit.sp
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
-import org.jellyfin.androidtv.ui.composable.modifier.overscan
 import org.jellyfin.androidtv.ui.composable.rememberCurrentTime
 
 @Composable
@@ -41,8 +42,9 @@ fun Toolbar(
 ) {
 	ToolbarLayout(
 		modifier = modifier
-			.height(95.dp)
-			.overscan(),
+			.fillMaxWidth()
+			.heightIn(min = 95.dp)
+			.padding(start = 48.dp, top = 27.dp, end = 48.dp, bottom = 8.dp),
 		start = start,
 		center = center,
 		end = end,
