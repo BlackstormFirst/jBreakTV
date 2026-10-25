@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.auth.model.Server
+import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.constant.BackdropBehavior
 import org.jellyfin.androidtv.util.apiclient.getUrl
@@ -35,6 +36,7 @@ class BackgroundService(
 	private val api: ApiClient,
 	private val userPreferences: UserPreferences,
 	private val imageLoader: ImageLoader,
+	private val serverRepository: ServerRepository,
 ) {
 	companion object {
 		val SLIDESHOW_DURATION = 30.seconds
@@ -94,22 +96,42 @@ class BackgroundService(
 	 * Use all available backdrops from [baseItem] as background.
 	 */
 	@JvmOverloads
-	fun setBackground(baseItem: BaseItemDto?, debounceMs: Long = 200L) {
+	fun setBackground(
+		baseItem: BaseItemDto?,
+		debounceMs: Long = 200L,
+		fallbackToSplashscreen: Boolean = false,
+	) {
 		val backdropBehavior = userPreferences[UserPreferences.backdropBehavior]
 
-		// Check if item is set and backgrounds are enabled
-		if (baseItem == null || backdropBehavior == BackdropBehavior.DISABLED)
+		// Check if backgrounds are enabled
+		if (backdropBehavior == BackdropBehavior.DISABLED)
 			return clearBackgrounds()
 
 		// Enable blur for backdrops
 		_blurBackground.value = backdropBehavior == BackdropBehavior.BACKDROP_WITH_BLUR
 
 		// Get all backdrop urls
-		val backdropUrls = (baseItem.itemBackdropImages + baseItem.parentBackdropImages)
-			.map { it.getUrl(api) }
-			.toSet()
+		val backdropUrls = baseItem?.let { item ->
+			(item.itemBackdropImages + item.parentBackdropImages)
+				.map { it.getUrl(api) }
+				.toSet()
+		} ?: emptySet()
 
-		loadBackgrounds(backdropUrls, debounceMs)
+		if (backdropUrls.isNotEmpty()) {
+			loadBackgrounds(backdropUrls, debounceMs)
+		} else if (fallbackToSplashscreen) {
+			setSplashscreenBackground()
+		} else {
+			clearBackgrounds()
+		}
+	}
+
+	fun setSplashscreenBackground(server: Server? = serverRepository.currentServer.value) {
+		if (server != null) {
+			setBackground(server)
+		} else {
+			clearBackgrounds()
+		}
 	}
 
 	/**

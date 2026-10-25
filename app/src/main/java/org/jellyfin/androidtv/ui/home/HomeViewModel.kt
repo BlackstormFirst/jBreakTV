@@ -56,6 +56,7 @@ import org.jellyfin.androidtv.util.usbdevices.UsbStorageManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.sockets.subscribe
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import timber.log.Timber
@@ -411,6 +412,16 @@ class HomeViewModel(
         lastFocusedRowIndex = 0
     }
 
+    private fun isLibraryRow(rowIndex: Int, item: Any?): Boolean {
+        if (item is UsbBaseRowItem) return true
+        if (item is BaseRowItem && item.baseItem?.type == BaseItemKind.USER_VIEW) return true
+        val rowStates = (uiState.value as? HomeUiState.Success)?.rows ?: _directRowStates
+        val rowState = rowStates.getOrNull(rowIndex) ?: return false
+        return rowState.sectionType == HomeSectionType.LIBRARY_TILES_SMALL ||
+                rowState.sectionType == HomeSectionType.LIBRARY_BUTTONS ||
+                rowState.id.startsWith("views_row_")
+    }
+
     fun onItemSelected(item: Any?, rowIndex: Int) {
         if (item != null) {
             lastFocusedItemKey = getItemKey(item)
@@ -421,10 +432,15 @@ class HomeViewModel(
         backgroundUpdateJob?.cancel()
         backgroundUpdateJob = viewModelScope.launch {
             delay(200)
+            val isLibraryRow = isLibraryRow(rowIndex, item)
             if (item !is BaseRowItem) {
-                backgroundService.clearBackgrounds()
+                if (isLibraryRow) {
+                    backgroundService.setSplashscreenBackground()
+                } else {
+                    backgroundService.clearBackgrounds()
+                }
             } else {
-                backgroundService.setBackground(item.baseItem)
+                backgroundService.setBackground(item.baseItem, fallbackToSplashscreen = isLibraryRow)
             }
         }
     }

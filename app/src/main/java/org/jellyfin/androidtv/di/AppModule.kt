@@ -220,7 +220,7 @@ val appModule = module {
 	viewModel { HomeViewModel(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 	viewModel { FullDetailsViewModel(get(), get(), get(), get()) }
 
-	single { BackgroundService(get(), get(), get(), get(), get()) }
+	single { BackgroundService(get(), get(), get(), get(), get(), get()) }
 
 	single { MarkdownRenderer(get()) }
 	single { ItemLauncher() }
