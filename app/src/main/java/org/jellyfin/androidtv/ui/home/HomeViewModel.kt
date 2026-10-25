@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
@@ -141,7 +142,7 @@ class HomeViewModel(
             onRowStateRemoved = { removeDirectRowState(it) }
         )
 
-        loadHomeSections(cardPresenter)
+        refreshRows(force = true, delayed = false)
 
         customMessageRepository.message
             .onEach { message ->
@@ -152,6 +153,7 @@ class HomeViewModel(
             .launchIn(viewModelScope)
 
         navigationRepository.currentAction
+            .drop(1)
             .onEach { action ->
                 if (action is NavigationAction.NavigateFragment && action.destination.fragment == HomeFragment::class) {
                     resetLastFocusedItem()
@@ -389,7 +391,7 @@ class HomeViewModel(
             dataRefreshService.lastFavoriteUpdate
         ).maxOrNull()
 
-        val dataChanged = maxDataTimestamp != null && (lastHandledRefresh == null || maxDataTimestamp.isAfter(lastHandledRefresh))
+        val dataChanged = lastHandledRefresh != null && maxDataTimestamp != null && maxDataTimestamp.isAfter(lastHandledRefresh)
         if (dataChanged) {
             refreshRows(force = true, delayed = false)
         }
