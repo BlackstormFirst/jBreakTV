@@ -3,7 +3,6 @@ package org.jellyfin.androidtv.ui.search
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -140,14 +138,14 @@ class SearchFragment : Fragment() {
 						Column {
 							Text(
 								text = stringResource(group.labelRes),
-								style = JellyfinTheme.typography.listHeader,
-								modifier = Modifier.padding(horizontal = 48.dp, vertical = 8.dp)
+								style = JellyfinTheme.typography.listHeader.copy(color = JellyfinTheme.colorScheme.listHeader),
+								modifier = Modifier.padding(start = 56.dp, end = 56.dp, top = 6.dp, bottom = 12.dp)
 							)
 
 							LazyRow(
 								modifier = Modifier.focusRestorer(),
-								contentPadding = PaddingValues(horizontal = 48.dp),
-								horizontalArrangement = Arrangement.spacedBy(16.dp)
+								contentPadding = PaddingValues(horizontal = 56.dp),
+								horizontalArrangement = Arrangement.spacedBy(12.dp)
 							) {
 								items(group.items.toList(), key = { it.id }) { baseItem ->
 									val rowItem = remember(baseItem) { BaseItemDtoBaseRowItem(baseItem) }
