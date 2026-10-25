@@ -25,13 +25,13 @@ fun BaseScreen(
 	Box(
 		modifier = Modifier
 			.focusRequester(focusRequester)
+			.focusGroup()
 			.onGloballyPositioned {
 				if (!hasRequestedFocus) {
 					hasRequestedFocus = true
-					try { focusRequester.requestFocus() } catch (e: Exception) {}
+					runCatching { focusRequester.requestFocus() }
 				}
 			}
-			.focusGroup()
 	) {
 		content()
 	}

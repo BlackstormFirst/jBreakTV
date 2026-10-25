@@ -111,10 +111,10 @@ class StartupActivity : FragmentActivity() {
 									ViewGroup.LayoutParams.MATCH_PARENT,
 									ViewGroup.LayoutParams.MATCH_PARENT
 								)
-								post {
-									if (!intent.getBooleanExtra(EXTRA_HIDE_SPLASH, false)) {
-										showSplash()
-									}
+								if (supportFragmentManager.findFragmentById(R.id.content_view) == null &&
+									!intent.getBooleanExtra(EXTRA_HIDE_SPLASH, false)
+								) {
+									showSplash()
 								}
 							}
 						},
