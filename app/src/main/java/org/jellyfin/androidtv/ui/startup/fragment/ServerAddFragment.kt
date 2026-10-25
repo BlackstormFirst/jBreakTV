@@ -37,7 +37,13 @@ class ServerAddFragment : Fragment() {
 			ServerAddScreen(
 				state = state,
 				initialAddress = serverAddressArgument,
-				onSubmit = { address -> startupViewModel.addServer(address) }
+				onSubmit = { address -> startupViewModel.addServer(address) },
+				openHelp = {
+					parentFragmentManager.commit {
+						addToBackStack(null)
+						replace<ConnectHelpAlertFragment>(R.id.content_view)
+					}
+				}
 			)
 		}
 	}
@@ -53,8 +59,7 @@ class ServerAddFragment : Fragment() {
 			if (state is ConnectedState) {
 				parentFragmentManager.commit {
 					// Open server view
-					replace<StartupToolbarFragment>(R.id.content_view)
-					add<ServerFragment>(
+					replace<ServerFragment>(
 						R.id.content_view,
 						null,
 						createBundle {

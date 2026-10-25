@@ -47,6 +47,7 @@ import org.jellyfin.androidtv.ui.base.popover.Popover
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenu
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenuItem
 import org.jellyfin.androidtv.ui.card.UserCard
+import org.jellyfin.androidtv.ui.shared.toolbar.StartupToolbar
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +66,7 @@ fun ServerScreen(
     onUserRemove: (User) -> Unit,
     onAddUser: () -> Unit,
     onEditServer: () -> Unit,
+    openHelp: () -> Unit = {},
     disclaimerText: CharSequence?
 ) {
     val userFocusRequester = remember { FocusRequester() }
@@ -107,6 +109,7 @@ fun ServerScreen(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                StartupToolbar(openHelp = openHelp)
 
                 // Notification Area
                 if (!server.versionSupported) {

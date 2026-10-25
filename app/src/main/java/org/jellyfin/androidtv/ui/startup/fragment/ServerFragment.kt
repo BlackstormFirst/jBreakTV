@@ -7,7 +7,6 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.add
 import androidx.fragment.app.commit
 import androidx.fragment.app.replace
 import androidx.fragment.compose.content
@@ -55,7 +54,7 @@ class ServerFragment : Fragment() {
 		val server = serverIdArgument?.let(startupViewModel::getServer)
 
 		if (server == null) {
-			navigateFragment<SelectServerFragment>(keepToolbar = true, keepHistory = false)
+			navigateFragment<SelectServerFragment>(keepHistory = false)
 			return@content
 		}
 
@@ -97,7 +96,8 @@ class ServerFragment : Fragment() {
 						putString(UserLoginFragment.ARG_USERNAME, null)
 					})
 				},
-				onEditServer = { navigateFragment<SelectServerFragment>(keepToolbar = true) },
+				onEditServer = { navigateFragment<SelectServerFragment>() },
+				openHelp = { navigateFragment<ConnectHelpAlertFragment>() },
 				disclaimerText = server.loginDisclaimer?.let { markdownRenderer.toMarkdownSpanned(it) }
 			)
 		}
@@ -128,19 +128,12 @@ class ServerFragment : Fragment() {
 
 	private inline fun <reified F : Fragment> navigateFragment(
 		args: Bundle = createBundle(),
-		keepToolbar: Boolean = false,
 		keepHistory: Boolean = true,
 	) {
 		requireActivity()
 			.supportFragmentManager
 			.commit {
-				if (keepToolbar) {
-					replace<StartupToolbarFragment>(R.id.content_view)
-					add<F>(R.id.content_view, null, args)
-				} else {
-					replace<F>(R.id.content_view, null, args)
-				}
-
+				replace<F>(R.id.content_view, null, args)
 				if (keepHistory) addToBackStack(null)
 			}
 	}
@@ -153,7 +146,7 @@ class ServerFragment : Fragment() {
 
 		val server = serverIdArgument?.let(startupViewModel::getServer)
 		if (server != null) startupViewModel.loadUsers(server)
-		else navigateFragment<SelectServerFragment>(keepToolbar = true)
+		else navigateFragment<SelectServerFragment>()
 	}
 }
 

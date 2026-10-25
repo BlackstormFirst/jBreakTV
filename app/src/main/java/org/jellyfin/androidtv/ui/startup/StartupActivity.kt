@@ -50,7 +50,6 @@ import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.startup.fragment.SelectServerFragment
 import org.jellyfin.androidtv.ui.startup.fragment.ServerFragment
 import org.jellyfin.androidtv.ui.startup.fragment.SplashFragment
-import org.jellyfin.androidtv.ui.startup.fragment.StartupToolbarFragment
 import org.jellyfin.androidtv.util.applyTheme
 import org.jellyfin.androidtv.util.createBundle
 import org.jellyfin.sdk.api.client.ApiClient
@@ -234,8 +233,7 @@ class StartupActivity : FragmentActivity() {
 	}
 
 	private fun showServer(id: UUID) = supportFragmentManager.commit {
-		replace<StartupToolbarFragment>(R.id.content_view)
-		add<ServerFragment>(
+		replace<ServerFragment>(
 			R.id.content_view, null, createBundle {
 				putString(ServerFragment.ARG_SERVER_ID, id.toString())
 			}
@@ -243,8 +241,7 @@ class StartupActivity : FragmentActivity() {
 	}
 
 	private fun showServerSelection() = supportFragmentManager.commit {
-		replace<StartupToolbarFragment>(R.id.content_view)
-		add<SelectServerFragment>(R.id.content_view)
+		replace<SelectServerFragment>(R.id.content_view)
 	}
 
 	override fun onNewIntent(intent: Intent) {

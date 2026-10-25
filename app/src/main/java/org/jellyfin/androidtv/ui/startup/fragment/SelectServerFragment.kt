@@ -37,7 +37,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.add
 import androidx.fragment.app.commit
 import androidx.fragment.app.replace
 import androidx.lifecycle.lifecycleScope
@@ -54,6 +53,7 @@ import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.Button
+import org.jellyfin.androidtv.ui.shared.toolbar.StartupToolbar
 import org.jellyfin.androidtv.ui.startup.StartupViewModel
 import org.jellyfin.androidtv.util.createBundle
 import org.jellyfin.androidtv.util.getSummary
@@ -71,7 +71,14 @@ class SelectServerFragment : Fragment() {
 		return ComposeView(requireContext()).apply {
 			setContent {
 				JellyfinTheme {
-					SelectServerScreen()
+					SelectServerScreen(
+						openHelp = {
+							parentFragmentManager.commit {
+								addToBackStack(null)
+								replace<ConnectHelpAlertFragment>(R.id.content_view)
+							}
+						}
+					)
 				}
 			}
 		}
@@ -84,170 +91,182 @@ class SelectServerFragment : Fragment() {
 	}
 
 	@Composable
-	fun SelectServerScreen() {
+	fun SelectServerScreen(
+		openHelp: () -> Unit = {}
+	) {
 		val storedServers by startupViewModel.storedServers.collectAsState(initial = emptyList())
 		val discoveredServers by startupViewModel.discoveredServers.collectAsState(initial = emptyList())
 		val context = LocalContext.current
 
-		Row(
-			modifier = Modifier
-				.fillMaxSize()
-				.padding(40.dp)
-		) {
-			Column(
-				modifier = Modifier
-					.weight(1f)
-					.fillMaxHeight(),
-				verticalArrangement = Arrangement.Center,
-				horizontalAlignment = Alignment.CenterHorizontally
-			) {
-				if (storedServers.isEmpty()) {
-					Text(
-						text = stringResource(id = R.string.welcome_title),
-						style = JellyfinTheme.typography.listHeader
-					)
-					Spacer(modifier = Modifier.height(16.dp))
-					Text(
-						text = stringResource(id = R.string.welcome_content)
-					)
-				} else {
-					Text(text = stringResource(id = R.string.saved_servers), style = JellyfinTheme.typography.listHeader)
-					Spacer(modifier = Modifier.height(16.dp))
-					LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-						items(storedServers) { server ->
-							AndroidView(
-								factory = { ctx ->
-									ServerButtonView(ctx).apply {
-										name = server.name
-										address = server.address
-										version = server.version
-										setOnClickListener {
-											requireActivity().supportFragmentManager.commit {
-												replace<StartupToolbarFragment>(R.id.content_view)
-												add<ServerFragment>(
-													R.id.content_view,
-													null,
-													createBundle { putString(ServerFragment.ARG_SERVER_ID, server.id.toString()) }
-												)
-												addToBackStack(null)
-											}
-										}
-										setPopupMenu {
-											item(ctx.getString(R.string.lbl_remove)) {
-												startupViewModel.deleteServer(server.id)
-											}
-										}
-									}
-								},
-								update = { view ->
-									view.name = server.name
-									view.address = server.address
-									view.version = server.version
-								},
-								modifier = Modifier.fillMaxWidth()
-							)
-						}
-					}
-				}
-			}
+		Column(modifier = Modifier.fillMaxSize()) {
+			StartupToolbar(openHelp = openHelp)
 
-			Spacer(modifier = Modifier.width(32.dp))
-
-			Column(
+			Row(
 				modifier = Modifier
-					.weight(1f)
-					.fillMaxHeight(),
-				verticalArrangement = Arrangement.Center
+					.fillMaxSize()
+					.padding(horizontal = 48.dp, vertical = 16.dp)
 			) {
-				Button(
-					onClick = {
-						parentFragmentManager.commit {
-							addToBackStack(null)
-							replace<ServerAddFragment>(R.id.content_view)
-						}
-					},
-					modifier = Modifier.fillMaxWidth()
+				Column(
+					modifier = Modifier
+						.weight(1f)
+						.fillMaxHeight()
 				) {
-					Icon(imageVector = Icons.Default.Add, contentDescription = null)
-					Spacer(modifier = Modifier.width(8.dp))
-					Text(text = stringResource(id = R.string.connect_manually_by_address))
-				}
-
-				Spacer(modifier = Modifier.height(32.dp))
-
-				Text(
-					text = stringResource(id = R.string.discovered_servers_title),
-					style = JellyfinTheme.typography.listHeader
-				)
-				Spacer(modifier = Modifier.height(16.dp))
-
-				var discoveredServerStates by remember { mutableStateOf(mapOf<String, org.jellyfin.androidtv.auth.model.ServerAdditionState>()) }
-
-				if (discoveredServers.isEmpty()) {
-					Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-						Text(text = stringResource(id = R.string.discovered_servers_empty))
-					}
-				} else {
-					LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-						items(discoveredServers) { server ->
-							val state = discoveredServerStates[server.id.toString()]
-							AndroidView(
-								factory = { ctx ->
-									ServerButtonView(ctx).apply {
-										name = server.name
-										address = server.address
-										version = server.version
-										setOnClickListener {
-											startupViewModel.addServer(server.address).onEach { newState ->
-												discoveredServerStates = discoveredServerStates + (server.id.toString() to newState)
-												if (newState is ConnectedState) {
-													parentFragmentManager.commit {
-														replace<StartupToolbarFragment>(R.id.content_view)
-														add<ServerFragment>(
-															R.id.content_view,
-															null,
-															createBundle { putString(ServerFragment.ARG_SERVER_ID, newState.id.toString()) }
-														)
-													}
-												} else if (newState is UnableToConnectState) {
-													Toast.makeText(
-														context,
-														context.getString(
-															R.string.server_connection_failed_candidates,
-															newState.addressCandidates
-																.map { "${it.key} ${it.value.getSummary(context)}" }
-																.joinToString(prefix = "\n", separator = "\n")
-														),
-														Toast.LENGTH_LONG,
-													).show()
+					if (storedServers.isEmpty()) {
+						Text(
+							text = stringResource(id = R.string.welcome_title),
+							style = JellyfinTheme.typography.listHeader,
+							color = JellyfinTheme.colorScheme.onBackground
+						)
+						Spacer(modifier = Modifier.height(16.dp))
+						Text(
+							text = stringResource(id = R.string.welcome_content),
+							color = JellyfinTheme.colorScheme.onBackground
+						)
+					} else {
+						Text(
+							text = stringResource(id = R.string.saved_servers),
+							style = JellyfinTheme.typography.listHeader,
+							color = JellyfinTheme.colorScheme.onBackground
+						)
+						Spacer(modifier = Modifier.height(16.dp))
+						LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+							items(storedServers) { server ->
+								AndroidView(
+									factory = { ctx ->
+										ServerButtonView(ctx).apply {
+											name = server.name
+											address = server.address
+											version = server.version
+											setOnClickListener {
+												requireActivity().supportFragmentManager.commit {
+													replace<ServerFragment>(
+														R.id.content_view,
+														null,
+														createBundle { putString(ServerFragment.ARG_SERVER_ID, server.id.toString()) }
+													)
+													addToBackStack(null)
 												}
-											}.launchIn(lifecycleScope)
+											}
+											setPopupMenu {
+												item(ctx.getString(R.string.lbl_remove)) {
+													startupViewModel.deleteServer(server.id)
+												}
+											}
 										}
-									}
-								},
-								update = { view ->
-									view.name = server.name
-									view.address = server.address
-									view.version = server.version
-									view.state = when (state) {
-										is ConnectingState -> ServerButtonView.State.CONNECTING
-										is UnableToConnectState -> ServerButtonView.State.ERROR
-										else -> ServerButtonView.State.DEFAULT
-									}
-								},
-								modifier = Modifier.fillMaxWidth()
-							)
+									},
+									update = { view ->
+										view.name = server.name
+										view.address = server.address
+										view.version = server.version
+									},
+									modifier = Modifier.fillMaxWidth()
+								)
+							}
 						}
 					}
 				}
 
-				Spacer(modifier = Modifier.height(32.dp))
-				NotificationsArea()
+				Spacer(modifier = Modifier.width(32.dp))
 
-				Spacer(modifier = Modifier.weight(1f))
-				Text(
-					text = "jBreakTV ${BuildConfig.VERSION_NAME} ${BuildConfig.BUILD_TYPE}"
-				)
+				Column(
+					modifier = Modifier
+						.weight(1f)
+						.fillMaxHeight()
+				) {
+					Button(
+						onClick = {
+							parentFragmentManager.commit {
+								addToBackStack(null)
+								replace<ServerAddFragment>(R.id.content_view)
+							}
+						},
+						modifier = Modifier.fillMaxWidth()
+					) {
+						Icon(imageVector = Icons.Default.Add, contentDescription = null)
+						Spacer(modifier = Modifier.width(8.dp))
+						Text(text = stringResource(id = R.string.connect_manually_by_address))
+					}
+
+					Spacer(modifier = Modifier.height(24.dp))
+
+					Text(
+						text = stringResource(id = R.string.discovered_servers_title),
+						style = JellyfinTheme.typography.listHeader,
+						color = JellyfinTheme.colorScheme.onBackground
+					)
+					Spacer(modifier = Modifier.height(16.dp))
+
+					var discoveredServerStates by remember { mutableStateOf(mapOf<String, org.jellyfin.androidtv.auth.model.ServerAdditionState>()) }
+
+					if (discoveredServers.isEmpty()) {
+						Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+							Text(
+								text = stringResource(id = R.string.discovered_servers_empty),
+								color = JellyfinTheme.colorScheme.onBackground
+							)
+						}
+					} else {
+						LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+							items(discoveredServers) { server ->
+								val state = discoveredServerStates[server.id.toString()]
+								AndroidView(
+									factory = { ctx ->
+										ServerButtonView(ctx).apply {
+											name = server.name
+											address = server.address
+											version = server.version
+											setOnClickListener {
+												startupViewModel.addServer(server.address).onEach { newState ->
+													discoveredServerStates = discoveredServerStates + (server.id.toString() to newState)
+													if (newState is ConnectedState) {
+														parentFragmentManager.commit {
+															replace<ServerFragment>(
+																R.id.content_view,
+																null,
+																createBundle { putString(ServerFragment.ARG_SERVER_ID, newState.id.toString()) }
+															)
+														}
+													} else if (newState is UnableToConnectState) {
+														Toast.makeText(
+															context,
+															context.resources.getString(
+																R.string.server_connection_failed_candidates,
+																newState.addressCandidates
+																	.map { "${it.key} ${it.value.getSummary(context)}" }
+																	.joinToString(prefix = "\n", separator = "\n")
+															),
+															Toast.LENGTH_LONG,
+														).show()
+													}
+												}.launchIn(lifecycleScope)
+											}
+										}
+									},
+									update = { view ->
+										view.name = server.name
+										view.address = server.address
+										view.version = server.version
+										view.state = when (state) {
+											is ConnectingState -> ServerButtonView.State.CONNECTING
+											is UnableToConnectState -> ServerButtonView.State.ERROR
+											else -> ServerButtonView.State.DEFAULT
+										}
+									},
+									modifier = Modifier.fillMaxWidth()
+								)
+							}
+						}
+					}
+
+					Spacer(modifier = Modifier.height(24.dp))
+					NotificationsArea()
+
+					Spacer(modifier = Modifier.weight(1f))
+					Text(
+						text = "jBreakTV ${BuildConfig.VERSION_NAME} ${BuildConfig.BUILD_TYPE}",
+						color = JellyfinTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+					)
+				}
 			}
 		}
 	}
