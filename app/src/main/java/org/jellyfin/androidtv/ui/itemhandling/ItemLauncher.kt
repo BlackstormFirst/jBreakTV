@@ -44,16 +44,16 @@ class ItemLauncher {
 				val displayPreferences = preferencesRepository.getLibraryPreferences(baseItem?.displayPreferencesId ?: "")
 				val enableSmartScreen = displayPreferences[LibraryPreferences.enableSmartScreen]
 
-				if (!enableSmartScreen && baseItem != null) Destinations.libraryBrowser(baseItem, null)
-				else if (baseItem != null) Destinations.librarySmartScreen(baseItem)
+				if (!enableSmartScreen && baseItem != null) Destinations.libraryBrowser(baseItem.id, null)
+				else if (baseItem != null) Destinations.librarySmartScreen(baseItem.id)
 				else Destinations.home
 			}
 			CollectionType.MUSIC, CollectionType.LIVETV -> {
-				if (baseItem != null) Destinations.librarySmartScreen(baseItem)
+				if (baseItem != null) Destinations.librarySmartScreen(baseItem.id)
 				else Destinations.home
 			}
 			else -> {
-				if (baseItem != null) Destinations.libraryBrowser(baseItem, null)
+				if (baseItem != null) Destinations.libraryBrowser(baseItem.id, null)
 				else Destinations.home
 			}
 		}
@@ -112,11 +112,11 @@ class ItemLauncher {
 						return
 					}
 					BaseItemKind.SEASON -> {
-						navigationRepository.navigate(Destinations.folderBrowser(baseItem))
+						navigationRepository.navigate(Destinations.folderBrowser(baseItem.id))
 						return
 					}
 					BaseItemKind.BOX_SET -> {
-						navigationRepository.navigate(Destinations.collectionBrowser(baseItem))
+						navigationRepository.navigate(Destinations.collectionBrowser(baseItem.id))
 						return
 					}
 					BaseItemKind.PHOTO -> {
@@ -139,7 +139,7 @@ class ItemLauncher {
 					if (baseItem.displayPreferencesId == null) {
 						baseItem = baseItem.copyWithDisplayPreferencesId(baseItem.id.toString())
 					}
-					navigationRepository.navigate(Destinations.libraryBrowser(baseItem, null))
+					navigationRepository.navigate(Destinations.libraryBrowser(baseItem.id, null))
 				} else {
 					when (rowItem.selectAction) {
 						BaseRowItemSelectAction.ShowDetails -> {
@@ -194,8 +194,7 @@ class ItemLauncher {
 				val program = rowItem.baseItem ?: return
 				when (rowItem.selectAction) {
 					BaseRowItemSelectAction.ShowDetails -> {
-						val channelId = program.channelId ?: return
-						navigationRepository.navigate(Destinations.channelDetails(program.id, channelId, program))
+						navigationRepository.navigate(Destinations.channelDetails(program.id))
 					}
 					BaseRowItemSelectAction.Play -> {
 						val channelId = program.channelId ?: return
@@ -241,7 +240,7 @@ class ItemLauncher {
 			BaseRowType.SeriesTimer -> {
 				val id = rowItem.itemId
 				if (id != null) {
-					navigationRepository.navigate(Destinations.seriesTimerDetails(id, (rowItem as SeriesTimerInfoDtoBaseRowItem).seriesTimerInfo))
+					navigationRepository.navigate(Destinations.seriesTimerDetails(id))
 				}
 			}
 			BaseRowType.GridButton -> {

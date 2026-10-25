@@ -1,6 +1,8 @@
 package org.jellyfin.androidtv.ui.browsing
 
 import android.os.Bundle
+import java.util.UUID
+import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -140,9 +142,9 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
-		setupViews()
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.CREATED) {
+				setupViews()
 				setupQueries(this@EnhancedBrowseFragment)
 			}
 		}
@@ -240,13 +242,13 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 	fun handleGridButtonClick(button: GridButton) {
 		val folder = mFolder ?: return
 		when (button.id) {
-			GRID -> navigationRepository.navigate(Destinations.libraryBrowser(folder, null))
-			BY_LETTER -> itemType?.let { navigationRepository.navigate(Destinations.libraryByLetter(folder, it.serialName)) }
-			GENRES -> itemType?.let { navigationRepository.navigate(Destinations.libraryByGenres(folder, it.serialName)) }
-			SUGGESTED -> navigationRepository.navigate(Destinations.librarySuggestions(folder))
-			ALBUMS -> navigationRepository.navigate(Destinations.libraryBrowser(folder, null))
-			ALBUM_ARTISTS -> navigationRepository.navigate(Destinations.libraryBrowser(folder, "AlbumArtist"))
-			ARTISTS -> navigationRepository.navigate(Destinations.libraryBrowser(folder, "Artist"))
+			GRID -> navigationRepository.navigate(Destinations.libraryBrowser(folder.id, null))
+			BY_LETTER -> itemType?.let { navigationRepository.navigate(Destinations.libraryByLetter(folder.id, it.serialName)) }
+			GENRES -> itemType?.let { navigationRepository.navigate(Destinations.libraryByGenres(folder.id, it.serialName)) }
+			SUGGESTED -> navigationRepository.navigate(Destinations.librarySuggestions(folder.id))
+			ALBUMS -> navigationRepository.navigate(Destinations.libraryBrowser(folder.id, null))
+			ALBUM_ARTISTS -> navigationRepository.navigate(Destinations.libraryBrowser(folder.id, "AlbumArtist"))
+			ARTISTS -> navigationRepository.navigate(Destinations.libraryBrowser(folder.id, "Artist"))
 			FAVSONGS -> navigationRepository.navigate(Destinations.musicFavorites(folder.id))
 			RANDOM -> {
 				itemType?.let { type ->
@@ -267,12 +269,21 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 		}
 	}
 
-	protected open fun setupViews() {
-		val folderJson = arguments?.getString(Extras.Folder) ?: return
-		runCatching {
-			mFolder = json.decodeFromString<BaseItemDto>(folderJson)
-		}.onFailure {
-			timber.log.Timber.e(it, "Failed to parse folder DTO in EnhancedBrowseFragment")
+	protected open suspend fun setupViews() {
+		val folderArg = arguments?.getString(Extras.Folder) ?: return
+		val folderId = runCatching { UUID.fromString(folderArg) }.getOrNull()
+		if (folderId != null) {
+			runCatching {
+				mFolder = api.userLibraryApi.getItem(itemId = folderId).content
+			}.onFailure {
+				timber.log.Timber.e(it, "Failed to fetch folder DTO in EnhancedBrowseFragment")
+			}
+		} else {
+			runCatching {
+				mFolder = json.decodeFromString<BaseItemDto>(folderArg)
+			}.onFailure {
+				timber.log.Timber.e(it, "Failed to parse folder DTO in EnhancedBrowseFragment")
+			}
 		}
 	}
 

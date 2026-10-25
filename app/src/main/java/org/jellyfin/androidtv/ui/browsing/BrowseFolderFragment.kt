@@ -100,8 +100,11 @@ import org.jellyfin.androidtv.ui.shared.toolbar.Toolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarButtons
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.apiclient.EmptyResponse
+import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.koin.android.ext.android.inject
+import java.util.UUID
 
 abstract class BrowseFolderFragment : Fragment(), RowLoader {
 	protected var folder: BaseItemDto? = null
@@ -117,24 +120,34 @@ abstract class BrowseFolderFragment : Fragment(), RowLoader {
 	private val backgroundService by inject<BackgroundService>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val navigationRepository by inject<NavigationRepository>()
+	private val api by inject<ApiClient>()
 
 	private val rowsState = mutableStateListOf<BrowseRowDef>()
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 
-		val folderJson = arguments?.getString(Extras.Folder)
-		if (!folderJson.isNullOrBlank()) {
-			runCatching {
-				folder = json.decodeFromString<BaseItemDto>(folderJson)
-			}.onFailure {
-				timber.log.Timber.e(it, "Failed to parse folder DTO in BrowseFolderFragment")
-			}
-		}
+		val folderArg = arguments?.getString(Extras.Folder)
 		includeType = arguments?.getString(Extras.IncludeType)
 
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.CREATED) {
+				if (!folderArg.isNullOrBlank()) {
+					val folderId = runCatching { UUID.fromString(folderArg) }.getOrNull()
+					if (folderId != null) {
+						runCatching {
+							folder = api.userLibraryApi.getItem(itemId = folderId).content
+						}.onFailure {
+							timber.log.Timber.e(it, "Failed to fetch folder DTO in BrowseFolderFragment")
+						}
+					} else {
+						runCatching {
+							folder = json.decodeFromString<BaseItemDto>(folderArg)
+						}.onFailure {
+							timber.log.Timber.e(it, "Failed to parse folder DTO in BrowseFolderFragment")
+						}
+					}
+				}
 				setupQueries(this@BrowseFolderFragment)
 			}
 		}

@@ -1,6 +1,5 @@
 package org.jellyfin.androidtv.ui.navigation
 
-import kotlinx.serialization.json.Json
 import org.jellyfin.androidtv.constant.Extras
 import org.jellyfin.androidtv.ui.browsing.BrowseGridFragment
 import org.jellyfin.androidtv.ui.browsing.BrowseRecordingsFragment
@@ -26,9 +25,7 @@ import org.jellyfin.androidtv.ui.search.SearchFragment
 import org.jellyfin.androidtv.util.usbdevices.ARG_CURRENT_DIR
 import org.jellyfin.androidtv.util.usbdevices.ARG_VOLUME_NAME
 import org.jellyfin.androidtv.util.usbdevices.UsbFileExplorerFragment
-import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ItemSortBy
-import org.jellyfin.sdk.model.api.SeriesTimerInfoDto
 import org.jellyfin.sdk.model.api.SortOrder
 import java.util.UUID
 
@@ -47,46 +44,39 @@ object Destinations {
 	}
 
 	// Browsing
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun libraryBrowser(item: BaseItemDto, includeType: String? = null) =
+	fun libraryBrowser(item: UUID, includeType: String? = null) =
 		fragmentDestination<BrowseGridFragment> {
-			putString(Extras.Folder, Json.encodeToString(item))
+			putString(Extras.Folder, item.toString())
 			putString(Extras.IncludeType, includeType)
 		}
 
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun librarySmartScreen(item: BaseItemDto) = fragmentDestination<BrowseViewFragment> {
-		putString(Extras.Folder, Json.encodeToString(item))
+	fun librarySmartScreen(item: UUID) = fragmentDestination<BrowseViewFragment> {
+		putString(Extras.Folder, item.toString())
 	}
 
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun collectionBrowser(item: BaseItemDto) = fragmentDestination<CollectionFragment> {
-		putString(Extras.Folder, Json.encodeToString(item))
+	fun collectionBrowser(item: UUID) = fragmentDestination<CollectionFragment> {
+		putString(Extras.Folder, item.toString())
 	}
 
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun folderBrowser(item: BaseItemDto) = fragmentDestination<GenericFolderFragment> {
-		putString(Extras.Folder, Json.encodeToString(item))
+	fun folderBrowser(item: UUID) = fragmentDestination<GenericFolderFragment> {
+		putString(Extras.Folder, item.toString())
 	}
 
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun libraryByGenres(item: BaseItemDto, includeType: String) =
+	fun libraryByGenres(item: UUID, includeType: String) =
 		fragmentDestination<ByGenreFragment> {
-			putString(Extras.Folder, Json.encodeToString(item))
+			putString(Extras.Folder, item.toString())
 			putString(Extras.IncludeType, includeType)
 		}
 
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun libraryByLetter(item: BaseItemDto, includeType: String) =
+	fun libraryByLetter(item: UUID, includeType: String) =
 		fragmentDestination<ByLetterFragment> {
-			putString(Extras.Folder, Json.encodeToString(item))
+			putString(Extras.Folder, item.toString())
 			putString(Extras.IncludeType, includeType)
 		}
 
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun librarySuggestions(item: BaseItemDto) =
+	fun librarySuggestions(item: UUID) =
 		fragmentDestination<SuggestedMoviesFragment> {
-			putString(Extras.Folder, Json.encodeToString(item))
+			putString(Extras.Folder, item.toString())
 		}
 
 	// Item details
@@ -94,20 +84,13 @@ object Destinations {
 		putString("ItemId", item.toString())
 	}
 
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun channelDetails(item: UUID, channel: UUID, programInfo: BaseItemDto) =
-		fragmentDestination<FullDetailsFragment> {
-			putString("ItemId", item.toString())
-			putString("ChannelId", channel.toString())
-			putString("ProgramInfo", Json.encodeToString(programInfo))
-		}
+	fun channelDetails(item: UUID) = fragmentDestination<FullDetailsFragment> {
+		putString("ItemId", item.toString())
+	}
 
-	// TODO only pass item id instead of complete JSON to browsing destinations
-	fun seriesTimerDetails(item: UUID, seriesTimer: SeriesTimerInfoDto) =
-		fragmentDestination<FullDetailsFragment> {
-			putString("ItemId", item.toString())
-			putString("SeriesTimer", Json.encodeToString(seriesTimer))
-		}
+	fun seriesTimerDetails(item: UUID) = fragmentDestination<FullDetailsFragment> {
+		putString("ItemId", item.toString())
+	}
 
 	fun itemList(item: UUID) = fragmentDestination<ItemListFragment> {
 		putString("ItemId", item.toString())

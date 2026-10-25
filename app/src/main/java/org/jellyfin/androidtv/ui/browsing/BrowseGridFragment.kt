@@ -65,6 +65,9 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.Extras
@@ -114,13 +117,16 @@ import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import org.koin.android.ext.android.inject
 import org.koin.compose.koinInject
 import java.time.Instant
+import java.util.UUID
+import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 
 class BrowseGridFragment : Fragment() {
-	private var folder: BaseItemDto? = null
+	private var folder by mutableStateOf<BaseItemDto?>(null)
 	private val backgroundService by inject<BackgroundService>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val navigationRepository by inject<NavigationRepository>()
 	private val preferencesRepository by inject<PreferencesRepository>()
+	private val api by inject<ApiClient>()
 
 	private val json = Json {
 		ignoreUnknownKeys = true
@@ -129,11 +135,24 @@ class BrowseGridFragment : Fragment() {
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
-		val folderJson = arguments?.getString(Extras.Folder) ?: return
-		runCatching {
-			folder = json.decodeFromString<BaseItemDto>(folderJson)
-		}.onFailure {
-			timber.log.Timber.e(it, "Failed to parse folder DTO in BrowseGridFragment")
+		val folderArg = arguments?.getString(Extras.Folder) ?: return
+		lifecycleScope.launch {
+			lifecycle.repeatOnLifecycle(Lifecycle.State.CREATED) {
+				val folderId = runCatching { UUID.fromString(folderArg) }.getOrNull()
+				if (folderId != null) {
+					runCatching {
+						folder = api.userLibraryApi.getItem(itemId = folderId).content
+					}.onFailure {
+						timber.log.Timber.e(it, "Failed to fetch folder DTO in BrowseGridFragment")
+					}
+				} else {
+					runCatching {
+						folder = json.decodeFromString<BaseItemDto>(folderArg)
+					}.onFailure {
+						timber.log.Timber.e(it, "Failed to parse folder DTO in BrowseGridFragment")
+					}
+				}
+			}
 		}
 	}
 
