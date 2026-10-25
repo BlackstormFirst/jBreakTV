@@ -176,7 +176,7 @@ class SessionRepositoryImpl(
 		}
 
 		try {
-			preferencesRepository.onSessionChanged()
+			preferencesRepository.onSessionChanged(session != null)
 		} catch (err: Exception) {
 			Timber.e(err, "Error updating preferences on session change")
 		}

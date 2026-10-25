@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.Composable
@@ -30,6 +31,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
@@ -84,6 +88,11 @@ class SelectServerFragment : Fragment() {
 		}
 	}
 
+	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+		super.onViewCreated(view, savedInstanceState)
+		view.post { view.requestFocus() }
+	}
+
 	override fun onResume() {
 		super.onResume()
 		startupViewModel.reloadStoredServers()
@@ -97,6 +106,10 @@ class SelectServerFragment : Fragment() {
 		val storedServers by startupViewModel.storedServers.collectAsState(initial = emptyList())
 		val discoveredServers by startupViewModel.discoveredServers.collectAsState(initial = emptyList())
 		val context = LocalContext.current
+
+		val firstServerFocusRequester = remember { FocusRequester() }
+		val manualConnectFocusRequester = remember { FocusRequester() }
+		var hasRequestedFocus by remember(storedServers.isEmpty()) { mutableStateOf(false) }
 
 		Column(modifier = Modifier.fillMaxSize()) {
 			StartupToolbar(openHelp = openHelp)
@@ -130,7 +143,7 @@ class SelectServerFragment : Fragment() {
 						)
 						Spacer(modifier = Modifier.height(16.dp))
 						LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-							items(storedServers) { server ->
+							itemsIndexed(storedServers) { index, server ->
 								AndroidView(
 									factory = { ctx ->
 										ServerButtonView(ctx).apply {
@@ -159,7 +172,20 @@ class SelectServerFragment : Fragment() {
 										view.address = server.address
 										view.version = server.version
 									},
-									modifier = Modifier.fillMaxWidth()
+									modifier = Modifier
+										.fillMaxWidth()
+										.then(
+											if (index == 0) {
+												Modifier
+													.focusRequester(firstServerFocusRequester)
+													.onGloballyPositioned {
+														if (!hasRequestedFocus) {
+															hasRequestedFocus = true
+															try { firstServerFocusRequester.requestFocus() } catch (_: Exception) {}
+														}
+													}
+											} else Modifier
+										)
 								)
 							}
 						}
@@ -180,7 +206,20 @@ class SelectServerFragment : Fragment() {
 								replace<ServerAddFragment>(R.id.content_view)
 							}
 						},
-						modifier = Modifier.fillMaxWidth()
+						modifier = Modifier
+							.fillMaxWidth()
+							.then(
+								if (storedServers.isEmpty()) {
+									Modifier
+										.focusRequester(manualConnectFocusRequester)
+										.onGloballyPositioned {
+											if (!hasRequestedFocus) {
+												hasRequestedFocus = true
+												try { manualConnectFocusRequester.requestFocus() } catch (_: Exception) {}
+											}
+										}
+								} else Modifier
+							)
 					) {
 						Icon(imageVector = Icons.Default.Add, contentDescription = null)
 						Spacer(modifier = Modifier.width(8.dp))

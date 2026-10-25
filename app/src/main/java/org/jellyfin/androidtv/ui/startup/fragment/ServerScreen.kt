@@ -16,7 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +50,6 @@ import org.jellyfin.androidtv.ui.shared.toolbar.StartupToolbar
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.yield
 import java.util.UUID
 
@@ -76,32 +74,8 @@ fun ServerScreen(
         users.find { it.id == lastUserId } ?: users.firstOrNull()
     }
 
-    var hasRequestedUserFocus by remember(targetUser) { mutableStateOf(false) }
+    var requestedFocusUserId by remember(targetUser?.id) { mutableStateOf<UUID?>(null) }
     var hasRequestedAddUserFocus by remember(users.isEmpty()) { mutableStateOf(false) }
-
-    LaunchedEffect(users, targetUser) {
-        if (users.isNotEmpty() && targetUser != null) {
-            yield()
-            repeat(10) {
-                try {
-                    userFocusRequester.requestFocus()
-                    return@LaunchedEffect
-                } catch (_: Exception) {
-                    delay(30)
-                }
-            }
-        } else {
-            yield()
-            repeat(10) {
-                try {
-                    addUserFocusRequester.requestFocus()
-                    return@LaunchedEffect
-                } catch (_: Exception) {
-                    delay(30)
-                }
-            }
-        }
-    }
 
     BaseScreen {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -184,8 +158,8 @@ fun ServerScreen(
                                                     Modifier
                                                         .focusRequester(userFocusRequester)
                                                         .onGloballyPositioned {
-                                                            if (!hasRequestedUserFocus) {
-                                                                hasRequestedUserFocus = true
+                                                            if (requestedFocusUserId != user.id) {
+                                                                requestedFocusUserId = user.id
                                                                 try { userFocusRequester.requestFocus() } catch (_: Exception) {}
                                                             }
                                                         }

@@ -63,12 +63,14 @@ class PreferencesRepository(
 		libraryPreferences.clear()
 	}
 
-	suspend fun onSessionChanged() {
+	suspend fun onSessionChanged(hasSession: Boolean = false) {
 		clearCaches()
 
-		// Note: Do not run parallel as the server can't deal with that
-		// Relevant server issue: https://github.com/jellyfin/jellyfin/issues/5261
-		liveTvPreferences.update()
-		userSettingPreferences.update()
+		if (hasSession) {
+			// Note: Do not run parallel as the server can't deal with that
+			// Relevant server issue: https://github.com/jellyfin/jellyfin/issues/5261
+			liveTvPreferences.update()
+			userSettingPreferences.update()
+		}
 	}
 }
