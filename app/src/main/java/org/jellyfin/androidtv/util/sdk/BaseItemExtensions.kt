@@ -80,8 +80,9 @@ fun BaseItemDto.getProgramSubText(context: Context) = buildString {
 	episodeTitle?.let { append(episodeTitle, " ") }
 
 	// If the start time is on a different day, add the date
-	if (startDate?.dayOfYear != LocalDateTime.now().dayOfYear)
-		append(TimeUtils.getFriendlyDate(context, startDate), " ")
+	val validStartDate = startDate
+	if (validStartDate != null && validStartDate.dayOfYear != LocalDateTime.now().dayOfYear)
+		append(TimeUtils.getFriendlyDate(context, validStartDate), " ")
 
 	// Add the start and end time
 	append(
@@ -128,7 +129,7 @@ fun BaseItemDto.getSubName(context: Context): String? = when (type) {
 			context.getString(
 				R.string.lbl_name_date,
 				name,
-				TimeUtils.getFriendlyDate(context, premiereDate)
+				TimeUtils.getFriendlyDate(context, premiereDate!!)
 			)
 
 		else -> name

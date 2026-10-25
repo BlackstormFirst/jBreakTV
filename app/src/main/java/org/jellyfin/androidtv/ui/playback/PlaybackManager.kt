@@ -48,7 +48,7 @@ private fun createStreamInfo(
 		mediaUrl = when {
 			source.isRemote && source.path != null -> source.path
 			else -> api.videosApi.getVideoStreamUrl(
-				itemId = itemId,
+				itemId = itemId!!,
 				container = container,
 				mediaSourceId = source.id,
 				static = true,
@@ -75,7 +75,7 @@ private fun createStreamInfo(
 		playMethod = PlayMethod.DIRECT_STREAM
 		container = source.container
 		mediaUrl = api.videosApi.getVideoStreamUrl(
-			itemId = itemId,
+			itemId = itemId!!,
 			container = container,
 			mediaSourceId = source.id,
 			static = false,
@@ -115,9 +115,10 @@ class PlaybackManager(
 		callback: Response<StreamInfo>
 	) = lifecycleOwner.lifecycleScope.launch {
 		Timber.d("PlaybackManager: Refreshing stream due to change. New video index: ${options.videoStreamIndex}")
-		if (stream.playSessionId != null && stream.playMethod != PlayMethod.DIRECT_PLAY) {
+		val playSessionId = stream.playSessionId
+		if (playSessionId != null && stream.playMethod != PlayMethod.DIRECT_PLAY) {
 			withContext(Dispatchers.IO) {
-				api.hlsSegmentApi.stopEncodingProcess(api.deviceInfo.id, stream.playSessionId)
+				api.hlsSegmentApi.stopEncodingProcess(api.deviceInfo.id, playSessionId)
 			}
 		}
 
