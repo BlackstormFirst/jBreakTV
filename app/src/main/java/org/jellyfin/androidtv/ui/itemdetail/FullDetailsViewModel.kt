@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +37,7 @@ import org.jellyfin.androidtv.util.Utils
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
+import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
 import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.sockets.subscribe
@@ -45,6 +47,7 @@ import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.PersonKind
+import org.jellyfin.sdk.model.api.PlaybackInfoDto
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import org.jellyfin.sdk.model.api.request.GetNextUpRequest
@@ -90,6 +93,7 @@ class FullDetailsViewModel(
     private var currentItemId: UUID? = null
     private var justLoaded = true
     private var appContext: Context? = null
+    private var fetchJob: Job? = null
 
     init {
         // Subscribe to real-time WebSockets
@@ -137,7 +141,8 @@ class FullDetailsViewModel(
     }
 
     private fun fetchItem(context: Context, itemId: UUID, showLoading: Boolean) {
-        viewModelScope.launch {
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch {
             if (showLoading) {
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
@@ -147,7 +152,7 @@ class FullDetailsViewModel(
 
             val baseItem = withContext(Dispatchers.IO) {
                 runCatching {
-                    api.userLibraryApi.getItem(itemId = itemId).content
+                    api.userLibraryApi.getItem(userId = userId, itemId = itemId).content
                 }.getOrElse {
                     runCatching {
                         val response = api.itemsApi.getItems(
@@ -213,13 +218,39 @@ class FullDetailsViewModel(
                 }
             } else null
 
+            val mediaSources = baseItem.mediaSources?.takeIf { sources -> sources.any { !it.mediaStreams.isNullOrEmpty() } }
+                ?: withContext(Dispatchers.IO) {
+                    runCatching {
+                        api.mediaInfoApi.getPlaybackInfo(
+                            itemId = baseItem.id,
+                            userId = userId
+                        ).content.mediaSources
+                    }.getOrElse {
+                        runCatching {
+                            api.mediaInfoApi.getPostedPlaybackInfo(
+                                itemId = baseItem.id,
+                                data = PlaybackInfoDto(
+                                    userId = userId,
+                                    enableDirectPlay = true,
+                                    enableDirectStream = true,
+                                    enableTranscoding = true
+                                )
+                            ).content.mediaSources
+                        }.getOrNull()
+                    }
+                }
+
+            val updatedBaseItem = if (!mediaSources.isNullOrEmpty()) {
+                baseItem.copy(mediaSources = mediaSources)
+            } else baseItem
+
             val currentSelectedSource = _uiState.value.selectedMediaSource
-            val selectedSource = baseItem.mediaSources?.firstOrNull { it.id == currentSelectedSource?.id }
-                ?: baseItem.mediaSources?.firstOrNull()
+            val selectedSource = updatedBaseItem.mediaSources?.firstOrNull { it.id == currentSelectedSource?.id }
+                ?: updatedBaseItem.mediaSources?.firstOrNull()
 
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
-                item = baseItem,
+                item = updatedBaseItem,
                 selectedMediaSource = selectedSource,
                 isFavorite = isFav,
                 isPlayed = isPl,
@@ -233,7 +264,7 @@ class FullDetailsViewModel(
                 prevItemId = previousEpisodeId
             )
 
-            loadAdditionalRows(context, baseItem, userId)
+            loadAdditionalRows(context, updatedBaseItem, userId)
         }
     }
 

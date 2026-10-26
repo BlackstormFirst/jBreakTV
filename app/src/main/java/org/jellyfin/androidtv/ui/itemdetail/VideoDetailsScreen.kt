@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -96,7 +97,10 @@ import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaSourceInfo
+import org.jellyfin.sdk.model.api.MediaStream
+import org.jellyfin.sdk.model.api.MediaStreamType
 import org.koin.compose.koinInject
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -106,19 +110,22 @@ import java.util.UUID
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun rememberTvPivotBringIntoViewSpec(): BringIntoViewSpec {
-    return remember {
+    val density = LocalDensity.current
+    val bottomMarginPx = with(density) { 48.dp.toPx() }
+
+    return remember(bottomMarginPx) {
         object : BringIntoViewSpec {
             override fun calculateScrollDistance(
                 offset: Float,
                 size: Float,
                 containerSize: Float
             ): Float {
-                val topPivot = containerSize * 0.35f
-                val bottomPivot = containerSize * 0.65f
+                val targetTop = containerSize * 0.35f
+                val maxVisibleBottom = containerSize - bottomMarginPx
 
                 return when {
-                    offset < topPivot -> offset - topPivot
-                    offset > bottomPivot -> offset - bottomPivot
+                    offset + size > maxVisibleBottom -> (offset + size) - maxVisibleBottom
+                    offset < targetTop -> offset - targetTop
                     else -> 0f
                 }
             }
@@ -354,6 +361,257 @@ fun TextUnderButton(
     }
 }
 
+@Composable
+fun MediaInfoRowText(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = TextStyle(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+        )
+        Text(
+            text = value,
+            style = TextStyle(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+fun MediaStreamCard(
+    stream: MediaStream,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val cardBg = if (isFocused) {
+        JellyfinTheme.colorScheme.listButtonFocused
+    } else {
+        JellyfinTheme.colorScheme.surface
+    }
+
+    val borderColor = if (isFocused) {
+        JellyfinTheme.colorScheme.buttonFocused
+    } else {
+        Color.Transparent
+    }
+
+    val streamTypeTitle = when (stream.type) {
+        MediaStreamType.VIDEO -> stringResource(R.string.playback_info_video_title)
+        MediaStreamType.AUDIO -> stringResource(R.string.playback_info_audio_title)
+        MediaStreamType.SUBTITLE -> stringResource(R.string.playback_info_subtitle_title)
+        else -> stream.type.name.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+    }
+
+    Box(
+        modifier = modifier
+            .width(180.dp)
+            .height(150.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(cardBg)
+            .border(2.dp, borderColor, RoundedCornerShape(10.dp))
+            .focusable(interactionSource = interactionSource)
+            .padding(10.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Header (e.g. "VIDÉO", "AUDIO", "SOUS-TITRES")
+                Text(
+                    text = streamTypeTitle.uppercase(Locale.ROOT),
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = JellyfinTheme.colorScheme.buttonFocused
+                    )
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                // Language
+                if (!stream.language.isNullOrBlank() && stream.type != MediaStreamType.VIDEO) {
+                    MediaInfoRowText(
+                        label = "Langue",
+                        value = stream.language?.uppercase(Locale.ROOT) ?: ""
+                    )
+                }
+
+                // Codec
+                if (!stream.codec.isNullOrBlank()) {
+                    MediaInfoRowText(
+                        label = "Codec",
+                        value = stream.codec?.uppercase(Locale.ROOT) ?: ""
+                    )
+                }
+
+                // Profile / Level
+                if (!stream.profile.isNullOrBlank()) {
+                    MediaInfoRowText(
+                        label = "Profile",
+                        value = stream.profile ?: ""
+                    )
+                }
+
+                // Specific properties by Stream Type
+                when (stream.type) {
+                    MediaStreamType.VIDEO -> {
+                        if (stream.width != null && stream.height != null) {
+                            MediaInfoRowText(
+                                label = "Resolution",
+                                value = "${stream.width}x${stream.height}"
+                            )
+                        }
+                        if (stream.realFrameRate != null && stream.realFrameRate!! > 0f) {
+                            MediaInfoRowText(
+                                label = "Framerate",
+                                value = "%.3f fps".format(Locale.US, stream.realFrameRate)
+                            )
+                        }
+                        if (stream.aspectRatio != null) {
+                            MediaInfoRowText(
+                                label = "Aspect",
+                                value = stream.aspectRatio ?: ""
+                            )
+                        }
+                    }
+
+                    MediaStreamType.AUDIO -> {
+                        if (!stream.channelLayout.isNullOrBlank()) {
+                            MediaInfoRowText(
+                                label = "Layout",
+                                value = stream.channelLayout?.uppercase(Locale.ROOT) ?: ""
+                            )
+                        } else if (stream.channels != null) {
+                            MediaInfoRowText(
+                                label = "Chaînes",
+                                value = "${stream.channels} ch"
+                            )
+                        }
+                    }
+
+                    else -> {}
+                }
+
+                // Bitrate
+                if (stream.bitRate != null && stream.bitRate!! > 0) {
+                    val kbps = stream.bitRate!! / 1024
+                    val bitrateStr = if (kbps >= 1000) {
+                        "%.1f Mbps".format(Locale.US, kbps / 1024f)
+                    } else {
+                        "$kbps kbps"
+                    }
+                    MediaInfoRowText(
+                        label = "Bitrate",
+                        value = bitrateStr
+                    )
+                }
+            }
+
+            // Flags at bottom of card (Default, Forced, External, SDH)
+            val flags = mutableListOf<String>()
+            if (stream.isDefault == true) flags.add("Par défaut")
+            if (stream.isForced == true) flags.add("Forcé")
+            if (stream.isExternal == true) flags.add("Externe")
+            if (stream.isHearingImpaired == true) flags.add("SDH")
+
+            if (flags.isNotEmpty()) {
+                Text(
+                    text = flags.joinToString(" • "),
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun MediaDetailsRow(
+    streams: List<MediaStream>,
+    containerName: String? = null,
+    modifier: Modifier = Modifier
+) {
+    val displayStreams = remember(streams) {
+        streams
+            .filter { it.type == MediaStreamType.VIDEO || it.type == MediaStreamType.AUDIO || it.type == MediaStreamType.SUBTITLE }
+            .distinctBy { "${it.type}_${it.index}_${it.codec}_${it.language}" }
+    }
+
+    if (displayStreams.isEmpty()) return
+
+    val formattedContainer = containerName
+        ?.replace("Détails des médias", "", ignoreCase = true)
+        ?.replace("Media Details", "", ignoreCase = true)
+        ?.trim(' ', '(', ')', '-', ':')
+
+    val title = if (!formattedContainer.isNullOrBlank()) {
+        "Détails des médias ($formattedContainer)"
+    } else {
+        "Détails des médias"
+    }
+
+    val density = LocalDensity.current
+    val horizontalBringIntoViewSpec = rememberHorizontalBringIntoViewSpec(paddingPx = with(density) { 56.dp.toPx() })
+
+    Column(
+        modifier = modifier.focusProperties { down = FocusRequester.Cancel }
+    ) {
+        Text(
+            text = title,
+            style = JellyfinTheme.typography.listHeader.copy(color = JellyfinTheme.colorScheme.listHeader),
+            modifier = Modifier.padding(start = 56.dp, end = 56.dp, bottom = 12.dp)
+        )
+
+        CompositionLocalProvider(LocalBringIntoViewSpec provides horizontalBringIntoViewSpec) {
+            LazyRow(
+                modifier = Modifier
+                    .focusRestorer()
+                    .focusProperties { down = FocusRequester.Cancel },
+                contentPadding = PaddingValues(horizontal = 56.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                itemsIndexed(
+                    displayStreams,
+                    key = { idx, stream -> "media_stream_${stream.type}_${stream.index}_$idx" }
+                ) { index, stream ->
+                    val isFirst = index == 0
+                    val isLast = index == displayStreams.lastIndex
+
+                    MediaStreamCard(
+                        stream = stream,
+                        modifier = Modifier.focusProperties {
+                            down = FocusRequester.Cancel
+                            if (isFirst) left = FocusRequester.Cancel
+                            if (isLast) right = FocusRequester.Cancel
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VideoDetailsScreen(
@@ -561,245 +819,252 @@ fun VideoDetailsScreen(
                         Spacer(Modifier.height(16.dp))
 
                         // 3 Columns Main Section starting at guide_top (180dp)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
+                        Box(
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            // Left Column (guide_left_end = 150dp width, right-aligned) - Hidden for PERSON
-                            Column(
-                                modifier = Modifier.width(150.dp),
-                                horizontalAlignment = Alignment.End
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top
                             ) {
-                                if (!isPerson) {
-                                    if (!state.directorText.isNullOrBlank()) {
-                                        Text(
-                                            text = "RÉALISATEUR",
-                                            style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                        )
-                                        Text(
-                                            text = state.directorText,
-                                            style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f)),
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.End
-                                        )
-                                        Spacer(Modifier.height(16.dp))
-                                    }
-
-                                    if (!state.writerText.isNullOrBlank()) {
-                                        Text(
-                                            text = "SCÉNARISTE",
-                                            style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                        )
-                                        Text(
-                                            text = state.writerText,
-                                            style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f)),
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.End
-                                        )
-                                        Spacer(Modifier.height(16.dp))
-                                    }
-
-                                    if (!state.endTimeText.isNullOrBlank()) {
-                                        Text(
-                                            text = "HEURE DE FIN",
-                                            style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                        )
-                                        Text(
-                                            text = state.endTimeText,
-                                            style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(Modifier.width(20.dp))
-
-                            // Middle Column (Expandable Overview + Action Buttons)
-                            Column(
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                ExpandableOverviewText(
-                                    overviewText = item.overview,
-                                    maxLines = if (isPerson) 9 else 6
-                                )
-
-                                Spacer(Modifier.height(16.dp))
-
-                                // Action Buttons Row using TextUnderButton in exact Leanback order:
-                                // 1. Resume -> 2. Play -> 3. Queue -> 4. Shuffle -> 5. Trailers -> 6. Watched -> 7. Favorite -> 8. Previous Episode -> 9. GoToSeries -> 10. Delete
-                                CompositionLocalProvider(LocalBringIntoViewSpec provides actionButtonsBringIntoViewSpec) {
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        verticalAlignment = Alignment.Top,
-                                        modifier = Modifier
-                                            .focusRequester(actionButtonsFocusRequester)
-                                            .focusGroup()
-                                            .focusRestorer()
-                                    ) {
-                                    // 1. Resume
-                                    if (state.canResume && !isPerson) {
-                                        item {
-                                            val resumeLabel = if (!state.resumePositionText.isNullOrEmpty()) {
-                                                stringResource(R.string.lbl_resume_from, state.resumePositionText)
-                                            } else {
-                                                stringResource(R.string.home_section_resume)
-                                            }
-
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_resume,
-                                                label = resumeLabel,
-                                                onClick = onResumeClick,
-                                                onFocused = { scrollToHeaderTop() },
-                                                modifier = initialFocusModifier
-                                            )
-                                        }
-                                    }
-
-                                    // 2. Play
+                                // Left Column (guide_left_end = 150dp width, right-aligned) - Hidden for PERSON
+                                Column(
+                                    modifier = Modifier.width(150.dp),
+                                    horizontalAlignment = Alignment.End
+                                ) {
                                     if (!isPerson) {
-                                        item {
-                                            val playLabel = if (item.type == BaseItemKind.SERIES) {
-                                                stringResource(R.string.lbl_play_next_up)
-                                            } else if (item.isFolder == true) {
-                                                stringResource(R.string.lbl_play_all)
-                                            } else {
-                                                stringResource(R.string.lbl_play)
-                                            }
-
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_play,
-                                                label = playLabel,
-                                                onClick = onPlayClick,
-                                                onFocused = { scrollToHeaderTop() },
-                                                modifier = if (!state.canResume) initialFocusModifier else Modifier
+                                        if (!state.directorText.isNullOrBlank()) {
+                                            Text(
+                                                text = "RÉALISATEUR",
+                                                style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                             )
-                                        }
-                                    }
-
-                                    // 3. Add to Queue (Music)
-                                    if (isMusic && !isPerson) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_add,
-                                                label = stringResource(R.string.lbl_add_to_queue),
-                                                onClick = onQueueClick,
-                                                onFocused = { scrollToHeaderTop() }
+                                            Text(
+                                                text = state.directorText,
+                                                style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f)),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                textAlign = TextAlign.End
                                             )
+                                            Spacer(Modifier.height(16.dp))
                                         }
-                                    }
 
-                                    // 4. Shuffle (Folder or Music)
-                                    if (isFolderOrMusic && !isPerson) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_shuffle,
-                                                label = stringResource(R.string.lbl_shuffle_all),
-                                                onClick = onShuffleClick,
-                                                onFocused = { scrollToHeaderTop() }
+                                        if (!state.writerText.isNullOrBlank()) {
+                                            Text(
+                                                text = "SCÉNARISTE",
+                                                style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                             )
-                                        }
-                                    }
-
-                                    // Version Selection (shown when item has multiple versions/media sources)
-                                    val versions = item.mediaSources
-                                    if (!isPerson && !versions.isNullOrEmpty() && versions.size > 1) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_control_select,
-                                                label = stringResource(R.string.select_version),
-                                                onClick = { showVersionPicker = true },
-                                                onFocused = { scrollToHeaderTop() }
+                                            Text(
+                                                text = state.writerText,
+                                                style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f)),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                textAlign = TextAlign.End
                                             )
+                                            Spacer(Modifier.height(16.dp))
                                         }
-                                    }
 
-                                    // 5. Trailers
-                                    if (hasTrailers && !isPerson) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_trailer,
-                                                label = stringResource(R.string.lbl_play_trailers),
-                                                onClick = onTrailerClick,
-                                                onFocused = { scrollToHeaderTop() }
+                                        if (!state.endTimeText.isNullOrBlank()) {
+                                            Text(
+                                                text = "HEURE DE FIN",
+                                                style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                             )
-                                        }
-                                    }
-
-                                    // 6. Watched (Vu)
-                                    if (!isPerson) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_check,
-                                                label = stringResource(R.string.lbl_watched),
-                                                onClick = onPlayedClick,
-                                                onFocused = { scrollToHeaderTop() },
-                                                isActivated = state.isPlayed
-                                            )
-                                        }
-                                    }
-
-                                    // 7. Favorite (Favori - shown for all including PERSON)
-                                    item {
-                                        TextUnderButton(
-                                            iconRes = R.drawable.ic_star,
-                                            label = stringResource(R.string.lbl_add_favorite),
-                                            onClick = onFavoriteClick,
-                                            onFocused = { scrollToHeaderTop() },
-                                            isActivated = state.isFavorite,
-                                            modifier = if (isPerson) initialFocusModifier else Modifier
-                                        )
-                                    }
-
-                                    // 8. Previous Episode (Épisode précédent - matching Leanback mPrevButton)
-                                    if (item.type == BaseItemKind.EPISODE && state.prevItemId != null && !isPerson) {
-                                        item {
-                                            val prevId = state.prevItemId
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_previous_episode,
-                                                label = stringResource(R.string.lbl_previous_episode),
-                                                onClick = { onPreviousEpisodeClick(prevId) },
-                                                onFocused = { scrollToHeaderTop() }
-                                            )
-                                        }
-                                    }
-
-                                    // 9. Go to Series (Episode)
-                                    if (item.type == BaseItemKind.EPISODE && item.seriesId != null && !isPerson) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_tv,
-                                                label = stringResource(R.string.lbl_goto_series),
-                                                onClick = onGoToSeriesClick,
-                                                onFocused = { scrollToHeaderTop() }
-                                            )
-                                        }
-                                    }
-
-                                    // 10. Delete
-                                    if (state.canDelete && !isPerson) {
-                                        item {
-                                            TextUnderButton(
-                                                iconRes = R.drawable.ic_delete,
-                                                label = stringResource(R.string.lbl_delete),
-                                                onClick = onDeleteClick,
-                                                onFocused = { scrollToHeaderTop() }
+                                            Text(
+                                                text = state.endTimeText,
+                                                style = TextStyle(fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
                                             )
                                         }
                                     }
                                 }
-                            }
 
-                            }
+                                Spacer(Modifier.width(20.dp))
 
-                            Spacer(Modifier.width(20.dp))
+                                // Middle Column (Expandable Overview + Action Buttons)
+                                // Ends at guide_main_end (240dp from right screen edge = 192dp from 48dp padding)
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(end = 192.dp)
+                                ) {
+                                    ExpandableOverviewText(
+                                        overviewText = item.overview,
+                                        maxLines = if (isPerson) 9 else 6
+                                    )
+
+                                    Spacer(Modifier.height(16.dp))
+
+                                    // Action Buttons Row using TextUnderButton in exact Leanback order:
+                                    // 1. Resume -> 2. Play -> 3. Queue -> 4. Shuffle -> 5. Trailers -> 6. Watched -> 7. Favorite -> 8. Previous Episode -> 9. GoToSeries -> 10. Delete
+                                    CompositionLocalProvider(LocalBringIntoViewSpec provides actionButtonsBringIntoViewSpec) {
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.Top,
+                                            modifier = Modifier
+                                                .focusRequester(actionButtonsFocusRequester)
+                                                .focusGroup()
+                                                .focusRestorer()
+                                        ) {
+                                            // 1. Resume
+                                            if (state.canResume && !isPerson) {
+                                                item {
+                                                    val resumeLabel = if (!state.resumePositionText.isNullOrEmpty()) {
+                                                        stringResource(R.string.lbl_resume_from, state.resumePositionText)
+                                                    } else {
+                                                        stringResource(R.string.home_section_resume)
+                                                    }
+
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_resume,
+                                                        label = resumeLabel,
+                                                        onClick = onResumeClick,
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = initialFocusModifier
+                                                    )
+                                                }
+                                            }
+
+                                            // 2. Play
+                                            if (!isPerson) {
+                                                item {
+                                                    val playLabel = if (item.type == BaseItemKind.SERIES) {
+                                                        stringResource(R.string.lbl_play_next_up)
+                                                    } else if (item.isFolder == true) {
+                                                        stringResource(R.string.lbl_play_all)
+                                                    } else {
+                                                        stringResource(R.string.lbl_play)
+                                                    }
+
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_play,
+                                                        label = playLabel,
+                                                        onClick = onPlayClick,
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = if (!state.canResume) initialFocusModifier else Modifier
+                                                    )
+                                                }
+                                            }
+
+                                            // 3. Add to Queue (Music)
+                                            if (isMusic && !isPerson) {
+                                                item {
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_add,
+                                                        label = stringResource(R.string.lbl_add_to_queue),
+                                                        onClick = onQueueClick,
+                                                        onFocused = { scrollToHeaderTop() }
+                                                    )
+                                                }
+                                            }
+
+                                            // 4. Shuffle (Folder or Music)
+                                            if (isFolderOrMusic && !isPerson) {
+                                                item {
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_shuffle,
+                                                        label = stringResource(R.string.lbl_shuffle_all),
+                                                        onClick = onShuffleClick,
+                                                        onFocused = { scrollToHeaderTop() }
+                                                    )
+                                                }
+                                            }
+
+                                            // Version Selection (shown when item has multiple versions/media sources)
+                                            val versions = item.mediaSources
+                                            if (!isPerson && !versions.isNullOrEmpty() && versions.size > 1) {
+                                                item {
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_control_select,
+                                                        label = stringResource(R.string.select_version),
+                                                        onClick = { showVersionPicker = true },
+                                                        onFocused = { scrollToHeaderTop() }
+                                                    )
+                                                }
+                                            }
+
+                                            // 5. Trailers
+                                            if (hasTrailers && !isPerson) {
+                                                item {
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_trailer,
+                                                        label = stringResource(R.string.lbl_play_trailers),
+                                                        onClick = onTrailerClick,
+                                                        onFocused = { scrollToHeaderTop() }
+                                                    )
+                                                }
+                                            }
+
+                                            // 6. Watched (Vu)
+                                            if (!isPerson) {
+                                                item {
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_check,
+                                                        label = stringResource(R.string.lbl_watched),
+                                                        onClick = onPlayedClick,
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        isActivated = state.isPlayed
+                                                    )
+                                                }
+                                            }
+
+                                            // 7. Favorite (Favori - shown for all including PERSON)
+                                            item {
+                                                TextUnderButton(
+                                                    iconRes = R.drawable.ic_star,
+                                                    label = stringResource(R.string.lbl_add_favorite),
+                                                    onClick = onFavoriteClick,
+                                                    onFocused = { scrollToHeaderTop() },
+                                                    isActivated = state.isFavorite,
+                                                    modifier = if (isPerson) initialFocusModifier else Modifier
+                                                )
+                                            }
+
+                                            // 8. Previous Episode (Épisode précédent - matching Leanback mPrevButton)
+                                            if (item.type == BaseItemKind.EPISODE && state.prevItemId != null && !isPerson) {
+                                                item {
+                                                    val prevId = state.prevItemId
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_previous_episode,
+                                                        label = stringResource(R.string.lbl_previous_episode),
+                                                        onClick = { onPreviousEpisodeClick(prevId) },
+                                                        onFocused = { scrollToHeaderTop() }
+                                                    )
+                                                }
+                                            }
+
+                                            // 9. Go to Series (Episode)
+                                            if (item.type == BaseItemKind.EPISODE && item.seriesId != null && !isPerson) {
+                                                item {
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_tv,
+                                                        label = stringResource(R.string.lbl_goto_series),
+                                                        onClick = onGoToSeriesClick,
+                                                        onFocused = { scrollToHeaderTop() }
+                                                    )
+                                                }
+                                            }
+
+                                            // 10. Delete
+                                            if (state.canDelete && !isPerson) {
+                                                item {
+                                                    TextUnderButton(
+                                                        iconRes = R.drawable.ic_delete,
+                                                        label = stringResource(R.string.lbl_delete),
+                                                        onClick = onDeleteClick,
+                                                        onFocused = { scrollToHeaderTop() }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
 
                             // Right Column (Poster / Logo Image top-aligned with first line of Overview)
+                            // Positioned at guide_right_start (220dp from right) to guide_right_end (50dp from right)
                             if (!rightImageUrl.isNullOrEmpty()) {
                                 Box(
-                                    modifier = Modifier.width(200.dp),
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(end = 2.dp)
+                                        .width(170.dp),
                                     contentAlignment = Alignment.TopStart
                                 ) {
                                     AsyncImage(
@@ -818,7 +1083,7 @@ fun VideoDetailsScreen(
                 }
 
                 // Additional Content Rows (Seasons, Episodes, Cast, Extras, Similar)
-                itemsIndexed(state.rows, key = { idx, row -> "${row.title}_$idx" }) { rowIndex: Int, rowState: DetailsRowState ->
+                this@LazyColumn.itemsIndexed(state.rows, key = { idx, row -> "details_content_row_${idx}_${row.title.hashCode()}" }) { rowIndex: Int, rowState: DetailsRowState ->
                     val items by rowState.adapter.collectAsStateAny()
 
                     if (items.isNotEmpty()) {
@@ -835,7 +1100,7 @@ fun VideoDetailsScreen(
                                     contentPadding = PaddingValues(horizontal = 56.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                itemsIndexed(items, key = { index, item -> "${rowIndex}_${item.hashCode()}_$index" }) { index: Int, rowItem: Any ->
+                                itemsIndexed(items, key = { index, item -> "row_item_${rowIndex}_${index}_${item.hashCode()}" }) { index: Int, rowItem: Any ->
                                     val interactionSource = remember { MutableInteractionSource() }
                                     val isFocusedState by interactionSource.collectIsFocusedAsState()
                                     var isFocusedInternal by remember { mutableStateOf(false) }
@@ -892,49 +1157,65 @@ fun VideoDetailsScreen(
                         }
                     }
                 }
-            }
-        }
+                // Media Details Streams Rows (matching Leanback addInfoRows / InfoCardPresenter / MyInfoCardView)
+                if (!isPerson) {
+                    val selectedSource = state.selectedMediaSource ?: item.mediaSources?.firstOrNull()
+                    val mediaStreams = selectedSource?.mediaStreams?.takeIf { it.isNotEmpty() } ?: item.mediaStreams
+                    val containerName = selectedSource?.container ?: item.container
 
-        if (showVersionPicker && !item.mediaSources.isNullOrEmpty()) {
-            val versionsList = item.mediaSources!!
-            val selectedIndex = versionsList.indexOfFirst {
-                it.id == (state.selectedMediaSource?.id ?: versionsList.firstOrNull()?.id)
-            }.coerceAtLeast(0)
-
-            Popover(
-                expanded = showVersionPicker,
-                onDismissRequest = { showVersionPicker = false },
-                alignment = Alignment.Center
-            ) {
-                PopoverMenu {
-                    Text(
-                        text = stringResource(R.string.select_version),
-                        style = TextStyle(
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        ),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
-
-                    versionsList.forEachIndexed { index, mediaSource ->
-                        val isSelected = index == selectedIndex
-                        PopoverMenuCheckboxItem(
-                            selected = isSelected,
-                            onClick = {
-                                showVersionPicker = false
-                                onSelectVersion(mediaSource)
-                            }
-                        ) {
-                            Text(
-                                text = mediaSource.name ?: item.name ?: "",
-                                style = TextStyle(color = Color.White, fontSize = 14.sp)
+                    if (!mediaStreams.isNullOrEmpty()) {
+                        this@LazyColumn.item {
+                            MediaDetailsRow(
+                                streams = mediaStreams,
+                                containerName = containerName
                             )
                         }
                     }
                 }
+            } // end of LazyColumn
+        } // end of CompositionLocalProvider
+
+        if (showVersionPicker && !item.mediaSources.isNullOrEmpty()) {
+                val versionsList = item.mediaSources!!
+                val selectedIndex = versionsList.indexOfFirst {
+                    it.id == (state.selectedMediaSource?.id ?: versionsList.firstOrNull()?.id)
+                }.coerceAtLeast(0)
+
+                Popover(
+                    expanded = showVersionPicker,
+                    onDismissRequest = { showVersionPicker = false },
+                    alignment = Alignment.Center
+                ) {
+                    PopoverMenu {
+                        Text(
+                            text = stringResource(R.string.select_version),
+                            style = TextStyle(
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            ),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+
+                        versionsList.forEachIndexed { index, mediaSource ->
+                            val isSelected = index == selectedIndex
+                            PopoverMenuCheckboxItem(
+                                selected = isSelected,
+                                onClick = {
+                                    showVersionPicker = false
+                                    onSelectVersion(mediaSource)
+                                }
+                            ) {
+                                Text(
+                                    text = mediaSource.name ?: item.name ?: "",
+                                    style = TextStyle(color = Color.White, fontSize = 14.sp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
-        }
+        } // end of Box
     }
-}
-}
+} // end of VideoDetailsScreen
+
