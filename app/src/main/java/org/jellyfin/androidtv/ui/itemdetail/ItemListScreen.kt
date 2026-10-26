@@ -176,9 +176,19 @@ fun ItemListScreen(
 			else if (!item.albumArtist.isNullOrBlank()) item.albumArtist
 			else null
 
-			val titleWidth = textMeasurer.measure(displayName, style = boldHeadlineStyle).size.width
+			val titleWidth = textMeasurer.measure(
+				text = displayName,
+				style = boldHeadlineStyle,
+				maxLines = 1,
+				softWrap = false
+			).size.width
 			val artistWidth = if (!artistName.isNullOrBlank()) {
-				textMeasurer.measure(artistName, style = captionStyle).size.width
+				textMeasurer.measure(
+					text = artistName,
+					style = captionStyle,
+					maxLines = 1,
+					softWrap = false
+				).size.width
 			} else 0
 
 			val itemMax = maxOf(titleWidth, artistWidth)
@@ -508,6 +518,7 @@ fun ItemListScreen(
 										color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listHeadline,
 										maxLines = 1,
 										overflow = TextOverflow.Ellipsis,
+										softWrap = false,
 										modifier = if (isFocused) Modifier.basicMarquee() else Modifier
 									)
 
@@ -518,6 +529,7 @@ fun ItemListScreen(
 											color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
 											maxLines = 1,
 											overflow = TextOverflow.Ellipsis,
+											softWrap = false,
 											modifier = if (isFocused) Modifier.basicMarquee() else Modifier
 										)
 									}

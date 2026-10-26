@@ -2,12 +2,13 @@ package org.jellyfin.androidtv.ui.composable.item
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
@@ -45,7 +46,10 @@ private fun ItemPreviewMetadata(
 	spacing: Dp,
 ) {
 	Column(
-		modifier = Modifier.padding(spacing),
+		modifier = Modifier
+			.fillMaxWidth()
+			.padding(spacing),
+		horizontalAlignment = Alignment.CenterHorizontally,
 		verticalArrangement = Arrangement.spacedBy(spacing),
 	) {
 		title?.let { content ->
@@ -70,6 +74,8 @@ private fun ItemPreviewMetadata(
 	}
 }
 
+private enum class ItemPreviewSlot { Card, Metadata }
+
 @Composable
 @Stable
 fun ItemPreviewLayout(
@@ -78,11 +84,25 @@ fun ItemPreviewLayout(
 	modifier: Modifier = Modifier,
 	spacing: Dp = Tokens.Space.spaceXs,
 ) {
-	Column(
-		modifier = modifier.width(IntrinsicSize.Min),
-		verticalArrangement = Arrangement.spacedBy(spacing),
-	) {
-		card()
-		metadata()
+	SubcomposeLayout(modifier = modifier) { constraints ->
+		val cardPlaceables = subcompose(ItemPreviewSlot.Card, card).map { it.measure(constraints) }
+		val cardWidth = cardPlaceables.maxOfOrNull { it.width } ?: 0
+		val cardHeight = cardPlaceables.maxOfOrNull { it.height } ?: 0
+
+		val spacingPx = spacing.roundToPx()
+
+		val metadataConstraints = constraints.copy(
+			minWidth = cardWidth,
+			maxWidth = cardWidth,
+		)
+		val metadataPlaceables = subcompose(ItemPreviewSlot.Metadata, metadata).map { it.measure(metadataConstraints) }
+		val metadataHeight = metadataPlaceables.maxOfOrNull { it.height } ?: 0
+
+		val totalHeight = cardHeight + (if (metadataHeight > 0) spacingPx + metadataHeight else 0)
+
+		layout(cardWidth, totalHeight) {
+			cardPlaceables.forEach { it.placeRelative(0, 0) }
+			metadataPlaceables.forEach { it.placeRelative(0, cardHeight + spacingPx) }
+		}
 	}
 }

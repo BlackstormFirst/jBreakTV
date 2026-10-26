@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.unit.dp
@@ -165,7 +166,9 @@ class UserCardView @JvmOverloads constructor(
 			name = {
 				Text(
 					text = name.orEmpty(),
-					maxLines = 1
+					maxLines = 1,
+					overflow = TextOverflow.Ellipsis,
+					softWrap = false
 				)
 			},
 			modifier = Modifier

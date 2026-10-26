@@ -520,9 +520,11 @@ private fun CardViewHolderContent(
 										text = title,
 										maxLines = 1,
 										overflow = TextOverflow.Ellipsis,
+										softWrap = false,
 										textAlign = TextAlign.Center,
 										color = Tokens.Color.colorWhite,
 										modifier = Modifier
+											.fillMaxWidth()
 											.then(focusModifier)
 											.padding(Tokens.Space.spaceXs),
 									)
@@ -563,8 +565,11 @@ private fun CardViewHolderContent(
 						text = text,
 						maxLines = 1,
 						overflow = TextOverflow.Ellipsis,
+						softWrap = false,
 						textAlign = TextAlign.Center,
-						modifier = Modifier.then(focusModifier),
+						modifier = Modifier
+							.fillMaxWidth()
+							.then(focusModifier),
 					)
 				}
 			},
@@ -574,9 +579,12 @@ private fun CardViewHolderContent(
 						text = text,
 						maxLines = 1,
 						overflow = TextOverflow.Ellipsis,
+						softWrap = false,
 						textAlign = TextAlign.Center,
 						color = Color(0xFFAAAAAA),
-						modifier = Modifier.then(focusModifier),
+						modifier = Modifier
+							.fillMaxWidth()
+							.then(focusModifier),
 					)
 				}
 			},
