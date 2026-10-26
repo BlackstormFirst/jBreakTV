@@ -147,29 +147,29 @@ class FullDetailsViewModel(
 
             val baseItem = withContext(Dispatchers.IO) {
                 runCatching {
-                    val response = api.itemsApi.getItems(
-                        userId = userId,
-                        ids = listOf(itemId),
-                        fields = setOf(
-                            ItemFields.CAN_DELETE,
-                            ItemFields.CHAPTERS,
-                            ItemFields.CHILD_COUNT,
-                            ItemFields.CUMULATIVE_RUN_TIME_TICKS,
-                            ItemFields.DATE_CREATED,
-                            ItemFields.GENRES,
-                            ItemFields.ITEM_COUNTS,
-                            ItemFields.MEDIA_SOURCES,
-                            ItemFields.MEDIA_STREAMS,
-                            ItemFields.OVERVIEW,
-                            ItemFields.PEOPLE,
-                            ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
-                            ItemFields.TAGLINES
-                        )
-                    ).content
-                    response.items.firstOrNull() ?: api.userLibraryApi.getItem(itemId = itemId).content
+                    api.userLibraryApi.getItem(itemId = itemId).content
                 }.getOrElse {
                     runCatching {
-                        api.userLibraryApi.getItem(itemId = itemId).content
+                        val response = api.itemsApi.getItems(
+                            userId = userId,
+                            ids = listOf(itemId),
+                            fields = setOf(
+                                ItemFields.CAN_DELETE,
+                                ItemFields.CHAPTERS,
+                                ItemFields.CHILD_COUNT,
+                                ItemFields.CUMULATIVE_RUN_TIME_TICKS,
+                                ItemFields.DATE_CREATED,
+                                ItemFields.GENRES,
+                                ItemFields.ITEM_COUNTS,
+                                ItemFields.MEDIA_SOURCES,
+                                ItemFields.MEDIA_STREAMS,
+                                ItemFields.OVERVIEW,
+                                ItemFields.PEOPLE,
+                                ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
+                                ItemFields.TAGLINES
+                            )
+                        ).content
+                        response.items.firstOrNull()
                     }.getOrNull()
                 }
             }

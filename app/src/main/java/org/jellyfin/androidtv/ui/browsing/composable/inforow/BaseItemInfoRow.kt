@@ -264,6 +264,8 @@ fun BaseItemInfoRow(
 	mediaSource: MediaSourceInfo?,
 	includeRuntime: Boolean,
 ) {
+	val resolvedMediaSource = mediaSource ?: item.mediaSources?.firstOrNull()
+
 	Row(
 		horizontalArrangement = Arrangement.spacedBy(8.dp),
 		verticalAlignment = Alignment.CenterVertically,
@@ -277,7 +279,7 @@ fun BaseItemInfoRow(
 				InfoRowDate(item)
 				if (includeRuntime) item.runTimeTicks?.ticks?.let { BaseItemInfoRowRuntime(it) }
 				item.officialRating?.let { InfoRowParentalRating(it) }
-				mediaSource?.let { InfoRowMediaDetails(it) }
+				resolvedMediaSource?.let { InfoRowMediaDetails(it) }
 			}
 
 			BaseItemKind.BOX_SET -> {
@@ -295,7 +297,7 @@ fun BaseItemInfoRow(
 				val runtime = item.cumulativeRunTimeTicks ?: item.runTimeTicks
 				if (includeRuntime) runtime?.ticks?.let { BaseItemInfoRowRuntime(it) }
 				item.officialRating?.let { InfoRowParentalRating(it) }
-				mediaSource?.let { InfoRowMediaDetails(it) }
+				resolvedMediaSource?.let { InfoRowMediaDetails(it) }
 			}
 
 			BaseItemKind.SERIES -> {
@@ -303,7 +305,7 @@ fun BaseItemInfoRow(
 				if (includeRuntime) item.runTimeTicks?.ticks?.let { BaseItemInfoRowRuntime(it) }
 				InfoRowSeriesStatus(item)
 				item.officialRating?.let { InfoRowParentalRating(it) }
-				mediaSource?.let { InfoRowMediaDetails(it) }
+				resolvedMediaSource?.let { InfoRowMediaDetails(it) }
 			}
 
 			BaseItemKind.PROGRAM -> {
@@ -341,7 +343,7 @@ fun BaseItemInfoRow(
 
 				if (includeRuntime) item.runTimeTicks?.ticks?.let { BaseItemInfoRowRuntime(it) }
 				item.officialRating?.let { InfoRowParentalRating(it) }
-				mediaSource?.let { InfoRowMediaDetails(it) }
+				resolvedMediaSource?.let { InfoRowMediaDetails(it) }
 			}
 
 			BaseItemKind.MUSIC_ARTIST -> {
@@ -381,14 +383,14 @@ fun BaseItemInfoRow(
 				val runtime = item.cumulativeRunTimeTicks ?: item.runTimeTicks
 				if (includeRuntime) runtime?.ticks?.let { BaseItemInfoRowRuntime(it) }
 				item.officialRating?.let { InfoRowParentalRating(it) }
-				mediaSource?.let { InfoRowMediaDetails(it) }
+				resolvedMediaSource?.let { InfoRowMediaDetails(it) }
 			}
 
 			else -> {
 				InfoRowDate(item)
 				if (includeRuntime) item.runTimeTicks?.ticks?.let { BaseItemInfoRowRuntime(it) }
 				item.officialRating?.let { InfoRowParentalRating(it) }
-				mediaSource?.let { InfoRowMediaDetails(it) }
+				resolvedMediaSource?.let { InfoRowMediaDetails(it) }
 			}
 		}
 	}
