@@ -28,11 +28,7 @@ fun ProfilePicture(
 	Box(
 		modifier = modifier
 	) {
-		val userImagePainter = rememberAsyncImagePainter(url)
-		val userImageState by userImagePainter.state.collectAsState()
-		val userImageVisible = userImageState is AsyncImagePainter.State.Success
-
-		if (!userImageVisible) {
+		if (url.isNullOrBlank()) {
 			Icon(
 				imageVector = ImageVector.vectorResource(R.drawable.ic_user),
 				contentDescription = contentDescription,
@@ -42,13 +38,28 @@ fun ProfilePicture(
 					.fillMaxSize()
 			)
 		} else {
-			Image(
-				painter = userImagePainter,
-				contentDescription = contentDescription,
-				contentScale = ContentScale.Crop,
-				modifier = Modifier
-					.aspectRatio(1f)
-			)
+			val userImagePainter = rememberAsyncImagePainter(url)
+			val userImageState by userImagePainter.state.collectAsState()
+			val userImageVisible = userImageState is AsyncImagePainter.State.Success
+
+			if (!userImageVisible) {
+				Icon(
+					imageVector = ImageVector.vectorResource(R.drawable.ic_user),
+					contentDescription = contentDescription,
+					modifier = Modifier
+						.align(Alignment.Center)
+						.padding(iconPadding)
+						.fillMaxSize()
+				)
+			} else {
+				Image(
+					painter = userImagePainter,
+					contentDescription = contentDescription,
+					contentScale = ContentScale.Crop,
+					modifier = Modifier
+						.aspectRatio(1f)
+				)
+			}
 		}
 	}
 }

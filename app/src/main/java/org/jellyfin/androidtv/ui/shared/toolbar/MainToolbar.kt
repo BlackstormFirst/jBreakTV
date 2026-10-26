@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,8 +94,8 @@ private fun MainToolbar(
 			.focusGroup(),
 		start = {
 			ToolbarButtons {
-				val userImagePainter = rememberAsyncImagePainter(userImage)
-				val userImageState by userImagePainter.state.collectAsState()
+				val userImagePainter = if (!userImage.isNullOrBlank()) rememberAsyncImagePainter(userImage) else null
+				val userImageState by (userImagePainter?.state?.collectAsState() ?: remember { mutableStateOf(null) })
 				val userImageVisible = userImageState is AsyncImagePainter.State.Success
 
 				IconButton(
