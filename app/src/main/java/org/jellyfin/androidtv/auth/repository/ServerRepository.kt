@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.auth.repository
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -187,6 +188,8 @@ class ServerRepositoryImpl(
 				?.let { version -> version < ServerRepository.minimumServerVersion } == true
 
 			updateServerInternal(id, server, forceUpdate)
+		} catch (err: CancellationException) {
+			throw err
 		} catch (err: Exception) {
 			Timber.e(err, "Unable to update server")
 			null
@@ -201,6 +204,8 @@ class ServerRepositoryImpl(
 
 		return try {
 			updateServerInternal(server.id, serverInfo, force) != null
+		} catch (err: CancellationException) {
+			throw err
 		} catch (err: Exception) {
 			Timber.e(err, "Unable to update server")
 
@@ -234,6 +239,8 @@ class ServerRepositoryImpl(
 					setupCompleted = systemInfo.startupWizardCompleted ?: server.setupCompleted,
 					lastRefreshed = now
 				)
+			} catch (err: CancellationException) {
+				throw err
 			} catch (err: Exception) {
 				Timber.e(err, "Failed to update server info")
 				null

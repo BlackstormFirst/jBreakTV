@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.ui.startup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,8 @@ class StartupViewModel(
 				val publicUsers = serverUserRepository.getPublicServerUsers(server)
 					.filterNot { it.id in storedUserIds }
 				_users.value = (storedUsers + publicUsers).sortedWith(userComparator)
+			} catch (err: CancellationException) {
+				throw err
 			} catch (err: Exception) {
 				Timber.e(err, "Error loading users for server ${server.id}")
 			}
@@ -87,6 +90,8 @@ class StartupViewModel(
 			discoveryMutex.withLock {
 				try {
 					serverRepository.loadDiscoveryServers()
+				} catch (err: CancellationException) {
+					throw err
 				} catch (err: Exception) {
 					Timber.e(err, "Error loading discovery servers")
 				}
@@ -98,6 +103,8 @@ class StartupViewModel(
 		viewModelScope.launch(Dispatchers.IO) {
 			try {
 				serverRepository.loadStoredServers()
+			} catch (err: CancellationException) {
+				throw err
 			} catch (err: Exception) {
 				Timber.e(err, "Error reloading stored servers")
 			}
