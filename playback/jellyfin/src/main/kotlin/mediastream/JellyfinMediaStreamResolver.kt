@@ -18,6 +18,7 @@ import org.jellyfin.sdk.api.client.extensions.audioApi
 import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
 import org.jellyfin.sdk.api.client.extensions.videosApi
 import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.DeviceProfile
 import org.jellyfin.sdk.model.api.MediaProtocol
 import org.jellyfin.sdk.model.api.MediaSourceInfo
@@ -236,6 +237,7 @@ class JellyfinMediaStreamResolver(
 		val shouldBurnIn = requestedSubStream?.deliveryMethod == SubtitleDeliveryMethod.ENCODE || isUnsupportedSubCodec || burnInPreference || isEmbeddedSub
 
 		val startTicks = item.userData?.playbackPositionTicks ?: 0L
+		val isLiveTv = item.type == BaseItemKind.TV_CHANNEL || item.type == BaseItemKind.PROGRAM || item.type == BaseItemKind.LIVE_TV_PROGRAM || item.type == BaseItemKind.LIVE_TV_CHANNEL
 
 		val response = api.mediaInfoApi.getPostedPlaybackInfo(
 			itemId = item.id,
@@ -249,7 +251,7 @@ class JellyfinMediaStreamResolver(
 				enableTranscoding = true,
 				allowVideoStreamCopy = true,
 				allowAudioStreamCopy = true,
-				autoOpenLiveStream = false,
+				autoOpenLiveStream = isLiveTv,
 				audioStreamIndex = audioIndexToUse,
 				subtitleStreamIndex = subIndexToUse,
 				alwaysBurnInSubtitleWhenTranscoding = shouldBurnIn,

@@ -155,7 +155,7 @@ class PlaybackManager(
 					subtitleStreamIndex = validSubtitleStreamIndex,
 					allowVideoStreamCopy = true,
 					allowAudioStreamCopy = true,
-					autoOpenLiveStream = false,
+					autoOpenLiveStream = options.isLiveTv,
 					alwaysBurnInSubtitleWhenTranscoding = options.alwaysBurnInSubtitleWhenTranscoding,
 				)
 			).content

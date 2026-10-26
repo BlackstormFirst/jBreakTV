@@ -684,7 +684,8 @@ public class PlaybackIndexManager {
         }
 
         // Fallback 2: First video stream
-        Timber.d("Best video found (fallback first stream): %d", allVideoStreams.get(0).getIndex());
-        return allVideoStreams.get(0).getIndex();
+        int fallbackIndex = allVideoStreams.get(0).getIndex();
+        Timber.d("Best video found (fallback first stream): %d", fallbackIndex);
+        return fallbackIndex >= 0 ? fallbackIndex : null;
     }
 }

@@ -5,4 +5,5 @@ class VideoOptions : AudioOptions() {
 	var videoStreamIndex: Int? = null
 	var subtitleStreamIndex: Int? = null
 	var alwaysBurnInSubtitleWhenTranscoding: Boolean = false
+	var isLiveTv: Boolean = false
 }
