@@ -25,8 +25,8 @@ abstract class DisplayPreferencesStore(
 	override val shouldUpdate: Boolean
 		get() = displayPreferencesDto == null
 
-	override suspend fun commit(): Boolean {
-		if (displayPreferencesDto == null) return false
+	override suspend fun commit(): Boolean = withContext(Dispatchers.IO) {
+		if (displayPreferencesDto == null) return@withContext false
 
 		try {
 			api.displayPreferencesApi.updateDisplayPreferences(
@@ -38,10 +38,10 @@ abstract class DisplayPreferencesStore(
 			)
 		} catch (err: ApiClientException) {
 			Timber.e(err, "Unable to save displaypreferences. (displayPreferencesId=$displayPreferencesId, app=$app)")
-			return false
+			return@withContext false
 		}
 
-		return true
+		return@withContext true
 	}
 
 	/**

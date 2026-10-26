@@ -47,7 +47,7 @@ class PreferencesRepository(
 		store
 	}
 
-	suspend fun refreshServerUserSettings() {
+	suspend fun refreshServerUserSettings() = withContext(Dispatchers.IO) {
 		Timber.i("Refresh Server User Settings.")
 		val configuration = api.userApi.getCurrentUser().content.configuration
 		userSettingPreferences.userServerRemoteSettings(configuration)
