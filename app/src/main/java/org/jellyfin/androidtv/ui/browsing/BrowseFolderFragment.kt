@@ -77,6 +77,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.jellyfin.androidtv.R
@@ -324,9 +325,24 @@ fun BrowseFolderScreen(
 ) {
 	val context = LocalContext.current
 	var selectedItem by remember { mutableStateOf<BaseRowItem?>(null) }
+	var displayedSelectedItem by remember { mutableStateOf<BaseRowItem?>(null) }
 	var selectedRowIndex by remember { mutableStateOf<Int?>(null) }
 	var userHasInteracted by remember { mutableStateOf(false) }
 	val selectedItemFocusRequester = remember { FocusRequester() }
+
+	LaunchedEffect(selectedItem) {
+		val target = selectedItem
+		if (target == null) {
+			displayedSelectedItem = null
+			return@LaunchedEffect
+		}
+		if (displayedSelectedItem == null) {
+			displayedSelectedItem = target
+		} else {
+			delay(180)
+			displayedSelectedItem = target
+		}
+	}
 
 	val listState = rememberLazyListState()
 	val coroutineScope = rememberCoroutineScope()
@@ -369,7 +385,7 @@ fun BrowseFolderScreen(
 				verticalAlignment = Alignment.CenterVertically
 			) {
 				Text(
-					text = selectedItem?.getCardName(context) ?: title ?: "",
+					text = displayedSelectedItem?.getCardName(context) ?: title ?: "",
 					style = JellyfinTheme.typography.default.copy(
 						fontSize = 32.sp,
 						fontWeight = FontWeight.Light
@@ -403,7 +419,7 @@ fun BrowseFolderScreen(
 					.fillMaxWidth()
 			) {
 				Box(modifier = Modifier.height(20.dp)) {
-					selectedItem?.baseItem?.let { baseItem ->
+					displayedSelectedItem?.baseItem?.let { baseItem ->
 						BaseItemInfoRow(
 							item = baseItem,
 							mediaSource = null,
@@ -415,7 +431,7 @@ fun BrowseFolderScreen(
 				Spacer(Modifier.height(12.dp))
 
 				Box(modifier = Modifier.height(150.dp).width(570.dp)) {
-					val summary = selectedItem?.getSummary(context) ?: ""
+					val summary = displayedSelectedItem?.getSummary(context) ?: ""
 					if (summary.isNotBlank()) {
 						Text(
 							text = summary,

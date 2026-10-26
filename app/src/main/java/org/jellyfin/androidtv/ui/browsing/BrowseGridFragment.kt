@@ -67,6 +67,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.jellyfin.androidtv.R
@@ -429,9 +430,24 @@ fun BrowseGridScreen(
 	val adapterRef = remember { mutableStateOf<ItemRowAdapter?>(null) }
 
 	var selectedItem by remember { mutableStateOf<BaseRowItem?>(null) }
+	var displayedSelectedItem by remember { mutableStateOf<BaseRowItem?>(null) }
 	var selectedIndex by remember { mutableStateOf(0) }
 	val firstCardFocusRequester = remember { FocusRequester() }
 	var hasRequestedFocus by remember { mutableStateOf(false) }
+
+	LaunchedEffect(selectedItem) {
+		val target = selectedItem
+		if (target == null) {
+			displayedSelectedItem = null
+			return@LaunchedEffect
+		}
+		if (displayedSelectedItem == null) {
+			displayedSelectedItem = target
+		} else {
+			delay(180)
+			displayedSelectedItem = target
+		}
+	}
 
 	// Toolbar filter & tool states
 	var isUnwatchedOnly by remember { mutableStateOf(false) }
@@ -652,7 +668,7 @@ fun BrowseGridScreen(
 				verticalAlignment = Alignment.CenterVertically
 			) {
 				Text(
-					text = selectedItem?.getCardName(context) ?: folder?.name ?: "",
+					text = displayedSelectedItem?.getCardName(context) ?: folder?.name ?: "",
 					style = JellyfinTheme.typography.default.copy(
 						fontSize = 32.sp,
 						fontWeight = FontWeight.Light
@@ -686,7 +702,7 @@ fun BrowseGridScreen(
 				verticalAlignment = Alignment.CenterVertically
 			) {
 				Box(modifier = Modifier.height(20.dp)) {
-					selectedItem?.baseItem?.let { baseItem ->
+					displayedSelectedItem?.baseItem?.let { baseItem ->
 						BaseItemInfoRow(
 							item = baseItem,
 							mediaSource = null,
