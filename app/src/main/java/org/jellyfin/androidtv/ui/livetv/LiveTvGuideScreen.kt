@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,80 +47,107 @@ fun LiveTvGuideScreen(
     val listState = rememberLazyListState()
     val horizontalScrollState = rememberScrollState()
     val context = LocalContext.current
+    var selectedDetailProgram by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<BaseItemDto?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.load()
     }
 
-    Column(modifier = modifier.fillMaxSize().background(colorResource(R.color.program_scroller_bg))) {
-        // Timeline Header
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            // Placeholder above Channel list with Options/Filters buttons
-            Row(
-                modifier = Modifier
-                    .width(160.dp)
-                    .height(30.dp)
-                    .background(colorResource(R.color.timeline_bg)),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                androidx.tv.material3.Button(onClick = onFiltersClicked) {
-                    androidx.tv.material3.Text(text = "Filters", fontSize = 10.sp)
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().background(colorResource(R.color.program_scroller_bg))) {
+            // Timeline Header
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                // Placeholder above Channel list with Options/Filters buttons
+                Row(
+                    modifier = Modifier
+                        .width(160.dp)
+                        .height(30.dp)
+                        .background(colorResource(R.color.timeline_bg)),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    androidx.tv.material3.Button(onClick = onFiltersClicked) {
+                        androidx.tv.material3.Text(text = "Filters", fontSize = 10.sp)
+                    }
+                    androidx.tv.material3.Button(onClick = onOptionsClicked) {
+                        androidx.tv.material3.Text(text = "Options", fontSize = 10.sp)
+                    }
                 }
-                androidx.tv.material3.Button(onClick = onOptionsClicked) {
-                    androidx.tv.material3.Text(text = "Options", fontSize = 10.sp)
-                }
-            }
 
-            // Timeline
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .horizontalScroll(horizontalScrollState, enabled = false)
-            ) {
-                TimelineRow(
-                    startTime = state.guideStart,
-                    hours = state.guideHours
-                )
-            }
-        }
-
-        // Main Grid (Channels and Programs)
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            itemsIndexed(state.displayedChannels, key = { _, channel -> channel.id.toString() }) { index, channel ->
-                Row {
-                    val isFavorite = channel.userData?.isFavorite == true
-                    ChannelHeader(
-                        channel = channel,
-                        isFavorite = isFavorite,
-                        imageUrl = getImageUrl(channel)
+                // Timeline
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(horizontalScrollState, enabled = false)
+                ) {
+                    TimelineRow(
+                        startTime = state.guideStart,
+                        hours = state.guideHours
                     )
+                }
+            }
 
-                    // Programs for this channel
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .horizontalScroll(horizontalScrollState, enabled = false)
-                    ) {
-                        val programs = state.programsByChannel[channel.id?.toString()] ?: emptyList()
-                        ProgramRow(
-                            programs = programs,
-                            channelId = channel.id,
-                            guideStart = state.guideStart,
-                            guideEnd = state.guideEnd,
-                            onProgramSelected = {
-                                viewModel.setSelectedProgram(it)
-                                onProgramSelected(it)
-                            },
-                            onProgramClicked = onProgramClicked
+            // Main Grid (Channels and Programs)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                itemsIndexed(state.displayedChannels, key = { _, channel -> channel.id.toString() }) { index, channel ->
+                    Row {
+                        val isFavorite = channel.userData?.isFavorite == true
+                        ChannelHeader(
+                            channel = channel,
+                            isFavorite = isFavorite,
+                            imageUrl = getImageUrl(channel)
                         )
+
+                        // Programs for this channel
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .horizontalScroll(horizontalScrollState, enabled = false)
+                        ) {
+                            val programs = state.programsByChannel[channel.id?.toString()] ?: emptyList()
+                            ProgramRow(
+                                programs = programs,
+                                channelId = channel.id,
+                                guideStart = state.guideStart,
+                                guideEnd = state.guideEnd,
+                                onProgramSelected = {
+                                    viewModel.setSelectedProgram(it)
+                                    onProgramSelected(it)
+                                },
+                                onProgramClicked = { program ->
+                                    if (program.id != null) {
+                                        selectedDetailProgram = program
+                                    } else {
+                                        onProgramClicked(program)
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
+
+        ProgramDetailDialog(
+            program = selectedDetailProgram,
+            visible = selectedDetailProgram != null,
+            onDismissRequest = { selectedDetailProgram = null },
+            onPlayClicked = { program ->
+                onProgramClicked(program)
+            },
+            onRecordClicked = { program ->
+                // Record
+            },
+            onRecordSeriesClicked = { program ->
+                // Record Series
+            },
+            onCancelRecordClicked = { program ->
+                // Cancel
+            }
+        )
     }
 }
 

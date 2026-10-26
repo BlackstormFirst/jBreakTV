@@ -48,7 +48,6 @@ import androidx.compose.ui.platform.ComposeView;
 import org.jellyfin.androidtv.databinding.VlcPlayerInterfaceBinding;
 import org.jellyfin.androidtv.ui.itemhandling.ChapterItemInfoBaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
-import org.jellyfin.androidtv.ui.livetv.LiveTvGuide;
 import org.jellyfin.androidtv.ui.livetv.LiveTvGuideFragment;
 import org.jellyfin.androidtv.ui.livetv.LiveTvGuideFragmentHelperKt;
 import org.jellyfin.androidtv.ui.livetv.TvManager;

@@ -23,8 +23,6 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.ItemMutationRepository
-import org.jellyfin.androidtv.ui.GuideChannelHeader
-import org.jellyfin.androidtv.ui.asTimerInfoDto
 import org.jellyfin.androidtv.ui.base.CircularProgressIndicator
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.livetv.TvManager
@@ -34,6 +32,7 @@ import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.androidtv.util.sdk.asTimerInfoDto
 import org.koin.android.ext.android.inject
 import timber.log.Timber
 import java.time.Instant
@@ -264,4 +263,5 @@ fun CustomPlaybackOverlayFragment.showBuffering(show: Boolean) {
 	val stateFlow = b.bufferingOverlay.getTag(bufferingKey) as? MutableStateFlow<Boolean>
 	stateFlow?.value = show
 }
+
 

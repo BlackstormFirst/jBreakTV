@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.RelativeLayout
 import androidx.compose.ui.platform.ComposeView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -27,7 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Box
 
-class LiveTvGuideFragment : Fragment(), LiveTvGuide {
+class LiveTvGuideFragment : Fragment() {
 
     companion object {
         const val GUIDE_ROW_HEIGHT_DP = 55
@@ -109,24 +108,15 @@ class LiveTvGuideFragment : Fragment(), LiveTvGuide {
         viewModel.load()
     }
 
-    override fun displayChannels(start: Int, max: Int) {
+    fun displayChannels(start: Int, max: Int) {
         viewModel.displayChannels(start, max)
     }
 
-    override fun getCurrentLocalStartDate(): LocalDateTime {
+    fun getCurrentLocalStartDate(): LocalDateTime {
         return viewModel.state.value.guideStart
     }
 
-    override fun showProgramOptions() {
-        // Implementation for options using Compose or old Popup if needed
-    }
-
-    override fun setSelectedProgram(programView: RelativeLayout) {
-        // Legacy compat
-    }
-
-    override fun refreshFavorite(channelId: UUID) {
-        // Re-trigger load to refresh favorites if needed
+    fun refreshFavorite(channelId: UUID) {
         viewModel.load()
     }
 }
