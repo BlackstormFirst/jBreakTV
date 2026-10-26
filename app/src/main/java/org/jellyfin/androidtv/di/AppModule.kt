@@ -217,6 +217,7 @@ val appModule = module {
 	viewModel { DreamViewModel(get(), get(), get(), get(), get(), get()) }
 	viewModel { SettingsViewModel() }
 	viewModel { SettingsLibrariesScreenViewModel(get()) }
+	viewModel { org.jellyfin.androidtv.ui.livetv.LiveTvGuideViewModel(get(), get(), get()) }
 	viewModel { HomeViewModel(androidContext(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
 	viewModel { FullDetailsViewModel(get(), get(), get(), get()) }
 

@@ -44,16 +44,8 @@ import org.jellyfin.androidtv.R;
 import org.jellyfin.androidtv.constant.CustomMessage;
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository;
 import org.jellyfin.androidtv.data.service.BackgroundService;
-import org.jellyfin.androidtv.databinding.OverlayTvGuideBinding;
+import androidx.compose.ui.platform.ComposeView;
 import org.jellyfin.androidtv.databinding.VlcPlayerInterfaceBinding;
-import org.jellyfin.androidtv.ui.GuideChannelHeader;
-import org.jellyfin.androidtv.ui.GuidePagingButton;
-import org.jellyfin.androidtv.ui.HorizontalScrollViewListener;
-import org.jellyfin.androidtv.ui.LiveProgramDetailPopup;
-import org.jellyfin.androidtv.ui.ObservableHorizontalScrollView;
-import org.jellyfin.androidtv.ui.ObservableScrollView;
-import org.jellyfin.androidtv.ui.ProgramGridCell;
-import org.jellyfin.androidtv.ui.ScrollViewListener;
 import org.jellyfin.androidtv.ui.itemhandling.ChapterItemInfoBaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
 import org.jellyfin.androidtv.ui.livetv.LiveTvGuide;
@@ -89,9 +81,9 @@ import java.util.UUID;
 import kotlin.Lazy;
 import timber.log.Timber;
 
-public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGuide, View.OnKeyListener {
+public class CustomPlaybackOverlayFragment extends Fragment implements View.OnKeyListener {
     protected VlcPlayerInterfaceBinding binding;
-    private OverlayTvGuideBinding tvGuideBinding;
+    public ComposeView mGuideComposeView;
 
     private RowsSupportFragment mPopupRowsFragment;
     private ListRow mChapterRow;
@@ -197,9 +189,11 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         mPopupRowsFragment.setOnItemViewClickedListener(itemViewClickedListener);
 
         // And the Live Guide element
-        tvGuideBinding = OverlayTvGuideBinding.inflate(inflater, container, false);
-        binding.getRoot().addView(tvGuideBinding.getRoot());
-        tvGuideBinding.getRoot().setVisibility(View.GONE);
+        mGuideComposeView = new ComposeView(requireContext());
+        mGuideComposeView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        mGuideComposeView.setVisibility(View.GONE);
+        binding.getRoot().addView(mGuideComposeView);
+        CustomPlaybackOverlayFragmentHelperKt.setupComposeGuide(this, mGuideComposeView);
 
         binding.getRoot().setOnTouchListener((v, event) -> {
             //and then manage our fade timer
@@ -280,44 +274,6 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         slideUp = AnimationUtils.loadAnimation(requireContext(), R.anim.slide_bottom_in);
         slideDown.setAnimationListener(showAnimationListener);
         setupPopupAnimations();
-
-        //live guide
-        tvGuideBinding.channelsStatus.setTextColor(Color.GRAY);
-        tvGuideBinding.filterStatus.setTextColor(Color.GRAY);
-
-        tvGuideBinding.programRows.setFocusable(false);
-        tvGuideBinding.programVScroller.setScrollViewListener(new ScrollViewListener() {
-            @Override
-            public void onScrollChanged(ObservableScrollView scrollView, int x, int y, int oldx, int oldy) {
-                tvGuideBinding.channelScroller.scrollTo(x, y);
-            }
-        });
-
-        tvGuideBinding.channelScroller.setScrollViewListener(new ScrollViewListener() {
-            @Override
-            public void onScrollChanged(ObservableScrollView scrollView, int x, int y, int oldx, int oldy) {
-                tvGuideBinding.programVScroller.scrollTo(x, y);
-            }
-        });
-
-        tvGuideBinding.timelineHScroller.setFocusable(false);
-        tvGuideBinding.timelineHScroller.setFocusableInTouchMode(false);
-        tvGuideBinding.timeline.setFocusable(false);
-        tvGuideBinding.timeline.setFocusableInTouchMode(false);
-        tvGuideBinding.channelScroller.setFocusable(false);
-        tvGuideBinding.channelScroller.setFocusableInTouchMode(false);
-
-        tvGuideBinding.programHScroller.setScrollViewListener(new HorizontalScrollViewListener() {
-            @Override
-            public void onScrollChanged(ObservableHorizontalScrollView scrollView, int x, int y, int oldx, int oldy) {
-                tvGuideBinding.timelineHScroller.scrollTo(x, y);
-            }
-        });
-        tvGuideBinding.programHScroller.setFocusable(false);
-        tvGuideBinding.programHScroller.setFocusableInTouchMode(false);
-
-        tvGuideBinding.channels.setFocusable(false);
-        tvGuideBinding.channelScroller.setFocusable(false);
 
         // register to receive message from popup
         CoroutineUtils.readCustomMessagesOnLifecycle(getLifecycle(), customMessageRepository.getValue(), message -> {
@@ -442,10 +398,6 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     public boolean onKey(View v, int keyCode, KeyEvent event) {
         if (event.isLongPress()) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                if (mSelectedProgramView instanceof ProgramGridCell)
-                    showProgramOptions();
-                else if (mSelectedProgramView instanceof GuideChannelHeader)
-                    CustomPlaybackOverlayFragmentHelperKt.toggleFavorite(this);
                 return true;
             }
         } else if (event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -457,18 +409,6 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
             if (keyListener.onKey(v, keyCode, event)) return true;
 
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                if ((event.getFlags() & KeyEvent.FLAG_CANCELED_LONG_PRESS) == 0) {
-                    if (mGuideVisible && mSelectedProgramView instanceof ProgramGridCell && mSelectedProgram != null && mSelectedProgram.getChannelId() != null) {
-                        if (mSelectedProgram.getStartDate().isBefore(LocalDateTime.now()))
-                            switchChannel(mSelectedProgram.getChannelId());
-                        else
-                            showProgramOptions();
-                        return true;
-                    } else if (mSelectedProgramView instanceof GuideChannelHeader) {
-                        switchChannel(((GuideChannelHeader) mSelectedProgramView).getChannel().getId(), false);
-                        return true;
-                    }
-                }
                 return false;
             }
 
@@ -498,11 +438,12 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     }
 
     public void refreshFavorite(UUID channelId) {
-        for (int i = 0; i < tvGuideBinding.channels.getChildCount(); i++) {
-            GuideChannelHeader gch = (GuideChannelHeader) tvGuideBinding.channels.getChildAt(i);
-            if (gch.getChannel().getId().equals(channelId))
-                gch.refreshFavorite();
-        }
+    }
+
+    public void dismissProgramOptions() {
+    }
+
+    public void showProgramOptions() {
     }
 
     private View.OnKeyListener keyListener = new View.OnKeyListener() {
@@ -789,355 +730,25 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         binding.skipOverlay.setSkipUiEnabled(!mGuideVisible && !mPopupPanelVisible);
     }
 
+    public boolean isGuideVisible() {
+        return mGuideVisible;
+    }
+
     public void showGuide() {
         hide();
         leanbackOverlayFragment.setShouldShowOverlay(false);
         leanbackOverlayFragment.hideOverlay();
         playbackControllerContainer.getValue().getPlaybackController().mVideoManager.contractVideo(Utils.convertDpToPixel(requireContext(), 300));
-        tvGuideBinding.getRoot().setVisibility(View.VISIBLE);
+        mGuideComposeView.setVisibility(View.VISIBLE);
         mGuideVisible = true;
-        LocalDateTime now = LocalDateTime.now();
-        boolean needLoad = mCurrentGuideStart == null;
-        if (!needLoad) {
-            LocalDateTime needLoadTime = mCurrentGuideStart.plusMinutes(30);
-            needLoad = now.isAfter(needLoadTime);
-            if (mSelectedProgramView != null)
-                mSelectedProgramView.requestFocus();
-        }
-        if (needLoad) {
-            loadGuide();
-        }
         binding.skipOverlay.setSkipUiEnabled(!mGuideVisible && !mPopupPanelVisible);
     }
 
-    private void hideGuide() {
-        tvGuideBinding.getRoot().setVisibility(View.GONE);
+    public void hideGuide() {
+        mGuideComposeView.setVisibility(View.GONE);
         playbackControllerContainer.getValue().getPlaybackController().mVideoManager.setVideoFullSize(true);
         mGuideVisible = false;
         binding.skipOverlay.setSkipUiEnabled(!mGuideVisible && !mPopupPanelVisible);
-    }
-
-    private void loadGuide() {
-        tvGuideBinding.spinner.setVisibility(View.VISIBLE);
-        fillTimeLine(GUIDE_HOURS);
-        TvManager.loadAllChannels(this, ndx -> {
-            if (ndx >= PAGE_SIZE) {
-                // last channel is not in first page so grab a set where it will be in the middle
-                ndx = ndx - (PAGE_SIZE / 2);
-            } else {
-                ndx = 0; // just start at beginning
-            }
-
-            mAllChannels = TvManager.getAllChannels();
-            if (!mAllChannels.isEmpty()) {
-                displayChannels(ndx, PAGE_SIZE);
-            } else {
-                tvGuideBinding.spinner.setVisibility(View.GONE);
-            }
-
-            return null;
-        });
-    }
-
-    public void displayChannels(int start, int max) {
-        int end = start + max;
-        if (end > mAllChannels.size()) end = mAllChannels.size();
-
-        mCurrentDisplayChannelStartNdx = start;
-        mCurrentDisplayChannelEndNdx = end - 1;
-        Timber.d("*** Display channels pre-execute");
-        tvGuideBinding.spinner.setVisibility(View.VISIBLE);
-
-        tvGuideBinding.channels.removeAllViews();
-        tvGuideBinding.programRows.removeAllViews();
-        tvGuideBinding.channelsStatus.setText("");
-        tvGuideBinding.filterStatus.setText("");
-        final CustomPlaybackOverlayFragment self = this;
-        TvManager.getProgramsAsync(this, mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, () -> {
-            if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
-            Timber.d("*** Programs response");
-            if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
-            mDisplayProgramsTask = new DisplayProgramsTask(self);
-            mDisplayProgramsTask.execute(mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx);
-        });
-        binding.skipOverlay.setSkipUiEnabled(!mGuideVisible && !mPopupPanelVisible);
-    }
-
-    DisplayProgramsTask mDisplayProgramsTask;
-
-    class DisplayProgramsTask extends AsyncTask<Integer, Integer, Void> {
-        private View firstRow;
-        private int displayedChannels = 0;
-        private final LiveTvGuide guide;
-
-        DisplayProgramsTask(LiveTvGuide guide) {
-            super();
-            this.guide = guide;
-        }
-
-        @Override
-        protected void onPreExecute() {
-            Timber.d("*** Display programs pre-execute");
-            tvGuideBinding.channels.removeAllViews();
-            tvGuideBinding.programRows.removeAllViews();
-            mFirstFocusChannelId = playbackControllerContainer.getValue().getPlaybackController().getCurrentlyPlayingItem().getId();
-
-            if (mCurrentDisplayChannelStartNdx > 0) {
-                // Show a paging row for channels above
-                int pageUpStart = mCurrentDisplayChannelStartNdx - PAGE_SIZE;
-                if (pageUpStart < 0) pageUpStart = 0;
-
-                TextView placeHolder = new TextView(requireContext());
-                placeHolder.setHeight(Utils.convertDpToPixel(requireContext(), LiveTvGuideFragment.GUIDE_ROW_HEIGHT_DP));
-                tvGuideBinding.channels.addView(placeHolder);
-                displayedChannels = 0;
-
-                String label = TextUtilsKt.getLoadChannelsLabel(requireContext(), mAllChannels.get(pageUpStart).getNumber(), mAllChannels.get(mCurrentDisplayChannelStartNdx - 1).getNumber());
-                tvGuideBinding.programRows.addView(new GuidePagingButton(requireContext(), guide, pageUpStart, label));
-            }
-        }
-
-        @Override
-        protected Void doInBackground(Integer... params) {
-            int start = params[0];
-            int end = params[1];
-
-            boolean first = true;
-
-            Timber.d("*** About to iterate programs");
-            LinearLayout prevRow = null;
-            for (int i = start; i <= end; i++) {
-                if (isCancelled()) return null;
-                final BaseItemDto channel = TvManager.getChannel(i);
-                if (channel == null) continue;
-                List<BaseItemDto> programs = TvManager.getProgramsForChannel(channel.getId());
-                final LinearLayout row = getProgramRow(programs, channel.getId());
-                if (first) {
-                    first = false;
-                    firstRow = row;
-                }
-
-                // put focus on the last tuned channel
-                if (channel.getId().equals(mFirstFocusChannelId)) {
-                    firstRow = row;
-                    mFirstFocusChannelId = null; // only do this first time in not while paging around
-                }
-
-                // set focus parameters if we are not on first row
-                // this makes focus movements more predictable for the grid view
-                if (prevRow != null) {
-                    TvManager.setFocusParams(row, prevRow, true);
-                    TvManager.setFocusParams(prevRow, row, false);
-                }
-                prevRow = row;
-
-                requireActivity().runOnUiThread(() -> {
-                    GuideChannelHeader header = getChannelHeader(requireContext(), channel);
-                    tvGuideBinding.channels.addView(header);
-                    header.loadImage();
-                    tvGuideBinding.programRows.addView(row);
-                });
-
-                displayedChannels++;
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            Timber.d("*** Display programs post execute");
-            if (mCurrentDisplayChannelEndNdx < mAllChannels.size() - 1) {
-                // Show a paging row for channels below
-                int pageDnEnd = mCurrentDisplayChannelEndNdx + PAGE_SIZE;
-                if (pageDnEnd >= mAllChannels.size()) pageDnEnd = mAllChannels.size() - 1;
-
-                TextView placeHolder = new TextView(requireContext());
-                placeHolder.setHeight(Utils.convertDpToPixel(requireContext(), LiveTvGuideFragment.GUIDE_ROW_HEIGHT_DP));
-                tvGuideBinding.channels.addView(placeHolder);
-
-                String label = TextUtilsKt.getLoadChannelsLabel(requireContext(), mAllChannels.get(mCurrentDisplayChannelEndNdx + 1).getNumber(), mAllChannels.get(pageDnEnd).getNumber());
-                tvGuideBinding.programRows.addView(new GuidePagingButton(requireContext(), guide, mCurrentDisplayChannelEndNdx + 1, label));
-            }
-
-            tvGuideBinding.channelsStatus.setText(getResources().getString(R.string.lbl_tv_channel_status, displayedChannels, mAllChannels.size()));
-            tvGuideBinding.filterStatus.setText(getResources().getString(R.string.lbl_tv_filter_status, GUIDE_HOURS));
-
-            tvGuideBinding.spinner.setVisibility(View.GONE);
-
-            if (firstRow != null) firstRow.requestFocus();
-        }
-    }
-
-    private int currentCellId = 0;
-
-    private GuideChannelHeader getChannelHeader(Context context, BaseItemDto channel) {
-        return new GuideChannelHeader(context, this, channel);
-    }
-
-    private LinearLayout getProgramRow(List<BaseItemDto> programs, UUID channelId) {
-        int guideRowHeightPx = Utils.convertDpToPixel(requireContext(), LiveTvGuideFragment.GUIDE_ROW_HEIGHT_DP);
-        int guideRowWidthPerMinPx = Utils.convertDpToPixel(requireContext(), LiveTvGuideFragment.GUIDE_ROW_WIDTH_PER_MIN_DP);
-
-        LinearLayout programRow = new LinearLayout(requireContext());
-        if (programs.size() == 0) {
-
-            int minutes = ((Long) ((mCurrentGuideEnd.toInstant(ZoneOffset.UTC).toEpochMilli() - mCurrentGuideStart.toInstant(ZoneOffset.UTC).toEpochMilli()) / 60000)).intValue();
-            int slot = 0;
-
-            do {
-                BaseItemDto empty = LiveTvGuideFragmentHelperKt.createNoProgramDataBaseItem(
-                        getContext(),
-                        channelId,
-                        mCurrentGuideStart.plusMinutes(30l * slot),
-                        mCurrentGuideEnd.plusMinutes(30l * (slot + 1))
-                );
-                ProgramGridCell cell = new ProgramGridCell(requireContext(), this, empty, false);
-                cell.setId(currentCellId++);
-                cell.setLayoutParams(new ViewGroup.LayoutParams(30 * guideRowWidthPerMinPx, guideRowHeightPx));
-                programRow.addView(cell);
-                if (slot == 0)
-                    cell.setFirst();
-                if (slot == (minutes / 30) - 1)
-                    cell.setLast();
-                slot++;
-            } while ((30 * slot) < minutes);
-
-            return programRow;
-        }
-
-        LocalDateTime prevEnd = getCurrentLocalStartDate();
-        for (BaseItemDto item : programs) {
-            LocalDateTime start = item.getStartDate() != null ? item.getStartDate() : getCurrentLocalStartDate();
-            if (start.isBefore(getCurrentLocalStartDate())) start = getCurrentLocalStartDate();
-            if (start.isAfter(getCurrentLocalEndDate())) continue;
-            if (start.isBefore(prevEnd)) continue;
-
-            if (start.isAfter(prevEnd)) {
-                BaseItemDto empty = LiveTvGuideFragmentHelperKt.createNoProgramDataBaseItem(
-                        getContext(),
-                        channelId,
-                        prevEnd,
-                        start
-                );
-                ProgramGridCell cell = new ProgramGridCell(requireContext(), this, empty, false);
-                cell.setId(currentCellId++);
-                cell.setLayoutParams(new ViewGroup.LayoutParams(((Long) ((start.toInstant(ZoneOffset.UTC).toEpochMilli() - prevEnd.toInstant(ZoneOffset.UTC).toEpochMilli()) / 60000)).intValue() * guideRowWidthPerMinPx, guideRowHeightPx));
-                programRow.addView(cell);
-            }
-            LocalDateTime end = item.getEndDate() != null ? item.getEndDate() : getCurrentLocalEndDate();
-            if (end.isAfter(getCurrentLocalEndDate())) end = getCurrentLocalEndDate();
-            prevEnd = end;
-            Long duration = (end.toInstant(ZoneOffset.UTC).toEpochMilli() - start.toInstant(ZoneOffset.UTC).toEpochMilli()) / 60000;
-            if (duration > 0) {
-                ProgramGridCell program = new ProgramGridCell(requireContext(), this, item, false);
-                program.setId(currentCellId++);
-                program.setLayoutParams(new ViewGroup.LayoutParams(duration.intValue() * guideRowWidthPerMinPx, guideRowHeightPx));
-
-                if (start == getCurrentLocalStartDate())
-                    program.setFirst();
-                if (end == getCurrentLocalEndDate())
-                    program.setLast();
-
-                programRow.addView(program);
-            }
-        }
-
-        return programRow;
-    }
-
-    private void fillTimeLine(int hours) {
-        mCurrentGuideStart = LocalDateTime.now();
-        mCurrentGuideStart = mCurrentGuideStart
-                .withMinute(mCurrentGuideStart.getMinute() >= 30 ? 30 : 0)
-                .withSecond(0)
-                .withNano(0);
-
-        tvGuideBinding.displayDate.setText(TimeUtils.getFriendlyDate(requireContext(), mCurrentGuideStart));
-        mCurrentGuideEnd = mCurrentGuideStart
-                .plusHours(hours);
-        int oneHour = 60 * Utils.convertDpToPixel(requireContext(), 7);
-        int halfHour = 30 * Utils.convertDpToPixel(requireContext(), 7);
-        int interval = mCurrentGuideStart.getMinute() >= 30 ? 30 : 60;
-        tvGuideBinding.timeline.removeAllViews();
-
-        LocalDateTime current = mCurrentGuideStart;
-        while (current.isBefore(mCurrentGuideEnd)) {
-            TextView time = new TextView(requireContext());
-            time.setText(DateTimeExtensionsKt.getTimeFormatter(getContext()).format(current));
-            time.setWidth(interval == 30 ? halfHour : oneHour);
-            tvGuideBinding.timeline.addView(time);
-            current = current.plusMinutes(interval);
-            //after first one, we always go on hours
-            interval = 60;
-        }
-    }
-
-    private Runnable detailUpdateTask = new Runnable() {
-        @Override
-        public void run() {
-            if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
-            CustomPlaybackOverlayFragmentHelperKt.refreshSelectedProgram(CustomPlaybackOverlayFragment.this);
-        }
-    };
-
-    void detailUpdateInternal() {
-        tvGuideBinding.guideTitle.setText(mSelectedProgram.getName());
-        tvGuideBinding.summary.setText(mSelectedProgram.getOverview());
-        //info row
-        InfoLayoutHelper.addInfoRow(requireContext(), mSelectedProgram, tvGuideBinding.guideInfoRow, false);
-        if (mSelectedProgram.getId() != null) {
-            tvGuideBinding.displayDate.setText(TimeUtils.getFriendlyDate(requireContext(), mSelectedProgram.getStartDate()));
-        }
-
-        if (mDetailPopup != null && mDetailPopup.isShowing() && mSelectedProgramView != null) {
-            mDetailPopup.setContent(mSelectedProgram, ((ProgramGridCell) mSelectedProgramView));
-        }
-    }
-
-    public void setSelectedProgram(RelativeLayout programView) {
-        mSelectedProgramView = programView;
-        if (mSelectedProgramView instanceof ProgramGridCell) {
-            mSelectedProgram = ((ProgramGridCell) mSelectedProgramView).getProgram();
-            mHandler.removeCallbacks(detailUpdateTask);
-            mHandler.postDelayed(detailUpdateTask, 500);
-        } else if (mSelectedProgramView instanceof GuideChannelHeader) {
-            for (int i = 0; i < tvGuideBinding.channels.getChildCount(); i++) {
-                if (mSelectedProgramView == tvGuideBinding.channels.getChildAt(i)) {
-                    LinearLayout programRow = (LinearLayout) tvGuideBinding.programRows.getChildAt(i);
-                    if (programRow == null)
-                        return;
-                    for (int ii = 0; ii < programRow.getChildCount(); ii++) {
-                        ProgramGridCell prog = (ProgramGridCell) programRow.getChildAt(ii);
-                        if (prog.getProgram() != null && prog.getProgram().getStartDate().isBefore(LocalDateTime.now()) && prog.getProgram().getEndDate().isAfter(LocalDateTime.now())) {
-                            mSelectedProgram = prog.getProgram();
-                            if (mSelectedProgram != null) {
-                                mHandler.removeCallbacks(detailUpdateTask);
-                                mHandler.postDelayed(detailUpdateTask, 500);
-                            }
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    public void dismissProgramOptions() {
-        if (mDetailPopup != null) mDetailPopup.dismiss();
-    }
-
-    private LiveProgramDetailPopup mDetailPopup;
-
-    public void showProgramOptions() {
-        if (mSelectedProgram == null) return;
-        if (mDetailPopup == null)
-            mDetailPopup = new LiveProgramDetailPopup(requireActivity(), this, this, Utils.convertDpToPixel(requireContext(), 600), () -> {
-                if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED)) return;
-                switchChannel(mSelectedProgram.getChannelId());
-            });
-        mDetailPopup.setContent(mSelectedProgram, (ProgramGridCell) mSelectedProgramView);
-        mDetailPopup.show(tvGuideBinding.guideTitle, 0, tvGuideBinding.guideTitle.getTop() - 10);
-
     }
 
     private Animation.AnimationListener hideAnimationListener = new Animation.AnimationListener() {
@@ -1293,7 +904,6 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
             leanbackOverlayFragment.recordingStateChanged();
             // set progress to match duration
             // set other information
-            tvGuideBinding.guideCurrentTitle.setText(current.getName());
 
             // Update the title and subtitle
             boolean isLocal = LocalVideoManager.isLocalItem(current);

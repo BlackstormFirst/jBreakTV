@@ -39,43 +39,17 @@ import timber.log.Timber
 import java.time.Instant
 import java.util.UUID
 import kotlin.time.Duration
+import androidx.compose.ui.platform.ComposeView
+import org.jellyfin.androidtv.ui.player.video.LiveTvGuideOverlay
 
-fun CustomPlaybackOverlayFragment.toggleFavorite() {
-	val header = mSelectedProgramView as? GuideChannelHeader
-	val channel = header?.channel ?: return
-
-	val itemMutationRepository by inject<ItemMutationRepository>()
-	val dataRefreshService by inject<DataRefreshService>()
-
-	lifecycleScope.launch {
-		runCatching {
-			val userData = itemMutationRepository.setFavorite(
-				item = header.channel.id,
-				favorite = !(channel.userData?.isFavorite ?: false)
-			)
-
-			header.channel = header.channel.copy(userData = userData)
-			header.findViewById<View>(R.id.favImage).isVisible = userData.isFavorite
-			dataRefreshService.lastFavoriteUpdate = Instant.now()
-		}
-	}
-}
-
-fun CustomPlaybackOverlayFragment.refreshSelectedProgram() {
-	val api by inject<ApiClient>()
-
-	lifecycleScope.launch {
-		runCatching {
-			val item = withContext(Dispatchers.IO) {
-				api.userLibraryApi.getItem(mSelectedProgram.id).content
-			}
-			mSelectedProgram = item
-		}.onFailure { error ->
-			Timber.e(error, "Unable to get program details")
-		}
-
-		detailUpdateInternal();
-	}
+fun CustomPlaybackOverlayFragment.setupComposeGuide(composeView: ComposeView) {
+    composeView.setContent {
+        LiveTvGuideOverlay(
+            visible = this.isGuideVisible(),
+            onDismissRequest = { this.hideGuide() },
+            onChannelSelected = { channelId -> this.playChannel(channelId) }
+        )
+    }
 }
 
 fun CustomPlaybackOverlayFragment.playChannel(id: UUID) {
