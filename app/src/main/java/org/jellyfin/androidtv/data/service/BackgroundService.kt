@@ -213,12 +213,15 @@ class BackgroundService(
 		// Re-enable backgrounds if disabled
 		_enabled.value = true
 
-		// Check "sauf si il est similaire": if the requested target is already loaded and currently displayed
-		if (capturedTargetId == currentlyLoadedTargetId &&
+		// Check if the requested target ID or set of backdrop URLs is already loaded and currently displayed
+		val isSameTarget = capturedTargetId == currentlyLoadedTargetId
+		val isSameBackdrops = backdropUrls.isNotEmpty() && backdropUrls == loadedUrls
+		if ((isSameTarget || isSameBackdrops) &&
 			_backgrounds.isNotEmpty() &&
 			_currentBackground.value != null &&
 			(backdropUrls.isEmpty() || backdropUrls == loadedUrls)
 		) {
+			currentlyLoadedTargetId = capturedTargetId
 			if (pendingUrls != null && pendingUrls != loadedUrls) {
 				loadBackgroundsJob?.cancel()
 				pendingUrls = null
@@ -249,12 +252,15 @@ class BackgroundService(
 					return@launch
 				}
 
-				// Verify again if target is similar / already loaded
-				if (capturedTargetId == currentlyLoadedTargetId &&
+				// Verify again if target or backdrop set is similar / already loaded
+				val isSameTargetAfter = capturedTargetId == currentlyLoadedTargetId
+				val isSameBackdropsAfter = backdropUrls.isNotEmpty() && backdropUrls == loadedUrls
+				if ((isSameTargetAfter || isSameBackdropsAfter) &&
 					_backgrounds.isNotEmpty() &&
 					_currentBackground.value != null &&
 					(backdropUrls.isEmpty() || backdropUrls == loadedUrls)
 				) {
+					currentlyLoadedTargetId = capturedTargetId
 					pendingUrls = null
 					return@launch
 				}
