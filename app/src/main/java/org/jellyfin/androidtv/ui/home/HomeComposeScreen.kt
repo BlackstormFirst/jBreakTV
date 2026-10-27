@@ -20,12 +20,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import org.jellyfin.androidtv.ui.InteractionTrackerViewModel
+import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -37,7 +39,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import timber.log.Timber
 import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.data.model.AppNotification
@@ -133,8 +134,11 @@ fun HomeComposeScreen(
     var focusedRowIndex by remember { mutableIntStateOf(0) }
     val focusRequesters = remember { mutableMapOf<String, FocusRequester>() }
 
-    LaunchedEffect(focusTrigger, rows, targetItemKey) {
-        if (rows.isNotEmpty() && targetItemKey != null) {
+    val interactionTrackerViewModel = koinInject<InteractionTrackerViewModel>()
+    val screensaverVisible by interactionTrackerViewModel.visible.collectAsState()
+
+    LaunchedEffect(focusTrigger, rows, targetItemKey, screensaverVisible) {
+        if (!screensaverVisible && rows.isNotEmpty() && targetItemKey != null) {
             if (targetRowIndex > 0) {
                 try { listState.scrollToItem(targetRowIndex) } catch (_: Exception) {}
             }

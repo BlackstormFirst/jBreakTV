@@ -297,6 +297,9 @@ class BackgroundService(
 					if (currentRequestedTargetId == capturedTargetId && remainingBitmaps.isNotEmpty()) {
 						_backgrounds = listOf(firstBitmap) + remainingBitmaps
 						loadedUrls = backdropUrls
+						if (_backgrounds.size > 1) {
+							setTimer()
+						}
 					}
 				}
 			} catch (_: Exception) {

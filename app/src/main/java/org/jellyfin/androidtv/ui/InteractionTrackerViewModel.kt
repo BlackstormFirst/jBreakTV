@@ -106,8 +106,8 @@ class InteractionTrackerViewModel(
 			_screensaverVisible.value = false
 		}
 
-		// Create new timer to show screensaver when enabled and not already running
-		if (inAppEnabled && !activityPaused && locks == 0 && (timer == null || timer?.isActive == false)) {
+		// Create new timer to show screensaver when enabled and not already running and not currently visible
+		if (inAppEnabled && !activityPaused && locks == 0 && !_screensaverVisible.value && (timer == null || timer?.isActive == false)) {
 			timer = viewModelScope.launch {
 				delay(timeout)
 				_screensaverVisible.value = true
