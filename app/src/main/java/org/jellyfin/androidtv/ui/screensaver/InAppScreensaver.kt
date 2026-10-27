@@ -19,11 +19,11 @@ import org.jellyfin.androidtv.integration.dream.composable.DreamHost
 import org.jellyfin.androidtv.ui.InteractionTrackerViewModel
 import org.jellyfin.androidtv.ui.base.dialog.DialogBase
 import org.jellyfin.androidtv.util.isMediaSessionKeyEvent
-import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 @Composable
 fun InAppScreensaver() {
-	val interactionTrackerViewModel = koinViewModel<InteractionTrackerViewModel>()
+	val interactionTrackerViewModel = koinInject<InteractionTrackerViewModel>()
 	val visible by interactionTrackerViewModel.visible.collectAsState()
 
 	DialogBase(

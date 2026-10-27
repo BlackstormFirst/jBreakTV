@@ -188,6 +188,7 @@ val appModule = module {
 	// Non API related
 	single { DataRefreshService() }
 	single { PlaybackControllerContainer() }
+	single { InteractionTrackerViewModel(get(), get()) }
 
 	single<UserRepository> { UserRepositoryImpl() }
 	single<UserViewsRepository> { UserViewsRepositoryImpl(get()) }
@@ -206,7 +207,6 @@ val appModule = module {
 	single { VimuExternalPlayerApi() } bind ExternalPlayerApi::class
 	single { DefaultExternalPlayerApi() }
 
-	viewModel { InteractionTrackerViewModel(get(), get()) }
 	viewModel { StartupViewModel(get(), get(), get(), get()) }
 	viewModel { UserLoginViewModel(get(), get(), get(), get(defaultDeviceInfo)) }
 	viewModel { ServerAddViewModel(get()) }

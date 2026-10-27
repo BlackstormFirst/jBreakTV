@@ -48,7 +48,7 @@ class MainActivity : FragmentActivity() {
 	private val navigationRepository by inject<NavigationRepository>()
 	private val sessionRepository by inject<SessionRepository>()
 	private val userRepository by inject<UserRepository>()
-	private val interactionTrackerViewModel by viewModel<InteractionTrackerViewModel>()
+	private val interactionTrackerViewModel by inject<InteractionTrackerViewModel>()
 	private val workManager by inject<WorkManager>()
 	private val userPreferences by inject<UserPreferences>()
 	private val preferencesRepository by inject<PreferencesRepository>()
