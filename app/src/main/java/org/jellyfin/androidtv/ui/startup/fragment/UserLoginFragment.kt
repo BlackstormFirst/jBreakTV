@@ -87,6 +87,16 @@ class UserLoginFragment : Fragment() {
 			viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
 				userLoginViewModel.initiateQuickconnect()
 
+				userLoginViewModel.loginState.onEach { state ->
+					if (state is AuthenticatedState) {
+						(activity as? org.jellyfin.androidtv.ui.startup.StartupActivity)?.let { startupActivity ->
+							startupActivity.lifecycleScope.launch {
+								startupActivity.openNextActivity()
+							}
+						}
+					}
+				}.launchIn(this)
+
 				// Background image handling
 				userLoginViewModel.server.onEach { server ->
 					if (server != null) backgroundService.setBackground(server)

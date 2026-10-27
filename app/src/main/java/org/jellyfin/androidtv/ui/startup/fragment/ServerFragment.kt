@@ -30,6 +30,7 @@ import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.ServerUserRepository
 import org.jellyfin.androidtv.data.service.BackgroundService
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
+import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.ui.startup.StartupViewModel
 import org.jellyfin.androidtv.util.MarkdownRenderer
 import org.jellyfin.androidtv.util.createBundle
@@ -69,7 +70,14 @@ class ServerFragment : Fragment() {
 				onUserClick = { user ->
 					startupViewModel.authenticate(server, user).onEach { state ->
 						when (state) {
-							AuthenticatingState, AuthenticatedState -> Unit
+							AuthenticatingState -> Unit
+							AuthenticatedState -> {
+								(activity as? StartupActivity)?.let { startupActivity ->
+									startupActivity.lifecycleScope.launch {
+										startupActivity.openNextActivity()
+									}
+								}
+							}
 							RequireSignInState -> navigateFragment<UserLoginFragment>(createBundle {
 								putString(UserLoginFragment.ARG_SERVER_ID, server.id.toString())
 								putString(UserLoginFragment.ARG_USERNAME, user.name)

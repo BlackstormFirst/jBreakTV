@@ -166,7 +166,7 @@ class StartupActivity : FragmentActivity() {
 			}
 		}.launchIn(lifecycleScope)
 
-	private suspend fun openNextActivity() {
+	suspend fun openNextActivity() {
 		val itemId = when {
 			intent.action == Intent.ACTION_VIEW && intent.data != null -> intent.data.toString()
 			else -> intent.getStringExtra(EXTRA_ITEM_ID)
