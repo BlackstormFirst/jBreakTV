@@ -134,13 +134,16 @@ class StartupActivity : FragmentActivity() {
 		applyTheme()
 	}
 
+	private var isInitialNavigation = true
+
 	private fun onPermissionsGranted() = sessionRepository.state
 		.flowWithLifecycle(lifecycle, Lifecycle.State.RESUMED)
 		.filter { it == SessionRepositoryState.READY }
 		.map { sessionRepository.currentSession.value }
 		.distinctUntilChanged()
 		.onEach { session ->
-			if (session != null) {
+			val hideSplash = intent.getBooleanExtra(EXTRA_HIDE_SPLASH, false)
+			if (session != null && (!hideSplash || !isInitialNavigation)) {
 				Timber.i("Found a session in the session repository, waiting for the currentUser in the application class.")
 
 				showSplash()
@@ -153,6 +156,7 @@ class StartupActivity : FragmentActivity() {
 					openNextActivity()
 				}
 			} else {
+				isInitialNavigation = false
 				// Clear audio queue in case left over from last run
 				mediaManager.clearAudioQueue()
 
