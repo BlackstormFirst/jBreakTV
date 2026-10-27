@@ -68,7 +68,7 @@ import org.jellyfin.androidtv.ui.itemhandling.AudioQueueBaseRowItem
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.player.base.PlayerSeekbar
-import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
+import org.jellyfin.androidtv.ui.presentation.composable.BaseRowItemCard
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.androidtv.util.TimeUtils

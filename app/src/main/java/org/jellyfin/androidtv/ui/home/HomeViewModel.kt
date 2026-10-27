@@ -45,14 +45,14 @@ import org.jellyfin.androidtv.ui.navigation.NavigationAction
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
+
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.util.KeyProcessor
 import coil3.ImageLoader
 import coil3.request.ImageRequest
 import kotlinx.coroutines.coroutineScope
 import org.jellyfin.androidtv.constant.ImageType
-import org.jellyfin.androidtv.ui.presentation.getDisplayConfig
+import org.jellyfin.androidtv.ui.presentation.config.getDisplayConfig
 import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.usbdevices.USB_GRID_BUTTON_ID
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
@@ -131,13 +131,13 @@ class HomeViewModel(
     }
 
     init {
-        val cardPresenter = CardPresenter()
-        notificationsRow.addRowStates(context, cardPresenter,
+
+        notificationsRow.addRowStates(context,
             onRowStateAdded = { addDirectRowState(it.copy(sectionIndex = -200)) },
             onRowStateRemoved = { removeDirectRowState(it) }
         )
 
-        nowPlaying.addRowStates(context, cardPresenter,
+        nowPlaying.addRowStates(context,
             onRowStateAdded = { addDirectRowState(it.copy(sectionIndex = -100)) },
             onRowStateRemoved = { removeDirectRowState(it) }
         )
@@ -250,7 +250,7 @@ class HomeViewModel(
         updateUiState()
     }
 
-    private fun loadHomeSections(cardPresenter: CardPresenter = CardPresenter()) {
+    private fun loadHomeSections() {
         viewModelScope.launch(Dispatchers.IO) {
             val currentUser = withTimeout(30.seconds) {
                 userRepository.currentUser.filterNotNull().first()
@@ -310,7 +310,7 @@ class HomeViewModel(
                     }
                     HomeSectionType.LIVE_TV -> if (currentUser.policy?.enableLiveTvAccess == true) {
                         val liveTvRow = HomeFragmentLiveTVRow(context, userRepository)
-                        liveTvRow.addRowStates(context, cardPresenter,
+                        liveTvRow.addRowStates(context,
                             onRowStateAdded = { state ->
                                 sectionRows.add(state.copy(sectionIndex = baseSectionIndex, sectionType = section))
                             },

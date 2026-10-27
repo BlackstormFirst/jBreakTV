@@ -1,6 +1,8 @@
 package org.jellyfin.androidtv.ui.presentation
 
 import androidx.leanback.widget.ObjectAdapter
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.leanback.widget.Presenter
 import androidx.leanback.widget.PresenterSelector
 import androidx.recyclerview.widget.DiffUtil
@@ -12,7 +14,8 @@ import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
  * operations. And uses generics for strong typing. Uses a MutableList as internal structure.
  */
 open class MutableObjectAdapter<T : Any> : ObjectAdapter, Iterable<T> {
-	private val data = mutableListOf<T>()
+	private val data = mutableStateListOf<T>()
+	val dataAsStateList: SnapshotStateList<T> get() = data
 
 	// Constructors
 	constructor(presenterSelector: PresenterSelector) : super(presenterSelector)

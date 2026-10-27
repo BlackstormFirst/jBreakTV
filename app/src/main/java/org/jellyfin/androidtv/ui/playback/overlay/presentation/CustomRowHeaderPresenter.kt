@@ -1,4 +1,4 @@
-package org.jellyfin.androidtv.ui.presentation
+package org.jellyfin.androidtv.ui.playback.overlay.presentation
 
 import androidx.leanback.widget.RowHeaderPresenter
 

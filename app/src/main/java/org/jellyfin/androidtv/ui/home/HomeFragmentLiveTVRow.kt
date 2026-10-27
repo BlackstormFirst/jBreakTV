@@ -5,7 +5,6 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.ui.GridButton
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.util.Utils
 
 class HomeFragmentLiveTVRow(
@@ -15,7 +14,6 @@ class HomeFragmentLiveTVRow(
 
 	override fun addRowStates(
 		context: Context,
-		cardPresenter: CardPresenter,
 		onRowStateAdded: (HomeRowState) -> Unit,
 		onRowStateRemoved: (HomeRowState) -> Unit
 	) {

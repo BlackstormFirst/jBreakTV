@@ -49,7 +49,7 @@ import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.GridButtonBaseRowItem
-import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
+import org.jellyfin.androidtv.ui.presentation.composable.BaseRowItemCard
 import org.jellyfin.androidtv.util.usbdevices.UsbBaseRowItem
 import org.jellyfin.sdk.model.api.BaseItemKind
 

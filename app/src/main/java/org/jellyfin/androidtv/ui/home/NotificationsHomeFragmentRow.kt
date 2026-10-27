@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.jellyfin.androidtv.data.model.AppNotification
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
+
 
 class NotificationsHomeFragmentRow(
 	coroutineScope: CoroutineScope,
@@ -25,7 +25,6 @@ class NotificationsHomeFragmentRow(
 
 	override fun addRowStates(
 		context: Context,
-		cardPresenter: CardPresenter,
 		onRowStateAdded: (HomeRowState) -> Unit,
 		onRowStateRemoved: (HomeRowState) -> Unit
 	) {

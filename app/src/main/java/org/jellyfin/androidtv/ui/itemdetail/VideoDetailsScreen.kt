@@ -92,7 +92,7 @@ import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.home.collectAsStateAny
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
-import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
+import org.jellyfin.androidtv.ui.presentation.composable.BaseRowItemCard
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock
 import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.sdk.model.api.BaseItemKind

@@ -10,7 +10,6 @@ import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.CollectionType
@@ -50,7 +49,7 @@ class HomeFragmentLatestRow(
 
 	suspend fun prepareRowStates(
 		context: Context,
-		cardPresenter: CardPresenter,
+		cardPresenter: Any?,
 		api: ApiClient,
 	): List<HomeRowState> = prepareRowStates(context, api)
 

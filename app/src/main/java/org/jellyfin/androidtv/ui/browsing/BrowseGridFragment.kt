@@ -94,8 +94,7 @@ import org.jellyfin.androidtv.ui.itemhandling.setItemsSorting
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.navigation.ProvideRouter
-import org.jellyfin.androidtv.ui.presentation.BaseRowItemCard
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
+import org.jellyfin.androidtv.ui.presentation.composable.BaseRowItemCard
 import org.jellyfin.androidtv.ui.settings.Routes
 import org.jellyfin.androidtv.ui.settings.composable.SettingsDialog
 import org.jellyfin.androidtv.ui.settings.composable.SettingsRouterContent
@@ -632,14 +631,13 @@ fun BrowseGridScreen(
 			),
 			sortOption
 		)
-		val cardPresenter = CardPresenter(false, imageType, 150)
 		val adapter = ItemRowAdapter(
 			context,
 			request,
 			100,
 			false,
 			false,
-			cardPresenter,
+			null,
 			null,
 			QueryType.Items
 		)

@@ -8,7 +8,6 @@ import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.itemhandling.AudioQueueBaseRowItem
 import org.jellyfin.androidtv.ui.playback.MediaManager
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.jellyfin.queue.baseItem
@@ -25,7 +24,6 @@ class HomeFragmentNowPlayingRow(
 
 	override fun addRowStates(
 		context: Context,
-		cardPresenter: CardPresenter,
 		onRowStateAdded: (HomeRowState) -> Unit,
 		onRowStateRemoved: (HomeRowState) -> Unit
 	) {

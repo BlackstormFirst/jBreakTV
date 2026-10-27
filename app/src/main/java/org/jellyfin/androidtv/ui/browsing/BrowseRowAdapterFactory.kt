@@ -3,10 +3,9 @@ package org.jellyfin.androidtv.ui.browsing
 import android.content.Context
 import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
 
 object BrowseRowAdapterFactory {
-	fun createAdapter(context: Context, def: BrowseRowDef, presenter: CardPresenter = CardPresenter()): ItemRowAdapter {
+	fun createAdapter(context: Context, def: BrowseRowDef): ItemRowAdapter {
 		val type = def.queryType ?: QueryType.Items
 		val items = def.items
 		val nextUpQuery = def.nextUpQuery
@@ -23,29 +22,29 @@ object BrowseRowAdapterFactory {
 		val query = def.query
 
 		return when {
-			items != null -> ItemRowAdapter(context, items, presenter)
-			nextUpQuery != null -> ItemRowAdapter(context, nextUpQuery, def.preferParentThumb, presenter, null)
-			latestItemsQuery != null -> ItemRowAdapter(context, latestItemsQuery, def.preferParentThumb, presenter, null)
-			resumeQuery != null -> ItemRowAdapter(context, resumeQuery, def.chunkSize, def.preferParentThumb, def.isStaticHeight, presenter, null)
-			similarQuery != null -> ItemRowAdapter(context, similarQuery, type, presenter, null)
-			artistsQuery != null -> ItemRowAdapter(context, artistsQuery, def.chunkSize, presenter, null)
-			albumArtistsQuery != null -> ItemRowAdapter(context, albumArtistsQuery, def.chunkSize, presenter, null)
-			seriesTimerQuery != null -> ItemRowAdapter(context, seriesTimerQuery, presenter, null)
-			tvChannelQuery != null -> ItemRowAdapter(context, tvChannelQuery, def.chunkSize, presenter, null)
-			programQuery != null -> ItemRowAdapter(context, programQuery, presenter, null)
-			recordingQuery != null -> ItemRowAdapter(context, recordingQuery, def.chunkSize, presenter, null)
-			specialsQuery != null -> ItemRowAdapter(context, specialsQuery, presenter, null)
+			items != null -> ItemRowAdapter(context, items)
+			nextUpQuery != null -> ItemRowAdapter(context, nextUpQuery, def.preferParentThumb, null, null)
+			latestItemsQuery != null -> ItemRowAdapter(context, latestItemsQuery, def.preferParentThumb, null, null)
+			resumeQuery != null -> ItemRowAdapter(context, resumeQuery, def.chunkSize, def.preferParentThumb, def.isStaticHeight, null, null)
+			similarQuery != null -> ItemRowAdapter(context, similarQuery, type, null, null)
+			artistsQuery != null -> ItemRowAdapter(context, artistsQuery, def.chunkSize, null, null)
+			albumArtistsQuery != null -> ItemRowAdapter(context, albumArtistsQuery, def.chunkSize, null, null)
+			seriesTimerQuery != null -> ItemRowAdapter(context, seriesTimerQuery, null, null)
+			tvChannelQuery != null -> ItemRowAdapter(context, tvChannelQuery, def.chunkSize, null, null)
+			programQuery != null -> ItemRowAdapter(context, programQuery, null, null)
+			recordingQuery != null -> ItemRowAdapter(context, recordingQuery, def.chunkSize, null, null)
+			specialsQuery != null -> ItemRowAdapter(context, specialsQuery, null, null)
 			query != null -> ItemRowAdapter(
 				context,
 				query,
 				def.chunkSize,
 				def.preferParentThumb,
 				def.isStaticHeight,
-				presenter,
+				null,
 				null,
 				type
 			)
-			else -> ItemRowAdapter(presenter)
+			else -> ItemRowAdapter()
 		}
 	}
 }

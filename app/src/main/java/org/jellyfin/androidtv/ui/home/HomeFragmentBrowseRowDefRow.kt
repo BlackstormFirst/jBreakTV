@@ -12,7 +12,6 @@ import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItemSelectAction
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
 import org.jellyfin.androidtv.ui.itemhandling.setInitialItems
-import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.util.sdk.isRealAvailableMedia
 import org.jellyfin.sdk.api.client.ApiClient
@@ -28,25 +27,24 @@ class HomeFragmentBrowseRowDefRow(
 ) : HomeFragmentRow, KoinComponent {
 	private val userPreferences by inject<UserPreferences>()
 
-	suspend fun prepareRow(
+	suspend 	fun prepareRow(
 		context: Context,
-		cardPresenter: CardPresenter,
 		api: ApiClient,
 		rowsAdapter: MutableObjectAdapter<Row>? = null,
 	): ListRow? {
 		val preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled]
 
 		val rowAdapter = when (browseRowDef.queryType) {
-			QueryType.NextUp -> ItemRowAdapter(context, browseRowDef.nextUpQuery!!, preferParentThumb, cardPresenter, rowsAdapter)
-			QueryType.LatestItems -> ItemRowAdapter(context, browseRowDef.latestItemsQuery!!, userPreferences[UserPreferences.seriesThumbnailsEnabled], cardPresenter, rowsAdapter)
-			QueryType.Views -> ItemRowAdapter(context, GetUserViewsRequest, cardPresenter, rowsAdapter)
-			QueryType.SimilarSeries -> ItemRowAdapter(context, browseRowDef.similarQuery!!, QueryType.SimilarSeries, cardPresenter, rowsAdapter)
-			QueryType.SimilarMovies -> ItemRowAdapter(context, browseRowDef.similarQuery!!, QueryType.SimilarMovies, cardPresenter, rowsAdapter)
-			QueryType.LiveTvChannel -> ItemRowAdapter(context, browseRowDef.tvChannelQuery!!, 40, cardPresenter, rowsAdapter)
-			QueryType.LiveTvProgram -> ItemRowAdapter(context, browseRowDef.programQuery!!, cardPresenter, rowsAdapter)
-			QueryType.LiveTvRecording -> ItemRowAdapter(context, browseRowDef.recordingQuery!!, browseRowDef.chunkSize, cardPresenter, rowsAdapter)
-			QueryType.Resume -> ItemRowAdapter(context, browseRowDef.resumeQuery!!, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, cardPresenter, rowsAdapter)
-			else -> ItemRowAdapter(context, browseRowDef.query!!, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, cardPresenter, rowsAdapter, browseRowDef.queryType ?: QueryType.Items)
+			QueryType.NextUp -> ItemRowAdapter(context, browseRowDef.nextUpQuery!!, preferParentThumb, null, rowsAdapter)
+			QueryType.LatestItems -> ItemRowAdapter(context, browseRowDef.latestItemsQuery!!, userPreferences[UserPreferences.seriesThumbnailsEnabled], null, rowsAdapter)
+			QueryType.Views -> ItemRowAdapter(context, GetUserViewsRequest, null, rowsAdapter)
+			QueryType.SimilarSeries -> ItemRowAdapter(context, browseRowDef.similarQuery!!, QueryType.SimilarSeries, null, rowsAdapter)
+			QueryType.SimilarMovies -> ItemRowAdapter(context, browseRowDef.similarQuery!!, QueryType.SimilarMovies, null, rowsAdapter)
+			QueryType.LiveTvChannel -> ItemRowAdapter(context, browseRowDef.tvChannelQuery!!, 40, null, rowsAdapter)
+			QueryType.LiveTvProgram -> ItemRowAdapter(context, browseRowDef.programQuery!!, null, rowsAdapter)
+			QueryType.LiveTvRecording -> ItemRowAdapter(context, browseRowDef.recordingQuery!!, browseRowDef.chunkSize, null, rowsAdapter)
+			QueryType.Resume -> ItemRowAdapter(context, browseRowDef.resumeQuery!!, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, null, rowsAdapter)
+			else -> ItemRowAdapter(context, browseRowDef.query!!, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, null, rowsAdapter, browseRowDef.queryType ?: QueryType.Items)
 		}
 
 		rowAdapter.reRetrieveTriggers = browseRowDef.changeTriggers
@@ -205,7 +203,7 @@ class HomeFragmentBrowseRowDefRow(
 
 	suspend fun prepareRowState(
 		context: Context,
-		cardPresenter: CardPresenter,
+		cardPresenter: Any?,
 		api: ApiClient,
 	): HomeRowState? = prepareRowState(context, api)
 }

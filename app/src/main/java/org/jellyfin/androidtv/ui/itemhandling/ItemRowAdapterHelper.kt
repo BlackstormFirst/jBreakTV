@@ -62,7 +62,7 @@ fun ItemRowAdapter.preloadRowImages(items: List<Any?>, maxCount: Int = 10) {
 	val api = runCatching { get<ApiClient>(ApiClient::class.java) }.getOrNull() ?: return
 	val imageLoader = runCatching { get<ImageLoader>(ImageLoader::class.java) }.getOrNull() ?: return
 	val density = context?.resources?.displayMetrics?.density ?: 1f
-	val cardStaticHeight = (items.firstOrNull()?.let { getPresenter(it) } as? org.jellyfin.androidtv.ui.presentation.CardPresenter)?.staticHeight ?: 150
+	val cardStaticHeight = 150
 
 	ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
 		val ctx = context ?: return@launch
