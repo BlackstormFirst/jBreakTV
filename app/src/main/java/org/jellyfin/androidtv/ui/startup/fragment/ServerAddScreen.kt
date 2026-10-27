@@ -100,7 +100,15 @@ fun ServerAddScreen(
                 color = JellyfinTheme.colorScheme.onBackground
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = stringResource(R.string.lbl_valid_server_address),
+                style = LocalTextStyle.current.copy(fontSize = 14.sp),
+                color = JellyfinTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             Box(
                 modifier = Modifier
@@ -117,6 +125,17 @@ fun ServerAddScreen(
                         shape = RoundedCornerShape(8.dp)
                     )
             ) {
+                if (address.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.lbl_ip_hint),
+                        style = LocalTextStyle.current.copy(
+                            color = JellyfinTheme.colorScheme.onInput.copy(alpha = 0.4f),
+                            fontSize = 18.sp
+                        ),
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+
                 BasicTextField(
                     value = address,
                     onValueChange = { address = it },
@@ -157,7 +176,17 @@ fun ServerAddScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = stringResource(R.string.lbl_server_ports_hint),
+                style = LocalTextStyle.current.copy(fontSize = 13.sp),
+                color = JellyfinTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.fillMaxWidth(0.6f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {

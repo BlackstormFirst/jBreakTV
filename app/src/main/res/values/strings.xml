@@ -87,6 +87,8 @@
     <string name="lbl_yes">Yes</string>
     <string name="lbl_enter_server_address">Enter server address</string>
     <string name="lbl_valid_server_address">Please enter the server address (IP or domain/machine name)</string>
+    <string name="lbl_ip_hint">192.168.1.100 or myserver.com</string>
+    <string name="lbl_server_ports_hint">If no port or protocol is specified, default ports (8096 for HTTP, 8920 for HTTPS, 80, 443) will be tested automatically.</string>
     <string name="lbl_ok">Ok</string>
     <string name="lbl_born">"Born "</string>
     <string name="lbl_loading_elipses">Loading…</string>
