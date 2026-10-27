@@ -148,7 +148,7 @@ fun ServerAddScreen(
                     ),
                     cursorBrush = SolidColor(if (isFocused) Color.White else JellyfinTheme.colorScheme.onInput),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Uri,
+                        keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Done,
                         showKeyboardOnFocus = true,
                     ),
