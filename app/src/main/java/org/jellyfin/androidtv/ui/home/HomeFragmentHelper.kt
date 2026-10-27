@@ -28,7 +28,6 @@ class HomeFragmentHelper(
 		val query = GetResumeItemsRequest(
 			limit = ITEM_LIMIT_RESUME,
 			fields = ItemRepository.browseFields,
-			imageTypeLimit = 1,
 			enableTotalRecordCount = false,
 			mediaTypes = includeMediaTypes,
 			excludeItemTypes = setOf(BaseItemKind.AUDIO_BOOK),
@@ -57,7 +56,6 @@ class HomeFragmentHelper(
 
 	fun loadNextUp(): HomeFragmentRow {
 		val query = GetNextUpRequest(
-			imageTypeLimit = 1,
 			limit = ITEM_LIMIT_NEXT_UP,
 			enableResumable = false,
 			fields = ItemRepository.nextUpFields,
@@ -79,7 +77,6 @@ class HomeFragmentHelper(
 		val query = GetRecommendedProgramsRequest(
 			isAiring = true,
 			fields = ItemRepository.browseFields,
-			imageTypeLimit = 1,
 			enableTotalRecordCount = false,
 			limit = ITEM_LIMIT_ON_NOW,
 		)

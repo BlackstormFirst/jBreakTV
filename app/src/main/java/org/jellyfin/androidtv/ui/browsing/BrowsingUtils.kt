@@ -104,7 +104,6 @@ object BrowsingUtils {
 	) = GetNextUpRequest(
 		limit = 50,
 		parentId = parentId,
-		imageTypeLimit = 1,
 		fields = ItemRepository.nextUpFields,
 		nextUpDateCutoff = (userPreferences ?: runCatching { KoinJavaComponent.get<UserPreferences>(UserPreferences::class.java) }.getOrNull())?.nextUpDateCutoff,
 	)
@@ -125,7 +124,6 @@ object BrowsingUtils {
 		fields = ItemRepository.browseFields,
 		parentId = parentId,
 		limit = 50,
-		imageTypeLimit = 1,
 		includeItemTypes = itemType?.let(::setOf),
 		groupItems = groupItems,
 	)
@@ -153,7 +151,6 @@ object BrowsingUtils {
 	fun createLiveTVOnNowRequest() = GetRecommendedProgramsRequest(
 		isAiring = true,
 		fields = ItemRepository.browseFields,
-		imageTypeLimit = 1,
 		enableTotalRecordCount = false,
 		limit = 150,
 	)
@@ -163,7 +160,6 @@ object BrowsingUtils {
 		isAiring = false,
 		hasAired = false,
 		fields = ItemRepository.browseFields,
-		imageTypeLimit = 1,
 		enableTotalRecordCount = false,
 		limit = 150,
 	)
@@ -259,7 +255,6 @@ object BrowsingUtils {
 		includeItemTypes = setOf(itemType),
 		recursive = true,
 		parentId = parentId,
-		imageTypeLimit = 1,
 		isMissing = false,
 		isUnaired = false,
 		excludeLocationTypes = setOf(LocationType.VIRTUAL),
@@ -273,7 +268,6 @@ object BrowsingUtils {
 		fields = ItemRepository.browseFields,
 		includeItemTypes = setOf(BaseItemKind.BOX_SET),
 		recursive = true,
-		imageTypeLimit = 1,
 		parentId = parentId,
 		sortBy = setOf(ItemSortBy.SORT_NAME),
 	)
@@ -284,7 +278,6 @@ object BrowsingUtils {
 		includeItemTypes = setOf(BaseItemKind.AUDIO),
 		recursive = true,
 		parentId = parentId,
-		imageTypeLimit = 1,
 		filters = setOf(ItemFilter.IS_PLAYED),
 		sortBy = setOf(ItemSortBy.DATE_PLAYED),
 		sortOrder = setOf(SortOrder.DESCENDING),
@@ -296,7 +289,6 @@ object BrowsingUtils {
 	fun createPlaylistsRequest() = GetItemsRequest(
 		fields = ItemRepository.browseFields,
 		includeItemTypes = setOf(BaseItemKind.PLAYLIST),
-		imageTypeLimit = 1,
 		recursive = true,
 		sortBy = setOf(ItemSortBy.DATE_CREATED),
 		sortOrder = setOf(SortOrder.DESCENDING),

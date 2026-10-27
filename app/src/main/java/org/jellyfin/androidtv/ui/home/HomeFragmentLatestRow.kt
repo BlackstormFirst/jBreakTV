@@ -35,7 +35,6 @@ class HomeFragmentLatestRow(
 			async(Dispatchers.IO) {
 				val request = GetLatestMediaRequest(
 					fields = ItemRepository.browseFields,
-					imageTypeLimit = 1,
 					parentId = item.id,
 					groupItems = true,
 					limit = ITEM_LIMIT,
