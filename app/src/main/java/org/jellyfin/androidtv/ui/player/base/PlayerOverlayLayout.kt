@@ -33,7 +33,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -82,8 +81,10 @@ fun rememberPlayerOverlayVisibility(
 	}
 
 	fun unpin() {
-		isPinned = false
-		show()
+		if (isPinned) {
+			isPinned = false
+			show()
+		}
 	}
 
 	fun hide() {
@@ -98,16 +99,7 @@ fun rememberPlayerOverlayVisibility(
 		else show()
 	}
 
-	// Force visibility when not the active window, reset timer when it changes
-	// to make sure popups keep the overlay visible
-	val windowInfo = LocalWindowInfo.current
-	val visible = timerVisible || isPinned || !windowInfo.isWindowFocused
-
-	var previousIsWindowFocused by remember { mutableStateOf(windowInfo.isWindowFocused) }
-	LaunchedEffect(windowInfo.isWindowFocused) {
-		if (windowInfo.isWindowFocused != previousIsWindowFocused) show()
-		previousIsWindowFocused = windowInfo.isWindowFocused
-	}
+	val visible = timerVisible || isPinned
 
 	return PlayerOverlayVisibilityState(
 		visible = visible,

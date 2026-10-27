@@ -646,8 +646,8 @@ public class CustomPlaybackOverlayFragment extends Fragment implements View.OnKe
 
         if (leanbackOverlayFragment != null) {
             mIsVisible = false;
-            leanbackOverlayFragment.setShouldShowOverlay(true);
-            leanbackOverlayFragment.showControlsOverlay(true);
+            leanbackOverlayFragment.setShouldShowOverlay(false);
+            leanbackOverlayFragment.hideOverlay();
         }
     }
 
