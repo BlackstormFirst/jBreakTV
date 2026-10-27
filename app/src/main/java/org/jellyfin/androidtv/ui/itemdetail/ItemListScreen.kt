@@ -453,6 +453,7 @@ fun ItemListScreen(
 						item.userData?.isFavorite == true
 					}
 
+					val itemFocusRequester = remember { FocusRequester() }
 					var showContextMenu by remember { mutableStateOf(false) }
 
 					Box(
@@ -461,6 +462,7 @@ fun ItemListScreen(
 					) {
 						Box(
 							modifier = Modifier
+								.focusRequester(itemFocusRequester)
 								.clip(RoundedCornerShape(6.dp))
 								.background(
 									when {
@@ -570,6 +572,7 @@ fun ItemListScreen(
 								item = rowItem,
 								expanded = showContextMenu,
 								onDismissRequest = { showContextMenu = false },
+								focusRequester = itemFocusRequester,
 								onItemUpdated = { updatedItem ->
 									updatedItem.baseItem?.let { updatedBaseItem ->
 										onItemUpdated?.invoke(index, updatedBaseItem)

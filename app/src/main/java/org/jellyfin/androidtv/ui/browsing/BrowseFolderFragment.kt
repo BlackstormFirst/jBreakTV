@@ -47,9 +47,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -57,6 +54,9 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -497,6 +497,7 @@ fun BrowseFolderScreen(
 									horizontalArrangement = Arrangement.spacedBy(12.dp)
 								) {
 									itemsIndexed(itemsState, key = { index, item -> "${rowIndex}_${item.baseItem?.id}_$index" }) { index, item ->
+										val cardFocusRequester = remember { FocusRequester() }
 										val interactionSource = remember { MutableInteractionSource() }
 										val isFocusedState by interactionSource.collectIsFocusedAsState()
 										var isFocusedInternal by remember { mutableStateOf(false) }
@@ -506,6 +507,7 @@ fun BrowseFolderScreen(
 
 										Box(
 											modifier = Modifier
+												.focusRequester(cardFocusRequester)
 												.zIndex(if (isFocused) 1f else 0f)
 												.then(if (isSelectedItem) {
 													Modifier
@@ -565,6 +567,7 @@ fun BrowseFolderScreen(
 													item = item,
 													expanded = showContextMenu,
 													onDismissRequest = { showContextMenu = false },
+													focusRequester = cardFocusRequester,
 													onItemUpdated = { updatedItem ->
 														val currentList = rowData[rowIndex]?.toMutableList()
 														if (currentList != null && index in currentList.indices) {

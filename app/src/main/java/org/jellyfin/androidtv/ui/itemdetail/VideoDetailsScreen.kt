@@ -1107,10 +1107,12 @@ fun VideoDetailsScreen(
                                     val isFocused = isFocusedState || isFocusedInternal
                                     var showContextMenu by remember { mutableStateOf(false) }
 
+                                    val cardFocusRequester = remember { FocusRequester() }
                                     val cardBringIntoViewRequester = remember { BringIntoViewRequester() }
 
                                     Box(
                                         modifier = Modifier
+                                            .focusRequester(cardFocusRequester)
                                             .zIndex(if (isFocused) 1f else 0f)
                                             .bringIntoViewRequester(cardBringIntoViewRequester)
                                             .onFocusChanged { focusState ->
@@ -1145,6 +1147,7 @@ fun VideoDetailsScreen(
                                                     item = rowItem,
                                                     expanded = showContextMenu,
                                                     onDismissRequest = { showContextMenu = false },
+                                                    focusRequester = cardFocusRequester,
                                                     onItemUpdated = { updatedItem ->
                                                         rowState.adapter.set(index, updatedItem)
                                                     }

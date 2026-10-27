@@ -148,6 +148,7 @@ class SearchFragment : Fragment() {
 								horizontalArrangement = Arrangement.spacedBy(12.dp)
 							) {
 								items(group.items.toList(), key = { it.id }) { baseItem ->
+									val cardFocusRequester = remember { FocusRequester() }
 									val rowItem = remember(baseItem) { BaseItemDtoBaseRowItem(baseItem) }
 									val interactionSource = remember { MutableInteractionSource() }
 									val isFocusedState by interactionSource.collectIsFocusedAsState()
@@ -157,6 +158,7 @@ class SearchFragment : Fragment() {
 
 									Box(
 										modifier = Modifier
+											.focusRequester(cardFocusRequester)
 											.zIndex(if (isFocused) 1f else 0f)
 											.onFocusChanged { focusState ->
 												isFocusedInternal = focusState.isFocused
@@ -184,6 +186,7 @@ class SearchFragment : Fragment() {
 												item = rowItem,
 												expanded = showContextMenu,
 												onDismissRequest = { showContextMenu = false },
+												focusRequester = cardFocusRequester,
 												onItemUpdated = { _ ->
 													viewModel.searchImmediately(query.text)
 												}

@@ -1,8 +1,11 @@
 package org.jellyfin.androidtv.data.repository
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.constant.CustomMessage
 
 interface CustomMessageRepository {
@@ -15,9 +18,12 @@ class CustomMessageRepositoryImpl : CustomMessageRepository {
 	override val message get() = _message.asStateFlow()
 
 	override fun pushMessage(message: CustomMessage) {
-		// Make sure to re-emit the same message if requested
 		if (_message.value == message) _message.value = null
-
 		_message.value = message
+		CoroutineScope(Dispatchers.Main.immediate).launch {
+			if (_message.value == message) {
+				_message.value = null
+			}
+		}
 	}
 }

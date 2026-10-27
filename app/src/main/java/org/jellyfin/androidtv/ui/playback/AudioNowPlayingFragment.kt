@@ -378,9 +378,11 @@ fun AudioNowPlayingScreen(
 						val isFocusedState by interactionSource.collectIsFocusedAsState()
 						var isFocusedInternal by remember { mutableStateOf(false) }
 						val isFocused = isFocusedState || isFocusedInternal
+						val cardFocusRequester = remember { FocusRequester() }
 
 						Box(
 							modifier = Modifier
+								.focusRequester(cardFocusRequester)
 								.zIndex(if (isFocused) 10f else 1f)
 								.onFocusChanged { focusState ->
 									isFocusedInternal = focusState.isFocused

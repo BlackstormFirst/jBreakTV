@@ -521,6 +521,7 @@ fun EnhancedBrowseScreen(
 									horizontalArrangement = Arrangement.spacedBy(12.dp)
 								) {
 									itemsIndexed(itemsState, key = { index, item -> "${rowIndex}_${item.baseItem?.id}_$index" }) { index, item ->
+										val cardFocusRequester = remember { FocusRequester() }
 										val interactionSource = remember { MutableInteractionSource() }
 										val isFocusedState by interactionSource.collectIsFocusedAsState()
 										var isFocusedInternal by remember { mutableStateOf(false) }
@@ -530,6 +531,7 @@ fun EnhancedBrowseScreen(
 
 										Box(
 											modifier = Modifier
+												.focusRequester(cardFocusRequester)
 												.zIndex(if (isFocused) 1f else 0f)
 												.then(if (isSelectedItem) {
 													Modifier
@@ -589,6 +591,7 @@ fun EnhancedBrowseScreen(
 													item = item,
 													expanded = showContextMenu,
 													onDismissRequest = { showContextMenu = false },
+													focusRequester = cardFocusRequester,
 													onItemUpdated = { updatedItem ->
 														val currentList = rowData[rowIndex]?.toMutableList()
 														if (currentList != null && index in currentList.indices) {

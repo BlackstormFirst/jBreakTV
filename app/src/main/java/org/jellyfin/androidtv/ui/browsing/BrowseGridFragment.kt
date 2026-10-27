@@ -904,6 +904,7 @@ fun BrowseGridScreen(
 							modifier = Modifier.fillMaxSize()
 						) {
 							itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
+								val cardFocusRequester = remember { FocusRequester() }
 								val interactionSource = remember { MutableInteractionSource() }
 								val isFocusedState by interactionSource.collectIsFocusedAsState()
 								var isFocusedInternal by remember { mutableStateOf(false) }
@@ -922,6 +923,7 @@ fun BrowseGridScreen(
 
 								Box(
 									modifier = Modifier
+										.focusRequester(cardFocusRequester)
 										.zIndex(if (isFocused) 1f else 0f)
 										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester).onGloballyPositioned {
 											if (!hasRequestedFocus) {
@@ -960,6 +962,7 @@ fun BrowseGridScreen(
 											item = item,
 											expanded = showContextMenu,
 											onDismissRequest = { showContextMenu = false },
+											focusRequester = cardFocusRequester,
 											onItemUpdated = { updatedItem ->
 												if (index in itemsState.indices) {
 													itemsState[index] = updatedItem
@@ -986,6 +989,7 @@ fun BrowseGridScreen(
 							modifier = Modifier.fillMaxSize()
 						) {
 							itemsIndexed(itemsState, key = { index, item -> "${item.baseItem?.id}_$index" }) { index, item ->
+								val cardFocusRequester = remember { FocusRequester() }
 								val interactionSource = remember { MutableInteractionSource() }
 								val isFocusedState by interactionSource.collectIsFocusedAsState()
 								var isFocusedInternal by remember { mutableStateOf(false) }
@@ -1004,6 +1008,7 @@ fun BrowseGridScreen(
 
 								Box(
 									modifier = Modifier
+										.focusRequester(cardFocusRequester)
 										.zIndex(if (isFocused) 1f else 0f)
 										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester).onGloballyPositioned {
 											if (!hasRequestedFocus) {
@@ -1043,6 +1048,7 @@ fun BrowseGridScreen(
 											item = item,
 											expanded = showContextMenu,
 											onDismissRequest = { showContextMenu = false },
+											focusRequester = cardFocusRequester,
 											onItemUpdated = { updatedItem ->
 												if (index in itemsState.indices) {
 													itemsState[index] = updatedItem

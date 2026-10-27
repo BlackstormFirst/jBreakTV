@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onKeyEvent
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -23,6 +24,9 @@ fun Modifier.itemCardClickable(
 	var isLongPressHandled by remember { mutableStateOf(false) }
 
 	return this
+		.onFocusChanged {
+			isLongPressHandled = false
+		}
 		.onKeyEvent { keyEvent ->
 			val nativeEvent = keyEvent.nativeKeyEvent
 			val keyCode = nativeEvent.keyCode
@@ -39,6 +43,7 @@ fun Modifier.itemCardClickable(
 				isMenuKey -> {
 					if (nativeEvent.action == KeyEvent.ACTION_UP) {
 						if (onLongClick != null) {
+							isLongPressHandled = false
 							onLongClick()
 							true
 						} else {
@@ -82,6 +87,8 @@ fun Modifier.itemCardClickable(
 			onClick = {
 				if (!isLongPressHandled) {
 					onClick()
+				} else {
+					isLongPressHandled = false
 				}
 			},
 			onLongClick = null
