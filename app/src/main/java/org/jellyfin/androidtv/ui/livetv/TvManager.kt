@@ -186,7 +186,7 @@ object TvManager : KoinComponent {
         val channel = TextView(context).apply {
             text = program.channelName
             setTypeface(null, Typeface.BOLD)
-            setTextColor(context.resources.getColor(android.R.color.holo_blue_light))
+            setTextColor(androidx.core.content.ContextCompat.getColor(context, android.R.color.holo_blue_light))
         }
         timelineRow.addView(channel)
 

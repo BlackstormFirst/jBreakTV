@@ -107,7 +107,7 @@ fun LiveTvGuideScreen(
                                 .weight(1f)
                                 .horizontalScroll(horizontalScrollState, enabled = false)
                         ) {
-                            val programs = state.programsByChannel[channel.id?.toString()] ?: emptyList()
+                            val programs = state.programsByChannel[channel.id.toString()] ?: emptyList()
                             ProgramRow(
                                 programs = programs,
                                 channelId = channel.id,
@@ -118,7 +118,7 @@ fun LiveTvGuideScreen(
                                     onProgramSelected(it)
                                 },
                                 onProgramClicked = { program ->
-                                    if (program.id != null) {
+                                    if (true) {
                                         selectedDetailProgram = program
                                     } else {
                                         onProgramClicked(program)
