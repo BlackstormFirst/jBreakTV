@@ -77,7 +77,7 @@ class DreamViewModel(
 				batchSize = 60,
 				emitDelay = 30.seconds,
 				noItemsDelay = 2.minutes,
-				errorDelay = 15.seconds,
+				initialErrorDelay = 15.seconds,
 			)
 		)
 	}
@@ -98,12 +98,15 @@ class DreamViewModel(
 		batchSize: Int,
 		emitDelay: Duration,
 		noItemsDelay: Duration,
-		errorDelay: Duration,
+		initialErrorDelay: Duration,
 	): Flow<DreamContent.LibraryShowcase?> = flow {
+		var currentErrorDelay = initialErrorDelay
+
 		while (true) {
 			if (userRepository.currentUser.value == null) {
 				emit(null)
 				delay(noItemsDelay)
+				currentErrorDelay = initialErrorDelay
 				continue
 			}
 
@@ -129,14 +132,21 @@ class DreamViewModel(
 
 			if (items == null) {
 				emit(null)
-				delay(errorDelay)
+				delay(currentErrorDelay)
+				currentErrorDelay = (currentErrorDelay * 2).coerceAtMost(5.minutes)
 			} else if (items.isEmpty()) {
 				emit(null)
 				delay(noItemsDelay)
+				currentErrorDelay = initialErrorDelay
 			} else {
+				currentErrorDelay = initialErrorDelay
 				for (item in items) {
 					if (item.itemBackdropImages.isEmpty()) continue
-					val showcase = item.asLibraryShowcase() ?: continue
+					val showcase = item.asLibraryShowcase()
+					if (showcase == null) {
+						delay(15.seconds)
+						continue
+					}
 					emit(showcase)
 					delay(emitDelay)
 				}

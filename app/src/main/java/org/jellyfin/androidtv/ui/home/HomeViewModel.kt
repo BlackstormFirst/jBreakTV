@@ -163,8 +163,6 @@ class HomeViewModel(
             .launchIn(viewModelScope)
 
         mediaManager.addAudioEventListener(this)
-
-        subscribeWebSockets()
     }
 
     private fun updateUiState() {
@@ -349,10 +347,10 @@ class HomeViewModel(
         }
     }
 
-    private fun subscribeWebSockets() {
-        viewModelScope.launch(Dispatchers.IO) {
+    suspend fun subscribeWebSockets() = coroutineScope {
+        launch(Dispatchers.IO) {
             api.webSocket.subscribe<UserDataChangedMessage>()
-                .onEach { message ->
+                .collect { message ->
                     val now = Instant.now()
                     dataRefreshService.lastPlayback = now
                     dataRefreshService.lastTvPlayback = now
@@ -369,15 +367,14 @@ class HomeViewModel(
 
                     refreshRows(force = false, delayed = true)
                 }
-                .launchIn(this)
-
+        }
+        launch(Dispatchers.IO) {
             api.webSocket.subscribe<LibraryChangedMessage>()
-                .onEach {
+                .collect {
                     dataRefreshService.lastLibraryChange = Instant.now()
                     userViewsRepository.clearCache()
                     refreshRows(force = false, delayed = true)
                 }
-                .launchIn(this)
         }
     }
 

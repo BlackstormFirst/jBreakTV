@@ -95,11 +95,10 @@ class FullDetailsViewModel(
     private var appContext: Context? = null
     private var fetchJob: Job? = null
 
-    init {
-        // Subscribe to real-time WebSockets
-        viewModelScope.launch {
+    suspend fun subscribeWebSockets() = kotlinx.coroutines.coroutineScope {
+        launch {
             api.webSocket.subscribe<UserDataChangedMessage>()
-                .onEach { message ->
+                .collect { message ->
                     val changedData = message.data
                     val itemId = currentItemId
                     if (itemId != null && changedData?.userDataList?.any { it.itemId == itemId } == true) {
@@ -107,14 +106,13 @@ class FullDetailsViewModel(
                         refresh()
                     }
                 }
-                .launchIn(this)
-
+        }
+        launch {
             api.webSocket.subscribe<LibraryChangedMessage>()
-                .onEach {
+                .collect {
                     dataRefreshService.lastLibraryChange = Instant.now()
                     refresh()
                 }
-                .launchIn(this)
         }
     }
 
