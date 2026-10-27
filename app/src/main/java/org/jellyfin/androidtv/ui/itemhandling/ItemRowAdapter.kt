@@ -1,12 +1,6 @@
 package org.jellyfin.androidtv.ui.itemhandling
 
 import android.content.Context
-import androidx.leanback.widget.ArrayObjectAdapter
-import androidx.leanback.widget.HeaderItem
-import androidx.leanback.widget.ListRow
-import androidx.leanback.widget.Presenter
-import androidx.leanback.widget.PresenterSelector
-import androidx.leanback.widget.Row
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
@@ -26,7 +20,6 @@ import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.androidtv.ui.browsing.EnhancedBrowseFragment
 import org.jellyfin.androidtv.ui.browsing.SortOption
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
-import org.jellyfin.androidtv.ui.playback.overlay.presentation.TextItemPresenter
 import org.jellyfin.androidtv.util.Utils
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -83,9 +76,6 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
     var persons: Array<BaseItemPerson>? = null
     var chapters: List<ChapterItemInfo>? = null
     var initialItems: List<BaseItemDto>? = null
-    var parent: MutableObjectAdapter<Row>? = null
-    var row: ListRow? = null
-    var siblingRow: Row? = null
     var chunkSize: Int = 0
 
     var itemsLoaded: Int = 0
@@ -108,11 +98,10 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
     private val userViewsRepository: Lazy<UserViewsRepository> = inject(UserViewsRepository::class.java)
     var context: Context? = null
 
-    constructor(context: Context, query: GetItemsRequest, chunkSize: Int, preferParentThumb: Boolean, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : this(context, query, chunkSize, preferParentThumb, false, presenter, parent, QueryType.Items)
+    constructor(context: Context, query: GetItemsRequest, chunkSize: Int, preferParentThumb: Boolean, presenter: Any? = null, parent: Any? = null) : this(context, query, chunkSize, preferParentThumb, false, presenter, parent, QueryType.Items)
 
-    constructor(context: Context, query: GetItemsRequest, chunkSize: Int, preferParentThumb: Boolean, staticHeight: Boolean, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null, queryType: QueryType = QueryType.Items) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetItemsRequest, chunkSize: Int, preferParentThumb: Boolean, staticHeight: Boolean, presenter: Any? = null, parent: Any? = null, queryType: QueryType = QueryType.Items) : super() {
         this.context = context
-        this.parent = parent
         this.query = query
         this.chunkSize = chunkSize
         this.preferParentThumb = preferParentThumb
@@ -120,183 +109,152 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
         this.queryType = queryType
     }
 
-    constructor(context: Context, query: GetItemsRequest, chunkSize: Int, preferParentThumb: Boolean, staticHeight: Boolean, presenterSelector: PresenterSelector, parent: MutableObjectAdapter<Row>? = null, queryType: QueryType = QueryType.Items) : super(presenterSelector) {
+    constructor(context: Context, query: GetArtistsRequest, chunkSize: Int, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
-        this.query = query
-        this.chunkSize = chunkSize
-        this.preferParentThumb = preferParentThumb
-        this.isStaticHeight = staticHeight
-        this.queryType = queryType
-    }
-
-    constructor(context: Context, query: GetArtistsRequest, chunkSize: Int, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
-        this.context = context
-        this.parent = parent
         this.artistsQuery = query
         this.chunkSize = chunkSize
         this.queryType = QueryType.Artists
     }
 
-    constructor(context: Context, query: GetAlbumArtistsRequest, chunkSize: Int, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetAlbumArtistsRequest, chunkSize: Int, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.albumArtistsQuery = query
         this.chunkSize = chunkSize
         this.queryType = QueryType.AlbumArtists
     }
 
-    constructor(context: Context, query: GetSeriesTimersRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetSeriesTimersRequest, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.seriesTimerQuery = query
         this.isStaticHeight = true
         this.queryType = QueryType.SeriesTimer
     }
 
-    constructor(context: Context, query: GetNextUpRequest, preferParentThumb: Boolean = false, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetNextUpRequest, preferParentThumb: Boolean = false, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.nextUpQuery = query
         this.queryType = QueryType.NextUp
         this.isStaticHeight = true
         this.preferParentThumb = preferParentThumb
     }
 
-    constructor(context: Context, query: GetLatestMediaRequest, preferParentThumb: Boolean = false, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetLatestMediaRequest, preferParentThumb: Boolean = false, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.latestQuery = query
         this.queryType = QueryType.LatestItems
         this.isStaticHeight = true
         this.preferParentThumb = preferParentThumb
     }
 
-    constructor(context: Context, query: GetLatestMediaRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : this(context, query, false, presenter, parent)
+    constructor(context: Context, query: GetLatestMediaRequest, presenter: Any? = null, parent: Any? = null) : this(context, query, false, presenter, parent)
 
-    constructor(context: Context, persons: Array<BaseItemPerson>, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, persons: Array<BaseItemPerson>, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.persons = persons
         this.isStaticHeight = true
         this.queryType = QueryType.StaticPeople
     }
 
-    constructor(persons: List<BaseItemPerson>, context: Context, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : this(context, persons.toTypedArray(), presenter, parent)
+    constructor(persons: List<BaseItemPerson>, context: Context, presenter: Any? = null, parent: Any? = null) : this(context, persons.toTypedArray(), presenter, parent)
 
-    constructor(context: Context, chapters: List<ChapterItemInfo>, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, chapters: List<ChapterItemInfo>, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.chapters = chapters
         this.isStaticHeight = true
         this.queryType = QueryType.StaticChapters
     }
 
-    constructor(context: Context, items: List<BaseRowItem>, presenter: Presenter? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, items: List<BaseRowItem>, presenter: Any? = null) : super() {
         this.context = context
         this.queryType = QueryType.StaticItems
         items.forEach { add(it) }
     }
 
-    constructor(context: Context, items: List<BaseItemDto>, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null, queryType: QueryType = QueryType.StaticItems) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, items: List<BaseItemDto>, presenter: Any? = null, parent: Any? = null, queryType: QueryType = QueryType.StaticItems) : super() {
         this.context = context
-        this.parent = parent
         this.initialItems = items
         this.queryType = queryType
     }
 
-    constructor(context: Context, items: List<BaseItemDto>, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null, staticItems: Boolean = true) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, items: List<BaseItemDto>, presenter: Any? = null, parent: Any? = null, staticItems: Boolean = true) : super() {
         this.context = context
-        this.parent = parent
         this.initialItems = items
         this.queryType = QueryType.StaticItems
     }
 
-    constructor(context: Context, query: GetSpecialsRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetSpecialsRequest, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.specialsQuery = query
         this.queryType = QueryType.Specials
     }
 
-    constructor(context: Context, query: GetAdditionalPartsRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetAdditionalPartsRequest, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.additionalPartsQuery = query
         this.queryType = QueryType.AdditionalParts
     }
 
-    constructor(context: Context, query: GetTrailersRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetTrailersRequest, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.trailersQuery = query
         this.queryType = QueryType.Trailers
     }
 
-    constructor(context: Context, query: GetNextEpisodesRequest, staticHeight: Boolean, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetNextEpisodesRequest, staticHeight: Boolean, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.nextEpisodesQuery = query
         this.isStaticHeight = staticHeight
         this.queryType = QueryType.NextEpisodes
     }
 
-    constructor(context: Context, query: GetLiveTvChannelsRequest, chunkSize: Int, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetLiveTvChannelsRequest, chunkSize: Int, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.tvChannelQuery = query
         this.chunkSize = chunkSize
         this.queryType = QueryType.LiveTvChannel
     }
 
-    constructor(context: Context, query: GetRecommendedProgramsRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetRecommendedProgramsRequest, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.tvProgramQuery = query
         this.queryType = QueryType.LiveTvProgram
         this.isStaticHeight = true
     }
 
-    constructor(context: Context, query: GetRecordingsRequest, chunkSize: Int, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetRecordingsRequest, chunkSize: Int, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.tvRecordingQuery = query
         this.chunkSize = chunkSize
         this.queryType = QueryType.LiveTvRecording
         this.isStaticHeight = true
     }
 
-    constructor(context: Context, query: GetSimilarItemsRequest, queryType: QueryType, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetSimilarItemsRequest, queryType: QueryType, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.similarQuery = query
         this.queryType = queryType
     }
 
-    constructor(context: Context, query: GetUpcomingEpisodesRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetUpcomingEpisodesRequest, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.upcomingQuery = query
         this.queryType = QueryType.Upcoming
     }
 
-    constructor(context: Context, query: GetSeasonsRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetSeasonsRequest, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.seasonQuery = query
         this.queryType = QueryType.Season
     }
 
-    constructor(context: Context, query: GetUserViewsRequest, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetUserViewsRequest, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.queryType = QueryType.Views
         this.isStaticHeight = true
     }
 
-    constructor(context: Context, query: GetResumeItemsRequest, chunkSize: Int, preferParentThumb: Boolean, staticHeight: Boolean, presenter: Presenter? = null, parent: MutableObjectAdapter<Row>? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(context: Context, query: GetResumeItemsRequest, chunkSize: Int, preferParentThumb: Boolean, staticHeight: Boolean, presenter: Any? = null, parent: Any? = null) : super() {
         this.context = context
-        this.parent = parent
         this.resumeQuery = query
         this.chunkSize = chunkSize
         this.preferParentThumb = preferParentThumb
@@ -304,22 +262,16 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
         this.queryType = QueryType.Resume
     }
 
-    constructor(rowDef: BrowseRowDef, presenter: Presenter? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} }) {
+    constructor(rowDef: BrowseRowDef, presenter: Any? = null) : super() {
         initFromRowDef(rowDef)
     }
 
-    constructor(rowDef: BrowseRowDef, presenterSelector: PresenterSelector) : super(presenterSelector) {
-        initFromRowDef(rowDef)
-    }
-
-    constructor(query: GetItemsRequest, presenterSelector: PresenterSelector) : super(presenterSelector) {
+    constructor(query: GetItemsRequest, presenterSelector: Any? = null) : super() {
         this.query = query
         this.queryType = QueryType.Items
     }
 
-    constructor(presenter: Presenter? = null) : super(presenter ?: object : Presenter() { override fun onCreateViewHolder(parent: android.view.ViewGroup) = ViewHolder(android.view.View(parent.context)); override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {} override fun onUnbindViewHolder(viewHolder: ViewHolder) {} })
-
-    constructor(presenterSelector: PresenterSelector) : super(presenterSelector)
+    constructor(presenter: Any? = null) : super()
 
     private fun initFromRowDef(rowDef: BrowseRowDef) {
         query = rowDef.query
@@ -390,20 +342,7 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
     }
 
     fun removeRow() {
-        val p = parent ?: run {
-            clear()
-            return
-        }
-
-        siblingRow?.let { p.remove(it) }
-
-        if (p.size() == 1 && context != null) {
-            val emptyRow = ArrayObjectAdapter(TextItemPresenter())
-            emptyRow.add(context!!.getString(R.string.lbl_no_items))
-            p.add(ListRow(HeaderItem(context!!.getString(R.string.lbl_empty)), emptyRow))
-        }
-
-        row?.let { p.remove(it) }
+        clear()
     }
 
     fun loadMoreItemsIfNeeded(pos: Int) {
@@ -415,7 +354,7 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
                 retrieveNext()
             }
         } else if (pos >= itemsLoaded - 20) {
-            Timber.i("Loading more items trigger pos <%s> itemsLoaded <%s> from total <%s>", pos, itemsLoaded, totalItems)
+            Timber.i("Loading more items trigger pos <%s> itemsLoaded <%s> from total <%s>", pos, itemsLoaded)
             retrieveNext()
         }
     }
@@ -506,7 +445,6 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
             QueryType.Trailers -> trailersQuery?.let { retrieveTrailers(api.value, it) }
             QueryType.Search -> {
                 loadStaticItems()
-                addToParentIfResultsReceived()
             }
             QueryType.Artists -> artistsQuery?.let { retrieveArtists(api.value, it, 0, chunkSize) }
             QueryType.AlbumArtists -> albumArtistsQuery?.let { retrieveAlbumArtists(api.value, it, 0, chunkSize) }
@@ -563,13 +501,6 @@ class ItemRowAdapter : MutableObjectAdapter<Any> {
             removeRow()
         }
         notifyRetrieveFinished()
-    }
-
-    private fun addToParentIfResultsReceived() {
-        val r = row
-        if (itemsLoaded > 0 && parent != null && r != null) {
-            parent!!.add(r)
-        }
     }
 
     private fun retrieveAudioPlaylists(query: GetItemsRequest) {

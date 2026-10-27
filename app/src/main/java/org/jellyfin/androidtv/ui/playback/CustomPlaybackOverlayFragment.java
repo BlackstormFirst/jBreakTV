@@ -47,7 +47,6 @@ import org.jellyfin.androidtv.data.service.BackgroundService;
 import androidx.compose.ui.platform.ComposeView;
 import org.jellyfin.androidtv.databinding.VlcPlayerInterfaceBinding;
 import org.jellyfin.androidtv.ui.itemhandling.ChapterItemInfoBaseRowItem;
-import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
 import org.jellyfin.androidtv.ui.livetv.LiveTvGuideFragment;
 import org.jellyfin.androidtv.ui.livetv.LiveTvGuideFragmentHelperKt;
 import org.jellyfin.androidtv.ui.livetv.TvManager;
@@ -57,7 +56,6 @@ import org.jellyfin.androidtv.ui.navigation.NavigationRepository;
 import org.jellyfin.androidtv.ui.playback.overlay.LeanbackOverlayFragment;
 import org.jellyfin.androidtv.ui.playback.overlay.presentation.CardPresenter;
 import org.jellyfin.androidtv.ui.playback.overlay.presentation.ChannelCardPresenter;
-import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter;
 import org.jellyfin.androidtv.ui.playback.overlay.presentation.PositionableListRowPresenter;
 import org.jellyfin.androidtv.util.CoroutineUtils;
 import org.jellyfin.androidtv.util.DateTimeExtensionsKt;
@@ -963,8 +961,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements View.OnKe
 
         if (chapters != null && !chapters.isEmpty()) {
             // create chapter row for later use
-            ItemRowAdapter chapterAdapter = new ItemRowAdapter(requireContext(), BaseItemExtensionsKt.buildChapterItems(item), new CardPresenter(true, 80), new MutableObjectAdapter<Row>());
-            chapterAdapter.Retrieve();
+            ArrayObjectAdapter chapterAdapter = new ArrayObjectAdapter(new CardPresenter(true, 80));
+            for (org.jellyfin.androidtv.data.model.ChapterItemInfo chapter : BaseItemExtensionsKt.buildChapterItems(item)) {
+                chapterAdapter.add(new ChapterItemInfoBaseRowItem(chapter));
+            }
             if (mChapterRow != null) mPopupRowAdapter.remove(mChapterRow);
             mChapterRow = new ListRow(new HeaderItem(requireContext().getString(R.string.chapters)), chapterAdapter);
             mPopupRowAdapter.add(mChapterRow);
