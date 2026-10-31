@@ -121,6 +121,16 @@ class AssVsyncScheduler(
         val nowNs = System.nanoTime()
         val effectiveReleaseNs = if (releaseTimeNs > 0L) releaseTimeNs else nowNs + 30_000_000L
 
+        // Enforce strict capacity limit to prevent unbounded memory growth if VSYNC stalls
+        while (ringBuffer.size >= queueCapacity) {
+            val oldest = ringBuffer.poll()
+            if (oldest != null) {
+                recyclePoolItem(oldest)
+            } else {
+                break
+            }
+        }
+
         val item = obtainPoolItem()
         item.releaseTimeNs = effectiveReleaseNs
         item.pureTimestampUs = pureTimestampUs
@@ -219,9 +229,9 @@ class AssVsyncScheduler(
 
         val finalEntry = selectedEntry ?: fallbackOlderEntry
 
-        finalEntry?.let { entry ->
-            val targetPureUs = entry.pureTimestampUs
-            val targetPtsMs = entry.ptsMs
+        if (finalEntry != null) {
+            val targetPureUs = finalEntry.pureTimestampUs
+            val targetPtsMs = finalEntry.ptsMs
 
             // Purge items from RingBuffer up to and including finalEntry
             val purgeIterator = ringBuffer.iterator()
@@ -246,6 +256,18 @@ class AssVsyncScheduler(
                 }
 
                 lastRenderedTimeMs = targetPtsMs
+            }
+        } else {
+            // Purge stale items older than lowerBoundNs if no valid frame was selected
+            val purgeIterator = ringBuffer.iterator()
+            while (purgeIterator.hasNext()) {
+                val item = purgeIterator.next()
+                if (item.releaseTimeNs < lowerBoundNs) {
+                    purgeIterator.remove()
+                    recyclePoolItem(item)
+                } else {
+                    break
+                }
             }
         }
     }

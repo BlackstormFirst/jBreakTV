@@ -145,8 +145,11 @@ class ExoPlayerBackend(
 				}
 			)
 		}.let { renderersFactory ->
-			if (exoPlayerOptions.enableLibass) AssRenderersFactory(assHandler, renderersFactory)
-			else renderersFactory
+			if (exoPlayerOptions.enableLibass && exoPlayerOptions.libassRenderMode == LibassRenderMode.STANDARD) {
+				AssRenderersFactory(assHandler, renderersFactory)
+			} else {
+				renderersFactory
+			}
 		}
 
 		val minBufferMs = exoPlayerOptions.minBufferDuration?.inWholeMilliseconds?.toInt()
@@ -160,7 +163,6 @@ class ExoPlayerBackend(
 
 		val backBufferMs = when {
 			isLowRamDevice -> 10_000
-			exoPlayerOptions.maxBufferDuration != null && exoPlayerOptions.maxBufferDuration.inWholeSeconds >= 200 -> 120_000
 			else -> 30_000
 		}
 		val retainBackBuffer = exoPlayerOptions.maxBufferDuration != null && exoPlayerOptions.maxBufferDuration.inWholeSeconds >= 200
@@ -613,6 +615,10 @@ class ExoPlayerBackend(
 		vsyncScheduler.release()
 		if (exoPlayerOptions.enableLibass && assHandlerDelegate.isInitialized()) {
 			synchronized(assHandler) {
+				runCatching {
+					val assObj = assHandler.javaClass.getMethod("getAss").invoke(assHandler)
+					assObj?.javaClass?.getMethod("clearFont")?.invoke(assObj)
+				}
 				runCatching { assHandler.release() }
 			}
 		}

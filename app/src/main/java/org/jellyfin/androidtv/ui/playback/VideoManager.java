@@ -411,7 +411,11 @@ public class VideoManager {
             };
             mediaSourceFactory.setSubtitleParserFactory(delegatingSubtitleParserFactory);
             exoPlayerBuilder.setMediaSourceFactory(mediaSourceFactory);
-            exoPlayerBuilder.setRenderersFactory(new AssRenderersFactory(assHandler, defaultRendererFactory));
+            if (libassRenderMode == LibassRenderMode.STANDARD) {
+                exoPlayerBuilder.setRenderersFactory(new AssRenderersFactory(assHandler, defaultRendererFactory));
+            } else {
+                exoPlayerBuilder.setRenderersFactory(defaultRendererFactory);
+            }
         } else {
             exoPlayerBuilder.setRenderersFactory(defaultRendererFactory);
             exoPlayerBuilder.setMediaSourceFactory(new DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory));
@@ -852,6 +856,12 @@ public class VideoManager {
         if (assHandler != null) {
             try {
                 synchronized (assHandler) {
+                    try {
+                        Object assObj = assHandler.getClass().getMethod("getAss").invoke(assHandler);
+                        if (assObj != null) {
+                            assObj.getClass().getMethod("clearFont").invoke(assObj);
+                        }
+                    } catch (Exception ignored) {}
                     assHandler.release();
                 }
             } catch (Exception e) {

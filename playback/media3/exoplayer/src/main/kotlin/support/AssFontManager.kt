@@ -2,7 +2,6 @@ package org.jellyfin.playback.media3.exoplayer.support
 
 import android.app.ActivityManager
 import android.content.Context
-import android.os.Build
 import io.github.peerless2012.ass.media.AssHandler
 import io.github.peerless2012.ass.media.AssHandlerConfig
 import kotlinx.coroutines.CoroutineScope
@@ -18,8 +17,10 @@ import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.util.isLocalPath
 import timber.log.Timber
 import java.io.File
+import java.io.FileInputStream
 import java.io.RandomAccessFile
 import java.net.URL
+import java.nio.ByteBuffer
 import java.util.Locale
 
 object AssFontManager {
@@ -41,7 +42,7 @@ object AssFontManager {
 
 	@JvmStatic
 	val defaultAssHandlerConfig: AssHandlerConfig = AssHandlerConfig(
-		glyphSize = 10000,
+		glyphSize = 20000,
 		cacheSize = 128,
 		maxRenderPixels = 1920 * 1080,
 	)
@@ -50,16 +51,13 @@ object AssFontManager {
 	fun getAssHandlerConfig(context: Context): AssHandlerConfig {
 		val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
 		val isLowRam = am?.isLowRamDevice == true
-		val isApi30Plus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
 		val glyphSize = when {
 			isLowRam -> 8000
-			isApi30Plus -> 35000
-			else -> 10000
+			else -> 20000
 		}
 		val cacheSize = when {
 			isLowRam -> 64
-			isApi30Plus -> 256
 			else -> 128
 		}
 		val maxRenderPixels = 1920 * 1080
@@ -234,23 +232,38 @@ object AssFontManager {
 
 				for (fontFile in fontFiles) {
 					if (!coroutineContext.isActive) break
-					if (totalLoadedBytes + fontFile.length() > maxTotalBytes) {
+					val fileSize = fontFile.length()
+					if (totalLoadedBytes + fileSize > maxTotalBytes) {
 						Timber.w("Reached max font preload limit (${maxTotalBytes / (1024 * 1024)}MB), skipping remaining fonts")
 						break
 					}
 					runCatching {
-						val fontBytes = fontFile.readBytes()
+						val sizeInt = fileSize.toInt()
+						val directBuffer = ByteBuffer.allocateDirect(sizeInt)
+						FileInputStream(fontFile).use { fis ->
+							fis.channel.read(directBuffer)
+						}
+						directBuffer.flip()
+						val fontBytesArray = ByteArray(sizeInt)
+						directBuffer.get(fontBytesArray)
+
 						synchronized(assHandler) {
 							if (coroutineContext.isActive) {
 								runCatching {
-									assHandler.addFont(fontFile.name, fontBytes)
+									assHandler.addFont(fontFile.name, fontBytesArray)
 								}.onFailure { error ->
 									Timber.w(error, "AssFontManager: AssHandler was released or failed while adding font ${fontFile.name}")
 								}
 							}
 						}
 						fontFile.setLastModified(System.currentTimeMillis())
-						totalLoadedBytes += fontBytes.size
+						totalLoadedBytes += sizeInt
+
+						// Immediate release of heap references and direct buffer cleanup
+						@Suppress("UNUSED_VALUE")
+						var fontBytesRef: ByteArray? = fontBytesArray
+						fontBytesRef = null
+						directBuffer.clear()
 					}.onFailure { error ->
 						Timber.w(error, "Failed to load font ${fontFile.name} into libass")
 					}
