@@ -222,6 +222,7 @@
     <string name="pref_next_up_timeout_title">Durée d\'attente avant la lecture du suivant</string>
     <string name="pref_about_title">A propos</string>
     <string name="lbl_my_media">Mes médias</string>
+    <string name="lbl_media_details">Détails des médias</string>
     <string name="watch_now">Regarder maintenant</string>
     <string name="pref_next_up_timeout_summary">Combien de temps attendre avant de lire l\'élément suivant</string>
     <string name="pref_app_theme">Thème de l\'application</string>

@@ -549,7 +549,6 @@ fun MediaStreamCard(
 @Composable
 fun MediaDetailsRow(
     streams: List<MediaStream>,
-    containerName: String? = null,
     modifier: Modifier = Modifier
 ) {
     val displayStreams = remember(streams) {
@@ -560,17 +559,6 @@ fun MediaDetailsRow(
 
     if (displayStreams.isEmpty()) return
 
-    val formattedContainer = containerName
-        ?.replace("Détails des médias", "", ignoreCase = true)
-        ?.replace("Media Details", "", ignoreCase = true)
-        ?.trim(' ', '(', ')', '-', ':')
-
-    val title = if (!formattedContainer.isNullOrBlank()) {
-        "Détails des médias ($formattedContainer)"
-    } else {
-        "Détails des médias"
-    }
-
     val density = LocalDensity.current
     val horizontalBringIntoViewSpec = rememberHorizontalBringIntoViewSpec(paddingPx = with(density) { 56.dp.toPx() })
 
@@ -578,7 +566,7 @@ fun MediaDetailsRow(
         modifier = modifier.focusProperties { down = FocusRequester.Cancel }
     ) {
         Text(
-            text = title,
+            text = stringResource(R.string.lbl_media_details),
             style = JellyfinTheme.typography.listHeader.copy(color = JellyfinTheme.colorScheme.listHeader),
             modifier = Modifier.padding(start = 56.dp, end = 56.dp, bottom = 12.dp)
         )
@@ -698,6 +686,16 @@ fun VideoDetailsScreen(
         (item.localTrailerCount ?: 0) > 0 || !(item.remoteTrailers.isNullOrEmpty())
     }
 
+    val activeSource = state.selectedMediaSource ?: item.mediaSources?.firstOrNull()
+    val mediaStreams = activeSource?.mediaStreams?.takeIf { it.isNotEmpty() }
+        ?: item.mediaStreams?.takeIf { it.isNotEmpty() }
+
+    val filteredStreams = remember(mediaStreams) {
+        mediaStreams?.filter {
+            it.type == MediaStreamType.VIDEO || it.type == MediaStreamType.AUDIO || it.type == MediaStreamType.SUBTITLE
+        }
+    }
+
     val backgroundService = koinInject<BackgroundService>()
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -769,7 +767,7 @@ fun VideoDetailsScreen(
                 verticalArrangement = Arrangement.spacedBy(28.dp)
             ) {
                 // Main Details Row Item matching view_row_details.xml
-                item {
+                item(key = "main_details_header") {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1085,8 +1083,9 @@ fun VideoDetailsScreen(
                 // Additional Content Rows (Seasons, Episodes, Cast, Extras, Similar)
                 this@LazyColumn.itemsIndexed(state.rows, key = { idx, row -> "details_content_row_${idx}_${row.title.hashCode()}" }) { rowIndex: Int, rowState: DetailsRowState ->
                     val items by rowState.adapter.collectAsStateAny()
+                    val validRowItems = remember(items) { items.filterIsInstance<BaseRowItem>() }
 
-                    if (items.isNotEmpty()) {
+                    if (validRowItems.isNotEmpty()) {
                         Column {
                             Text(
                                 text = rowState.title,
@@ -1100,42 +1099,35 @@ fun VideoDetailsScreen(
                                     contentPadding = PaddingValues(horizontal = 56.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                itemsIndexed(items, key = { index, item -> "row_item_${rowIndex}_${index}_${item.hashCode()}" }) { index: Int, rowItem: Any ->
-                                    val interactionSource = remember { MutableInteractionSource() }
-                                    val isFocusedState by interactionSource.collectIsFocusedAsState()
-                                    var isFocusedInternal by remember { mutableStateOf(false) }
-                                    val isFocused = isFocusedState || isFocusedInternal
-                                    var showContextMenu by remember { mutableStateOf(false) }
+                                    itemsIndexed(validRowItems, key = { index, item -> "row_item_${rowIndex}_${index}_${item.hashCode()}" }) { index: Int, rowItem: BaseRowItem ->
+                                        val interactionSource = remember { MutableInteractionSource() }
+                                        val isFocusedState by interactionSource.collectIsFocusedAsState()
+                                        var isFocusedInternal by remember { mutableStateOf(false) }
+                                        val isFocused = isFocusedState || isFocusedInternal
+                                        var showContextMenu by remember { mutableStateOf(false) }
 
-                                    val cardFocusRequester = remember { FocusRequester() }
-                                    val cardBringIntoViewRequester = remember { BringIntoViewRequester() }
+                                        val cardFocusRequester = remember { FocusRequester() }
+                                        val cardBringIntoViewRequester = remember { BringIntoViewRequester() }
 
-                                    Box(
-                                        modifier = Modifier
-                                            .focusRequester(cardFocusRequester)
-                                            .zIndex(if (isFocused) 1f else 0f)
-                                            .bringIntoViewRequester(cardBringIntoViewRequester)
-                                            .onFocusChanged { focusState ->
-                                                isFocusedInternal = focusState.isFocused
-                                                if (focusState.isFocused) {
-                                                    coroutineScope.launch {
-                                                        try { cardBringIntoViewRequester.bringIntoView() } catch (e: Exception) {}
+                                        Box(
+                                            modifier = Modifier
+                                                .focusRequester(cardFocusRequester)
+                                                .zIndex(if (isFocused) 1f else 0f)
+                                                .bringIntoViewRequester(cardBringIntoViewRequester)
+                                                .onFocusChanged { focusState ->
+                                                    isFocusedInternal = focusState.isFocused
+                                                    if (focusState.isFocused) {
+                                                        coroutineScope.launch {
+                                                            try { cardBringIntoViewRequester.bringIntoView() } catch (e: Exception) {}
+                                                        }
                                                     }
                                                 }
-                                            }
-                                            .itemCardClickable(
-                                                interactionSource = interactionSource,
-                                                onClick = {
-                                                    if (rowItem is BaseRowItem) onItemClick(rowItem)
-                                                },
-                                                onLongClick = {
-                                                    if (rowItem is BaseRowItem) {
-                                                        showContextMenu = true
-                                                    }
-                                                }
-                                            )
-                                    ) {
-                                        if (rowItem is BaseRowItem) {
+                                                .itemCardClickable(
+                                                    interactionSource = interactionSource,
+                                                    onClick = { onItemClick(rowItem) },
+                                                    onLongClick = { showContextMenu = true }
+                                                )
+                                        ) {
                                             BaseRowItemCard(
                                                 item = rowItem,
                                                 focused = isFocused,
@@ -1160,19 +1152,11 @@ fun VideoDetailsScreen(
                         }
                     }
                 }
-                // Media Details Streams Rows (matching Leanback addInfoRows / InfoCardPresenter / MyInfoCardView)
-                if (!isPerson) {
-                    val selectedSource = state.selectedMediaSource ?: item.mediaSources?.firstOrNull()
-                    val mediaStreams = selectedSource?.mediaStreams?.takeIf { it.isNotEmpty() } ?: item.mediaStreams
-                    val containerName = selectedSource?.container ?: item.container
 
-                    if (!mediaStreams.isNullOrEmpty()) {
-                        this@LazyColumn.item {
-                            MediaDetailsRow(
-                                streams = mediaStreams,
-                                containerName = containerName
-                            )
-                        }
+                // Media Details Streams Rows (matching Leanback addInfoRows / InfoCardPresenter / MyInfoCardView)
+                if (!isPerson && !filteredStreams.isNullOrEmpty()) {
+                    this@LazyColumn.item(key = "media_details_streams_row") {
+                        MediaDetailsRow(streams = filteredStreams)
                     }
                 }
             } // end of LazyColumn
@@ -1220,5 +1204,3 @@ fun VideoDetailsScreen(
             }
         } // end of Box
     }
-} // end of VideoDetailsScreen
-

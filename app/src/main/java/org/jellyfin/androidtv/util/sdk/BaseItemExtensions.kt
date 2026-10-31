@@ -55,9 +55,24 @@ fun BaseItemDto?.canPlay() = this != null
 	&& type != BaseItemKind.PERSON
 	&& (if (isFolder == true) (childCount ?: 0) > 0 else (mediaSourceCount ?: mediaSources?.size ?: 0) > 0)
 
-fun BaseItemDto.isRealAvailableMedia(): Boolean =
-	locationType != LocationType.VIRTUAL &&
-	isPlaceHolder != true
+fun BaseItemDto.isRealAvailableMedia(): Boolean {
+	if (isPlaceHolder == true) return false
+	return when (type) {
+		BaseItemKind.SEASON,
+		BaseItemKind.SERIES,
+		BaseItemKind.BOX_SET,
+		BaseItemKind.FOLDER,
+		BaseItemKind.COLLECTION_FOLDER,
+		BaseItemKind.USER_VIEW,
+		BaseItemKind.PLAYLIST,
+		BaseItemKind.MUSIC_ALBUM,
+		BaseItemKind.MUSIC_ARTIST,
+		BaseItemKind.PERSON,
+		BaseItemKind.CHANNEL,
+		BaseItemKind.CHANNEL_FOLDER_ITEM -> true
+		else -> locationType != LocationType.VIRTUAL
+	}
+}
 
 fun BaseItemDto.isLiveTv() = type == BaseItemKind.PROGRAM || type == BaseItemKind.LIVE_TV_CHANNEL
 fun BaseItemDto.isNew() = isSeries == true && isNews != true && isRepeat != true

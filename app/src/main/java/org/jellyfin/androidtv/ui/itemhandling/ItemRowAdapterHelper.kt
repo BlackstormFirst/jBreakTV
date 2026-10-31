@@ -201,8 +201,12 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 				// Combine the next up episode with the additionally retrieved episodes
 				val items = buildList {
 					add(firstNextUp)
-					addAll(episodesResponse.items.dropWhile { it.id == firstNextUp.id }.filter { it.isRealAvailableMedia() })
-				}
+					addAll(
+						episodesResponse.items
+							.filter { it.id != firstNextUp.id && it.isRealAvailableMedia() }
+							.distinctBy { it.id }
+					)
+				}.distinctBy { it.id }
 
 				setInitialItems(
 					items = items,
@@ -299,12 +303,14 @@ fun ItemRowAdapter.retrieveAdditionalParts(api: ApiClient, query: GetAdditionalP
 				api.videosApi.getAdditionalPart(query.itemId).content
 			}
 
+			val filteredParts = response.items.filter { it.id != query.itemId }.distinctBy { it.id }
+
 			setInitialItems(
-				items = response.items,
+				items = filteredParts,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
 
-			if (response.items.isEmpty()) removeRow()
+			if (filteredParts.isEmpty()) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
@@ -324,11 +330,10 @@ fun ItemRowAdapter.retrieveNextEpisodes(api: ApiClient, query: GetNextEpisodesRe
 				).content
 			}
 
-			// getEpisodes includes the startItemId if it exists. We only want the *next* episodes.
-			// However, if the current episode is missing from the list (e.g. filtered),
-			// startItemId might just start returning from the next available.
-			// Let's filter out the startItemId itself just in case.
-			val nextEpisodes = response.items.dropWhile { it.id == query.startItemId }
+			// Filter out current episode (startItemId) and deduplicate next episodes
+			val nextEpisodes = response.items
+				.filter { it.id != query.startItemId }
+				.distinctBy { it.id }
 
 			setInitialItems(
 				items = nextEpisodes,
@@ -453,12 +458,14 @@ fun ItemRowAdapter.retrieveSeasons(api: ApiClient, query: GetSeasonsRequest) {
 				api.tvShowsApi.getSeasons(query).content
 			}
 
+			val filteredSeasons = response.items.filter { it.isRealAvailableMedia() }.distinctBy { it.id }
+
 			setInitialItems(
-				items = response.items,
+				items = filteredSeasons,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
 
-			if (response.items.isEmpty()) removeRow()
+			if (filteredSeasons.isEmpty()) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
@@ -473,12 +480,14 @@ fun ItemRowAdapter.retrieveUpcomingEpisodes(api: ApiClient, query: GetUpcomingEp
 				api.tvShowsApi.getUpcomingEpisodes(query).content
 			}
 
+			val upcomingEpisodes = response.items.distinctBy { it.id }
+
 			setInitialItems(
-				items = response.items,
+				items = upcomingEpisodes,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
 
-			if (response.items.isEmpty()) removeRow()
+			if (upcomingEpisodes.isEmpty()) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
@@ -493,12 +502,16 @@ fun ItemRowAdapter.retrieveSimilarItems(api: ApiClient, query: GetSimilarItemsRe
 				api.libraryApi.getSimilarItems(query).content
 			}
 
+			val filteredSimilar = response.items
+				.filter { it.id != query.itemId && it.isRealAvailableMedia() }
+				.distinctBy { it.id }
+
 			setInitialItems(
-				items = response.items,
+				items = filteredSimilar,
 				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
 			)
 
-			if (response.items.isEmpty()) removeRow()
+			if (filteredSimilar.isEmpty()) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }
@@ -513,8 +526,12 @@ fun ItemRowAdapter.retrieveTrailers(api: ApiClient, query: GetTrailersRequest) {
 				api.userLibraryApi.getLocalTrailers(itemId = query.itemId)
 			}.content
 
+			val filteredTrailers = response
+				.filter { it.id != query.itemId && it.isRealAvailableMedia() }
+				.distinctBy { it.id }
+
 			setInitialItems(
-				items = response,
+				items = filteredTrailers,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
 						item,
@@ -526,7 +543,7 @@ fun ItemRowAdapter.retrieveTrailers(api: ApiClient, query: GetTrailersRequest) {
 				}
 			)
 
-			if (response.isEmpty()) removeRow()
+			if (filteredTrailers.isEmpty()) removeRow()
 		}.fold(
 			onSuccess = { notifyRetrieveFinished() },
 			onFailure = { error -> notifyRetrieveFinished(error as? Exception) }

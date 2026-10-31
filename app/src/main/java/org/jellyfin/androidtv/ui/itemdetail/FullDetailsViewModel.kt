@@ -237,8 +237,10 @@ class FullDetailsViewModel(
                     }
                 }
 
-            val updatedBaseItem = if (!mediaSources.isNullOrEmpty()) {
-                baseItem.copy(mediaSources = mediaSources)
+            val deduplicatedSources = mediaSources?.distinctBy { it.id ?: it.path ?: it.container }
+
+            val updatedBaseItem = if (!deduplicatedSources.isNullOrEmpty()) {
+                baseItem.copy(mediaSources = deduplicatedSources)
             } else baseItem
 
             val currentSelectedSource = _uiState.value.selectedMediaSource
@@ -564,7 +566,7 @@ class FullDetailsViewModel(
                 else -> Unit
             }
 
-            _uiState.value = _uiState.value.copy(rows = rows)
+            _uiState.value = _uiState.value.copy(rows = rows.distinctBy { it.title })
         }
     }
 
