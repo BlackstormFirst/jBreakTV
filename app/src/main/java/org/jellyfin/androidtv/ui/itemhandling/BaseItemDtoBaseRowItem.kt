@@ -14,6 +14,7 @@ import org.jellyfin.androidtv.util.sdk.getSubName
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.SeriesStatus
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import java.time.format.DateTimeFormatter
 import org.jellyfin.androidtv.constant.ImageType as BaseRowImageType
@@ -68,11 +69,18 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 	override fun getCardName(context: Context) = when {
 		showParentTitle && baseItem?.type == BaseItemKind.SEASON && !baseItem.seriesName.isNullOrBlank() -> baseItem.seriesName
 
-		baseItem?.type == BaseItemKind.AUDIO && baseItem.artists != null -> baseItem.artists?.joinToString(", ")
-		baseItem?.type == BaseItemKind.AUDIO && baseItem.albumArtists != null -> baseItem.albumArtists?.joinToString(", ")
-		baseItem?.type == BaseItemKind.AUDIO && baseItem.albumArtist != null -> baseItem.albumArtist
-		baseItem?.type == BaseItemKind.AUDIO && baseItem.album != null -> baseItem.album
-
+		baseItem?.type == BaseItemKind.EPISODE -> baseItem.seriesName?.takeIf { it.isNotBlank() } ?: baseItem.name
+		baseItem?.type == BaseItemKind.SERIES -> baseItem.name
+		baseItem?.type == BaseItemKind.MOVIE -> baseItem.name
+		baseItem?.type == BaseItemKind.RECORDING -> baseItem.name
+		baseItem?.type == BaseItemKind.MUSIC_ALBUM -> baseItem.name
+		baseItem?.type == BaseItemKind.AUDIO -> when {
+			!baseItem.artists.isNullOrEmpty() -> baseItem.artists?.joinToString(", ")
+			!baseItem.albumArtists.isNullOrEmpty() -> baseItem.albumArtists?.joinToString(", ")
+			!baseItem.albumArtist.isNullOrBlank() -> baseItem.albumArtist
+			!baseItem.album.isNullOrBlank() -> baseItem.album
+			else -> baseItem.getFullName(context)
+		}
 		else -> baseItem?.getFullName(context)
 	}
 
@@ -85,9 +93,57 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 	override fun getSummary(context: Context) = baseItem?.overview
 
 	override fun getSubText(context: Context) = when (baseItem?.type) {
-		BaseItemKind.TV_CHANNEL -> baseItem.number
-		BaseItemKind.TV_PROGRAM,
-		BaseItemKind.PROGRAM -> baseItem.episodeTitle ?: baseItem.channelName
+		BaseItemKind.EPISODE -> {
+			val seasonStr = baseItem.parentIndexNumber?.let { "S$it" }
+			val episodeStr = when {
+				baseItem.indexNumber != null && baseItem.indexNumberEnd != null -> "E${baseItem.indexNumber}-${baseItem.indexNumberEnd}"
+				baseItem.indexNumber != null -> "E${baseItem.indexNumber}"
+				else -> null
+			}
+			val seCode = listOfNotNull(seasonStr, episodeStr).joinToString(":")
+			val title = baseItem.name.orEmpty()
+			when {
+				seCode.isNotEmpty() && title.isNotEmpty() -> "$seCode - $title"
+				seCode.isNotEmpty() -> seCode
+				title.isNotEmpty() -> title
+				else -> null
+			}
+		}
+
+		BaseItemKind.SEASON if showParentTitle && !baseItem.seriesName.isNullOrBlank() -> baseItem.name
+		BaseItemKind.SEASON -> baseItem.getSubName(context)
+
+		BaseItemKind.SERIES -> {
+			val year = baseItem.productionYear ?: baseItem.premiereDate?.year
+			val statusEnum = baseItem.status?.let(SeriesStatus::fromNameOrNull)
+			val isEnded = statusEnum == SeriesStatus.ENDED || baseItem.status?.equals("Ended", ignoreCase = true) == true
+
+			val statusText = if (isEnded) {
+				null
+			} else {
+				when (statusEnum) {
+					SeriesStatus.CONTINUING -> "En production"
+					SeriesStatus.UNRELEASED -> "Non sortie"
+					else -> when {
+						baseItem.status?.equals("Continuing", ignoreCase = true) == true -> "En production"
+						baseItem.status?.equals("Unreleased", ignoreCase = true) == true -> "Non sortie"
+						else -> baseItem.status
+					}
+				}
+			}
+
+			when {
+				year != null && !statusText.isNullOrBlank() -> "$year - $statusText"
+				year != null -> year.toString()
+				!statusText.isNullOrBlank() -> statusText
+				else -> baseItem.getSubName(context)
+			}
+		}
+
+		BaseItemKind.MOVIE -> {
+			val year = baseItem.productionYear ?: baseItem.premiereDate?.year ?: baseItem.startDate?.year
+			year?.toString() ?: baseItem.getSubName(context)
+		}
 
 		BaseItemKind.RECORDING -> {
 			val channelName = baseItem.channelName
@@ -99,23 +155,38 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 				else -> ""
 			}
 
-			val timeFormatter = context.getTimeFormatter()
 			val startDate = baseItem.startDate
 			val endDate = baseItem.endDate
 
-			val formattedDate = dayMonthFormatter.withLocale(context.locale).format(startDate)
-			val formattedStartTime = timeFormatter.format(startDate)
-			val formattedEndTime = timeFormatter.format(endDate)
+			if (startDate != null && endDate != null) {
+				val timeFormatter = context.getTimeFormatter()
+				val formattedDate = dayMonthFormatter.withLocale(context.locale).format(startDate)
+				val formattedStartTime = timeFormatter.format(startDate)
+				val formattedEndTime = timeFormatter.format(endDate)
 
-			if (title.isEmpty()) {
-				"$formattedDate $formattedStartTime - $formattedEndTime"
+				if (title.isEmpty()) {
+					"$formattedDate $formattedStartTime - $formattedEndTime"
+				} else {
+					"$title $formattedDate $formattedStartTime - $formattedEndTime"
+				}
 			} else {
-				"$title $formattedDate $formattedStartTime - $formattedEndTime"
+				title.ifEmpty { baseItem.getSubName(context) }
 			}
 		}
 
-		BaseItemKind.SEASON if showParentTitle && !baseItem.seriesName.isNullOrBlank() -> baseItem.name
-		BaseItemKind.SEASON -> baseItem.getSubName(context)
+		BaseItemKind.MUSIC_ALBUM -> {
+			val artist = when {
+				!baseItem.artists.isNullOrEmpty() -> baseItem.artists?.joinToString(", ")
+				!baseItem.albumArtists.isNullOrEmpty() -> baseItem.albumArtists?.joinToString(", ")
+				!baseItem.albumArtist.isNullOrBlank() -> baseItem.albumArtist
+				else -> null
+			}
+			artist ?: baseItem.getSubName(context)
+		}
+
+		BaseItemKind.TV_CHANNEL -> baseItem.number
+		BaseItemKind.TV_PROGRAM,
+		BaseItemKind.PROGRAM -> baseItem.episodeTitle ?: baseItem.channelName
 
 		else -> baseItem?.getSubName(context)
 	}
