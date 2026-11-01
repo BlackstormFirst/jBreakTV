@@ -82,6 +82,7 @@ import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
+import org.jellyfin.androidtv.util.sdk.getSeasonEpisodeName
 import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
@@ -358,7 +359,18 @@ fun EnhancedBrowseScreen(
 	val currentItem = displayedSelectedItem?.baseItem ?: folder
 	val currentTitle = remember(displayedSelectedItem, folder, title, context) {
 		if (displayedSelectedItem != null) {
-			displayedSelectedItem?.getCardName(context) ?: title ?: ""
+			val baseItem = displayedSelectedItem?.baseItem
+			if (baseItem?.type == BaseItemKind.EPISODE) {
+				val seCode = baseItem.getSeasonEpisodeName(context)
+				val epName = baseItem.name.orEmpty()
+				when {
+					seCode.isNotBlank() && epName.isNotBlank() -> "$seCode - $epName"
+					seCode.isNotBlank() -> seCode
+					else -> epName
+				}
+			} else {
+				displayedSelectedItem?.getCardName(context) ?: title ?: ""
+			}
 		} else if (folder != null) {
 			if (folder.type == BaseItemKind.SEASON && !folder.seriesName.isNullOrBlank()) {
 				"${folder.seriesName} - ${folder.name}"

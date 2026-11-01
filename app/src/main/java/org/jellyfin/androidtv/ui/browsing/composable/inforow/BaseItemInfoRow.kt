@@ -275,7 +275,6 @@ fun BaseItemInfoRow(
 
 		when (item.type) {
 			BaseItemKind.EPISODE -> {
-				InfoRowSeasonEpisode(item)
 				InfoRowDate(item)
 				if (includeRuntime) item.runTimeTicks?.ticks?.let { BaseItemInfoRowRuntime(it) }
 				item.officialRating?.let { InfoRowParentalRating(it) }

@@ -197,7 +197,17 @@ class FullDetailsViewModel(
 
             val directors = baseItem.people?.filter { it.type == PersonKind.DIRECTOR }?.mapNotNull { it.name }?.joinToString(", ")
             val writers = baseItem.people?.filter { it.type == PersonKind.WRITER }?.mapNotNull { it.name }?.joinToString(", ")
-            val genres = baseItem.genres?.joinToString(" / ")
+
+            val genresList = baseItem.genres?.takeIf { it.isNotEmpty() }
+                ?: if (baseItem.type == BaseItemKind.EPISODE && baseItem.seriesId != null) {
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            api.userLibraryApi.getItem(userId = userId, itemId = baseItem.seriesId!!).content.genres
+                        }.getOrNull()
+                    }
+                } else null
+
+            val genres = genresList?.joinToString(" / ")
 
             val canDel = currentUser.policy?.enableContentDeletion == true && baseItem.canDelete == true
 

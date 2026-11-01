@@ -61,6 +61,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
@@ -89,6 +90,7 @@ import org.jellyfin.androidtv.ui.base.popover.PopoverMenu
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenuCheckboxItem
 import androidx.compose.foundation.basicMarquee
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
+import org.jellyfin.androidtv.util.sdk.getSeasonEpisodeName
 import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.home.collectAsStateAny
@@ -864,8 +866,23 @@ fun VideoDetailsScreen(
                                     Spacer(Modifier.height(2.dp))
                                 }
 
+                                val context = LocalContext.current
+                                val titleText = remember(item, context) {
+                                    if (item.type == BaseItemKind.EPISODE) {
+                                        val seCode = item.getSeasonEpisodeName(context)
+                                        val epName = item.name.orEmpty()
+                                        when {
+                                            seCode.isNotBlank() && epName.isNotBlank() -> "$seCode - $epName"
+                                            seCode.isNotBlank() -> seCode
+                                            else -> epName
+                                        }
+                                    } else {
+                                        item.name ?: ""
+                                    }
+                                }
+
                                 Text(
-                                    text = item.name ?: "",
+                                    text = titleText,
                                     style = TextStyle(
                                         fontSize = 30.sp,
                                         fontWeight = FontWeight.Light,
