@@ -78,7 +78,7 @@ class ItemLauncher {
 						launchUserView(baseItem)
 						return
 					}
-					BaseItemKind.SERIES, BaseItemKind.MUSIC_ARTIST -> {
+					BaseItemKind.SERIES, BaseItemKind.SEASON, BaseItemKind.MUSIC_ARTIST -> {
 						navigationRepository.navigate(Destinations.itemDetails(baseItem.id))
 						return
 					}
@@ -107,10 +107,6 @@ class ItemLauncher {
 							val index = if (adapter is List<*>) adapter.indexOf(rowItem) else 0
 							playbackLauncher.launch(context, audioItemsAsList, 0, false, index)
 						}
-						return
-					}
-					BaseItemKind.SEASON -> {
-						navigationRepository.navigate(Destinations.folderBrowser(baseItem.id))
 						return
 					}
 					BaseItemKind.BOX_SET -> {

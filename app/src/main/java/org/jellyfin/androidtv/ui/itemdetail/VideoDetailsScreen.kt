@@ -706,12 +706,18 @@ fun VideoDetailsScreen(
     val initialPlayButtonFocusRequester = remember { FocusRequester() }
     var initialFocusRequested by remember { mutableStateOf(false) }
 
+    LaunchedEffect(item.id) {
+        initialFocusRequested = false
+        delay(100)
+        try { initialPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+    }
+
     val initialFocusModifier = Modifier
         .focusRequester(initialPlayButtonFocusRequester)
         .onGloballyPositioned {
             if (!initialFocusRequested) {
                 initialFocusRequested = true
-                try { initialPlayButtonFocusRequester.requestFocus() } catch (e: Exception) {}
+                try { initialPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
             }
         }
 
@@ -852,7 +858,7 @@ fun VideoDetailsScreen(
                             Spacer(Modifier.width(170.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
-                                if (item.type == BaseItemKind.SEASON && !item.seriesName.isNullOrBlank()) {
+                                if ((item.type == BaseItemKind.SEASON || item.type == BaseItemKind.EPISODE) && !item.seriesName.isNullOrBlank()) {
                                     Text(
                                         text = item.seriesName!!,
                                         style = TextStyle(

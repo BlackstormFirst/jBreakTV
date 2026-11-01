@@ -199,7 +199,7 @@ class FullDetailsViewModel(
             val writers = baseItem.people?.filter { it.type == PersonKind.WRITER }?.mapNotNull { it.name }?.joinToString(", ")
 
             val genresList = baseItem.genres?.takeIf { it.isNotEmpty() }
-                ?: if (baseItem.type == BaseItemKind.EPISODE && baseItem.seriesId != null) {
+                ?: if ((baseItem.type == BaseItemKind.EPISODE || baseItem.type == BaseItemKind.SEASON) && baseItem.seriesId != null) {
                     withContext(Dispatchers.IO) {
                         runCatching {
                             api.userLibraryApi.getItem(userId = userId, itemId = baseItem.seriesId!!).content.genres
@@ -455,10 +455,29 @@ class FullDetailsViewModel(
                         }
                     }
 
-                    // Cast / Crew
-                    baseItem.people?.takeIf { it.isNotEmpty() }?.let { peopleList ->
+                    // Specials
+                    if ((baseItem.specialFeatureCount ?: 0) > 0) {
                         runCatching {
-                            val adapter = ItemRowAdapter(peopleList, context, null)
+                            val query = GetSpecialsRequest(baseItem.id)
+                            val adapter = ItemRowAdapter(context, query, null)
+                            adapter.Retrieve()
+                            rows.add(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
+                        }
+                    }
+
+                    // Cast / Crew (from Season, or fallback to parent Series if empty)
+                    var peopleList = baseItem.people
+                    if (peopleList.isNullOrEmpty() && baseItem.seriesId != null) {
+                        runCatching {
+                            val seriesItem = withContext(Dispatchers.IO) {
+                                api.userLibraryApi.getItem(userId = userId, itemId = baseItem.seriesId!!).content
+                            }
+                            peopleList = seriesItem.people
+                        }
+                    }
+                    peopleList?.takeIf { it.isNotEmpty() }?.let { people ->
+                        runCatching {
+                            val adapter = ItemRowAdapter(people, context, null)
                             adapter.Retrieve()
                             rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
                         }
