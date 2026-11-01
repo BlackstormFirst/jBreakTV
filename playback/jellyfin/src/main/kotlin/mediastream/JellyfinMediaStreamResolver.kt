@@ -232,9 +232,8 @@ class JellyfinMediaStreamResolver(
 			(isPgsCodec && !isPgsSupportedDirect) ||
 			subCodec.contains("dvd") || subCodec.contains("sub") || subCodec.contains("idx")
 
-		val isEmbeddedSub = requestedSubStream != null && !requestedSubStream.isExternal && subIndexToUse != null && subIndexToUse >= 0
 		val burnInPreference = subtitlesBurnDuringTranscodeProvider?.invoke() == true
-		val shouldBurnIn = requestedSubStream?.deliveryMethod == SubtitleDeliveryMethod.ENCODE || isUnsupportedSubCodec || burnInPreference || isEmbeddedSub
+		val shouldBurnIn = requestedSubStream?.deliveryMethod == SubtitleDeliveryMethod.ENCODE || isUnsupportedSubCodec || burnInPreference
 
 		val startTicks = item.userData?.playbackPositionTicks ?: 0L
 		val isLiveTv = item.type == BaseItemKind.TV_CHANNEL || item.type == BaseItemKind.PROGRAM || item.type == BaseItemKind.LIVE_TV_PROGRAM || item.type == BaseItemKind.LIVE_TV_CHANNEL
