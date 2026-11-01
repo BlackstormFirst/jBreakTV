@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
@@ -45,7 +46,6 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -60,6 +60,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
@@ -84,6 +85,10 @@ import org.jellyfin.androidtv.ui.base.Icon
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.IconButton
+import org.jellyfin.androidtv.ui.base.popover.Popover
+import org.jellyfin.androidtv.ui.base.popover.PopoverMenu
+import org.jellyfin.androidtv.ui.base.popover.PopoverMenuCheckboxItem
+import org.jellyfin.androidtv.ui.base.popover.PopoverMenuItem
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
 import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
@@ -249,123 +254,7 @@ fun getGridColumnCount(
 	}
 }
 
-@Composable
-fun FilterPanel(
-	availableGenres: Map<String, Int>,
-	availableAudio: Map<String, Int>,
-	availableTypes: Map<String, Int>,
-	selectedGenre: String?,
-	selectedAudio: String?,
-	selectedType: String?,
-	isMoviesLibrary: Boolean,
-	onSelectGenre: (String?) -> Unit,
-	onSelectAudio: (String?) -> Unit,
-	onSelectType: (String?) -> Unit,
-	onResetFilters: () -> Unit,
-	modifier: Modifier = Modifier
-) {
-	Column(
-		modifier = modifier
-			.padding(horizontal = 40.dp, vertical = 6.dp)
-			.fillMaxWidth(),
-		verticalArrangement = Arrangement.spacedBy(8.dp)
-	) {
-		if (selectedGenre != null || selectedAudio != null || selectedType != null) {
-			IconButton(onClick = onResetFilters) {
-				Text(
-					text = stringResource(R.string.lbl_Reset),
-					color = Color.Red,
-					fontSize = 13.sp,
-					fontWeight = FontWeight.Bold
-				)
-			}
-		}
 
-		if (availableAudio.isNotEmpty()) {
-			Row(
-				horizontalArrangement = Arrangement.spacedBy(8.dp),
-				verticalAlignment = Alignment.CenterVertically
-			) {
-				Text(
-					text = "${stringResource(R.string.lbl_filter_audio)}:",
-					fontSize = 13.sp,
-					fontWeight = FontWeight.Bold,
-					color = Color.LightGray
-				)
-				LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-					itemsIndexed(availableAudio.keys.toList().sorted()) { _, lang ->
-						val count = availableAudio[lang] ?: 0
-						val isSelected = selectedAudio == lang
-						IconButton(onClick = { onSelectAudio(if (isSelected) null else lang) }) {
-							Text(
-								text = if (count > 0) "$lang ($count)" else lang,
-								color = if (isSelected) JellyfinTheme.colorScheme.buttonActive else Color.White,
-								fontSize = 12.sp,
-								fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-							)
-						}
-					}
-				}
-			}
-		}
-
-		if (availableGenres.isNotEmpty()) {
-			Row(
-				horizontalArrangement = Arrangement.spacedBy(8.dp),
-				verticalAlignment = Alignment.CenterVertically
-			) {
-				Text(
-					text = "${stringResource(R.string.lbl_genres)}:",
-					fontSize = 13.sp,
-					fontWeight = FontWeight.Bold,
-					color = Color.LightGray
-				)
-				LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-					itemsIndexed(availableGenres.keys.toList().sorted()) { _, genre ->
-						val count = availableGenres[genre] ?: 0
-						val isSelected = selectedGenre == genre
-						IconButton(onClick = { onSelectGenre(if (isSelected) null else genre) }) {
-							Text(
-								text = if (count > 0) "$genre ($count)" else genre,
-								color = if (isSelected) JellyfinTheme.colorScheme.buttonActive else Color.White,
-								fontSize = 12.sp,
-								fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-							)
-						}
-					}
-				}
-			}
-		}
-
-		if (isMoviesLibrary) {
-			Row(
-				horizontalArrangement = Arrangement.spacedBy(8.dp),
-				verticalAlignment = Alignment.CenterVertically
-			) {
-				Text(
-					text = "${stringResource(R.string.lbl_filter_media_type)}:",
-					fontSize = 13.sp,
-					fontWeight = FontWeight.Bold,
-					color = Color.LightGray
-				)
-				LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-					itemsIndexed(listOf("4K", "HD", "3D")) { _, type ->
-						val count = availableTypes[type] ?: 0
-						val isSelected = selectedType == type
-						IconButton(onClick = { onSelectType(if (isSelected) null else type) }) {
-							Text(
-								text = if (count > 0) "$type ($count)" else type,
-								color = if (isSelected) JellyfinTheme.colorScheme.buttonActive else Color.White,
-								fontSize = 12.sp,
-								fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-							)
-						}
-					}
-				}
-			}
-		}
-	}
-}
 
 @Composable
 fun AlphaPickerButton(
@@ -714,29 +603,215 @@ fun BrowseGridScreen(
 					verticalAlignment = Alignment.CenterVertically,
 					modifier = Modifier.offset(y = (-3).dp)
 				) {
-					IconButton(
-						onClick = { showSortBar = !showSortBar; showFilterBar = false; showAlphaPicker = false },
-						contentPadding = PaddingValues(2.dp),
-						modifier = Modifier.size(28.dp)
-					) {
-						Icon(
-							painter = painterResource(R.drawable.ic_sort),
-							contentDescription = stringResource(R.string.lbl_sort_by),
-							tint = if (showSortBar) JellyfinTheme.colorScheme.buttonActive else Color.White.copy(alpha = 0.85f),
-							modifier = Modifier.size(20.dp)
-						)
+					Box {
+						IconButton(
+							onClick = { showSortBar = !showSortBar; showFilterBar = false; showAlphaPicker = false },
+							contentPadding = PaddingValues(2.dp),
+							modifier = Modifier.size(28.dp)
+						) {
+							Icon(
+								painter = painterResource(R.drawable.ic_sort),
+								contentDescription = stringResource(R.string.lbl_sort_by),
+								tint = if (showSortBar) JellyfinTheme.colorScheme.buttonActive else Color.White.copy(alpha = 0.85f),
+								modifier = Modifier.size(20.dp)
+							)
+						}
+
+						val selectedSortFocusRequester = remember { FocusRequester() }
+
+						Popover(
+							expanded = showSortBar,
+							onDismissRequest = { showSortBar = false },
+							alignment = Alignment.BottomEnd,
+							offset = DpOffset(0.dp, 4.dp),
+							initialFocusRequester = selectedSortFocusRequester
+						) {
+							PopoverMenu(
+								maxHeight = 360.dp,
+								modifier = Modifier.widthIn(min = 220.dp)
+							) {
+								val sortOptions = listOf(
+									Triple(ItemSortBy.SORT_NAME, SortOrder.ASCENDING, R.string.lbl_name),
+									Triple(ItemSortBy.DATE_CREATED, SortOrder.DESCENDING, R.string.lbl_date_added),
+									Triple(ItemSortBy.PREMIERE_DATE, SortOrder.DESCENDING, R.string.lbl_premier_date),
+									Triple(ItemSortBy.COMMUNITY_RATING, SortOrder.DESCENDING, R.string.lbl_community_rating),
+									Triple(ItemSortBy.CRITIC_RATING, SortOrder.DESCENDING, R.string.lbl_critic_rating),
+									Triple(ItemSortBy.OFFICIAL_RATING, SortOrder.DESCENDING, R.string.lbl_rating),
+									Triple(ItemSortBy.DATE_PLAYED, SortOrder.DESCENDING, R.string.lbl_last_played),
+									Triple(ItemSortBy.RUNTIME, SortOrder.ASCENDING, R.string.lbl_runtime),
+									Triple(ItemSortBy.RANDOM, SortOrder.ASCENDING, R.string.random)
+								)
+
+								val hasSelectedSort = sortOptions.any { (sortBy, _, _) ->
+									currentSortBy == sortBy || (sortBy == ItemSortBy.DATE_CREATED && currentSortBy == ItemSortBy.DATE_LAST_CONTENT_ADDED)
+								}
+
+								sortOptions.forEachIndexed { index, (sortBy, sortOrder, labelRes) ->
+									val isSelected = currentSortBy == sortBy || (sortBy == ItemSortBy.DATE_CREATED && currentSortBy == ItemSortBy.DATE_LAST_CONTENT_ADDED)
+									val itemFocusRequester = when {
+										isSelected -> selectedSortFocusRequester
+										!hasSelectedSort && index == 0 -> selectedSortFocusRequester
+										else -> null
+									}
+
+									PopoverMenuCheckboxItem(
+										selected = isSelected,
+										focusRequester = itemFocusRequester,
+										onClick = {
+											updateSort(sortBy, sortOrder)
+											showSortBar = false
+										}
+									) {
+										Text(
+											text = stringResource(labelRes),
+											fontSize = 13.sp,
+											fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+										)
+									}
+								}
+							}
+						}
 					}
-					IconButton(
-						onClick = { showFilterBar = !showFilterBar; showSortBar = false; showAlphaPicker = false },
-						contentPadding = PaddingValues(2.dp),
-						modifier = Modifier.size(28.dp)
-					) {
-						Icon(
-							painter = painterResource(R.drawable.ic_filter),
-							contentDescription = stringResource(R.string.filters),
-							tint = if (showFilterBar || selectedGenre != null || selectedType != null || selectedAudio != null) JellyfinTheme.colorScheme.buttonActive else Color.White.copy(alpha = 0.85f),
-							modifier = Modifier.size(20.dp)
-						)
+
+					Box {
+						IconButton(
+							onClick = { showFilterBar = !showFilterBar; showSortBar = false; showAlphaPicker = false },
+							contentPadding = PaddingValues(2.dp),
+							modifier = Modifier.size(28.dp)
+						) {
+							Icon(
+								painter = painterResource(R.drawable.ic_filter),
+								contentDescription = stringResource(R.string.filters),
+								tint = if (showFilterBar || selectedGenre != null || selectedType != null || selectedAudio != null) JellyfinTheme.colorScheme.buttonActive else Color.White.copy(alpha = 0.85f),
+								modifier = Modifier.size(20.dp)
+							)
+						}
+
+						Popover(
+							expanded = showFilterBar,
+							onDismissRequest = { showFilterBar = false },
+							alignment = Alignment.BottomEnd,
+							offset = DpOffset(0.dp, 4.dp)
+						) {
+							PopoverMenu(
+								maxHeight = 360.dp,
+								modifier = Modifier.widthIn(min = 240.dp)
+							) {
+								if (selectedGenre != null || selectedAudio != null || selectedType != null) {
+									PopoverMenuItem(
+										onClick = {
+											selectedGenre = null
+											selectedAudio = null
+											selectedType = null
+										}
+									) {
+										Text(
+											text = stringResource(R.string.lbl_Reset),
+											color = Color.Red,
+											fontSize = 13.sp,
+											fontWeight = FontWeight.Bold
+										)
+									}
+								}
+
+								if (availableAudio.isNotEmpty()) {
+									Text(
+										text = "${stringResource(R.string.lbl_filter_audio)}:",
+										fontSize = 12.sp,
+										fontWeight = FontWeight.Bold,
+										color = Color.LightGray,
+										modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+									)
+									availableAudio.keys.sorted().forEach { lang ->
+										val count = availableAudio[lang] ?: 0
+										val isSelected = selectedAudio == lang
+										val isEnabled = count > 0 || isSelected
+										PopoverMenuCheckboxItem(
+											selected = isSelected,
+											enabled = isEnabled,
+											onClick = {
+												selectedAudio = if (isSelected) null else lang
+											}
+										) {
+											Text(
+												text = "$lang ($count)",
+												fontSize = 13.sp,
+												fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+												color = if (!isEnabled) Color.Gray else Color.Unspecified
+											)
+										}
+									}
+								}
+
+								if (availableGenres.isNotEmpty()) {
+									Text(
+										text = "${stringResource(R.string.lbl_genres)}:",
+										fontSize = 12.sp,
+										fontWeight = FontWeight.Bold,
+										color = Color.LightGray,
+										modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+									)
+									availableGenres.keys.sorted().forEach { genre ->
+										val count = availableGenres[genre] ?: 0
+										val isSelected = selectedGenre == genre
+										val isEnabled = count > 0 || isSelected
+										PopoverMenuCheckboxItem(
+											selected = isSelected,
+											enabled = isEnabled,
+											onClick = {
+												selectedGenre = if (isSelected) null else genre
+											}
+										) {
+											Text(
+												text = "$genre ($count)",
+												fontSize = 13.sp,
+												fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+												color = if (!isEnabled) Color.Gray else Color.Unspecified
+											)
+										}
+									}
+								}
+
+								if (folder?.collectionType == CollectionType.MOVIES && availableTypes.isNotEmpty()) {
+									Text(
+										text = "${stringResource(R.string.lbl_filter_media_type)}:",
+										fontSize = 12.sp,
+										fontWeight = FontWeight.Bold,
+										color = Color.LightGray,
+										modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+									)
+									listOf("4K", "HD", "3D").forEach { type ->
+										val count = availableTypes[type] ?: 0
+										val isSelected = selectedType == type
+										val isEnabled = count > 0 || isSelected
+										PopoverMenuCheckboxItem(
+											selected = isSelected,
+											enabled = isEnabled,
+											onClick = {
+												selectedType = if (isSelected) null else type
+											}
+										) {
+											Text(
+												text = "$type ($count)",
+												fontSize = 13.sp,
+												fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+												color = if (!isEnabled) Color.Gray else Color.Unspecified
+											)
+										}
+									}
+								}
+
+								if (availableAudio.isEmpty() && availableGenres.isEmpty() && availableTypes.isEmpty() && selectedGenre == null && selectedAudio == null && selectedType == null) {
+									PopoverMenuItem(onClick = {}) {
+										Text(
+											text = stringResource(R.string.lbl_no_items),
+											color = Color.Gray,
+											fontSize = 13.sp
+										)
+									}
+								}
+							}
+						}
 					}
 					IconButton(
 						onClick = { isUnwatchedOnly = !isUnwatchedOnly },
@@ -789,27 +864,6 @@ fun BrowseGridScreen(
 				}
 			}
 
-			// Optional Filter Bar (Audio, Genres, Types)
-			if (showFilterBar) {
-				FilterPanel(
-					availableGenres = availableGenres,
-					availableAudio = availableAudio,
-					availableTypes = availableTypes,
-					selectedGenre = selectedGenre,
-					selectedAudio = selectedAudio,
-					selectedType = selectedType,
-					isMoviesLibrary = folder?.collectionType == CollectionType.MOVIES,
-					onSelectGenre = { selectedGenre = it },
-					onSelectAudio = { selectedAudio = it },
-					onSelectType = { selectedType = it },
-					onResetFilters = {
-						selectedGenre = null
-						selectedAudio = null
-						selectedType = null
-					}
-				)
-			}
-
 			// Optional AlphaPicker Bar
 			if (showAlphaPicker) {
 				val letters = remember { "#ABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray() }
@@ -826,61 +880,6 @@ fun BrowseGridScreen(
 								selectedLetter = if (selectedLetter == char) null else char
 							}
 						)
-					}
-				}
-			}
-
-			// Optional Sort Option Bar (All 9 Sort Options)
-			if (showSortBar) {
-				LazyRow(
-					contentPadding = PaddingValues(horizontal = 40.dp, vertical = 6.dp),
-					horizontalArrangement = Arrangement.spacedBy(10.dp),
-					verticalAlignment = Alignment.CenterVertically
-				) {
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.SORT_NAME, SortOrder.ASCENDING) }) {
-							Text(stringResource(R.string.lbl_name), color = if (currentSortBy == ItemSortBy.SORT_NAME) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
-					}
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.DATE_CREATED, SortOrder.DESCENDING) }) {
-							Text(stringResource(R.string.lbl_date_added), color = if (currentSortBy == ItemSortBy.DATE_CREATED) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
-					}
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.PREMIERE_DATE, SortOrder.DESCENDING) }) {
-							Text(stringResource(R.string.lbl_premier_date), color = if (currentSortBy == ItemSortBy.PREMIERE_DATE) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
-					}
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.COMMUNITY_RATING, SortOrder.DESCENDING) }) {
-							Text(stringResource(R.string.lbl_community_rating), color = if (currentSortBy == ItemSortBy.COMMUNITY_RATING) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
-					}
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.CRITIC_RATING, SortOrder.DESCENDING) }) {
-							Text(stringResource(R.string.lbl_critic_rating), color = if (currentSortBy == ItemSortBy.CRITIC_RATING) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
-					}
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.OFFICIAL_RATING, SortOrder.DESCENDING) }) {
-							Text(stringResource(R.string.lbl_rating), color = if (currentSortBy == ItemSortBy.OFFICIAL_RATING) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
-					}
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.DATE_PLAYED, SortOrder.DESCENDING) }) {
-							Text(stringResource(R.string.lbl_last_played), color = if (currentSortBy == ItemSortBy.DATE_PLAYED) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
-					}
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.RUNTIME, SortOrder.ASCENDING) }) {
-							Text(stringResource(R.string.lbl_runtime), color = if (currentSortBy == ItemSortBy.RUNTIME) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
-					}
-					item {
-						IconButton(onClick = { updateSort(ItemSortBy.RANDOM, SortOrder.ASCENDING) }) {
-							Text(stringResource(R.string.random), color = if (currentSortBy == ItemSortBy.RANDOM) JellyfinTheme.colorScheme.buttonActive else Color.White, fontSize = 13.sp)
-						}
 					}
 				}
 			}

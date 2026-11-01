@@ -56,11 +56,13 @@ fun PopoverMenu(
 fun PopoverMenuItem(
 	onClick: () -> Unit,
 	modifier: Modifier = Modifier,
+	enabled: Boolean = true,
 	shape: Shape = RoundedCornerShape(3.dp),
 	focusRequester: FocusRequester? = null,
 	content: @Composable RowScope.() -> Unit,
 ) = Button(
 	onClick = onClick,
+	enabled = enabled,
 	modifier = Modifier
 		.fillMaxWidth()
 		.run { if (focusRequester != null) focusRequester(focusRequester) else this }
@@ -68,6 +70,8 @@ fun PopoverMenuItem(
 	shape = shape,
 	colors = ButtonDefaults.colors(
 		containerColor = Color.Transparent,
+		disabledContainerColor = Color.Transparent,
+		disabledContentColor = Color.Gray,
 	),
 ) {
 	content()
@@ -78,11 +82,13 @@ fun PopoverMenuCheckboxItem(
 	selected: Boolean,
 	onClick: () -> Unit,
 	modifier: Modifier = Modifier,
+	enabled: Boolean = true,
 	focusRequester: FocusRequester? = null,
 	content: @Composable RowScope.() -> Unit,
 ) = PopoverMenuItem(
 	onClick = onClick,
 	modifier = modifier,
+	enabled = enabled,
 	focusRequester = focusRequester,
 ) {
 
