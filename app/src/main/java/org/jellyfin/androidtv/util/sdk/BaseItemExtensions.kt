@@ -74,7 +74,8 @@ fun BaseItemDto?.canPlay(): Boolean {
 }
 
 fun BaseItemDto.isRealAvailableMedia(): Boolean {
-	if (isNonexistentOrVirtualMedia()) return false
+	if (type == BaseItemKind.EPISODE && isNonexistentOrVirtualMedia()) return false
+	if (isPlaceHolder == true) return false
 	return when (type) {
 		BaseItemKind.SEASON,
 		BaseItemKind.SERIES,

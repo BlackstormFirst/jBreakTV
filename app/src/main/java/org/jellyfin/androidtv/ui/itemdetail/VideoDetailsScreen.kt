@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -698,16 +699,32 @@ fun VideoDetailsScreen(
 
     var showVersionPicker by remember { mutableStateOf(false) }
 
-    val activeContentRows = remember(state.rows) {
-        derivedStateOf {
-            state.rows.mapNotNull { rowState ->
-                val validItems = rowState.adapter.dataAsStateList.filterIsInstance<BaseRowItem>()
-                if (validItems.isNotEmpty()) {
-                    rowState to validItems
-                } else null
+    val rowData = remember(state.rows) { mutableStateMapOf<Int, List<BaseRowItem>>() }
+
+    LaunchedEffect(state.rows) {
+        state.rows.forEachIndexed { rowIndex, rowState ->
+            val adapter = rowState.adapter
+            val updateLoaded = {
+                val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
+                if (loaded.isNotEmpty()) {
+                    rowData[rowIndex] = loaded
+                }
             }
+            adapter.setRetrieveFinishedListener {
+                updateLoaded()
+            }
+            updateLoaded()
         }
-    }.value
+    }
+
+    val activeContentRows = remember(state.rows, rowData.toMap()) {
+        state.rows.mapIndexedNotNull { rowIndex, rowState ->
+            val items = rowData[rowIndex] ?: rowState.adapter.dataAsStateList.filterIsInstance<BaseRowItem>()
+            if (items.isNotEmpty()) {
+                rowState to items
+            } else null
+        }
+    }
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
