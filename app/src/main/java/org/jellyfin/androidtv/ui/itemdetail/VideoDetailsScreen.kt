@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -695,6 +696,17 @@ fun VideoDetailsScreen(
 
     var showVersionPicker by remember { mutableStateOf(false) }
 
+    val activeContentRows = remember(state.rows) {
+        derivedStateOf {
+            state.rows.mapNotNull { rowState ->
+                val validItems = rowState.adapter.dataAsStateList.filterIsInstance<BaseRowItem>()
+                if (validItems.isNotEmpty()) {
+                    rowState to validItems
+                } else null
+            }
+        }
+    }.value
+
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -1188,70 +1200,68 @@ fun VideoDetailsScreen(
                 }
 
                 // Additional Content Rows (Seasons, Episodes, Cast, Extras, Similar)
-                this@LazyColumn.itemsIndexed(state.rows, key = { idx, row -> "details_content_row_${idx}_${row.title.hashCode()}" }) { rowIndex: Int, rowState: DetailsRowState ->
-                    val items by rowState.adapter.collectAsStateAny()
-                    val validRowItems = remember(items) { items.filterIsInstance<BaseRowItem>() }
+                this@LazyColumn.itemsIndexed(
+                    activeContentRows,
+                    key = { idx, (rowState, _) -> "details_content_row_${idx}_${rowState.title.hashCode()}" }
+                ) { rowIndex: Int, (rowState, validRowItems) ->
+                    Column {
+                        Text(
+                            text = rowState.title,
+                            style = JellyfinTheme.typography.listHeader.copy(color = JellyfinTheme.colorScheme.listHeader),
+                            modifier = Modifier.padding(start = 56.dp, end = 56.dp, bottom = 12.dp)
+                        )
 
-                    if (validRowItems.isNotEmpty()) {
-                        Column {
-                            Text(
-                                text = rowState.title,
-                                style = JellyfinTheme.typography.listHeader.copy(color = JellyfinTheme.colorScheme.listHeader),
-                                modifier = Modifier.padding(start = 56.dp, end = 56.dp, bottom = 12.dp)
-                            )
+                        CompositionLocalProvider(LocalBringIntoViewSpec provides contentRowsBringIntoViewSpec) {
+                            LazyRow(
+                                modifier = Modifier.focusRestorer(),
+                                contentPadding = PaddingValues(horizontal = 56.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                itemsIndexed(validRowItems, key = { index, item -> "row_item_${rowIndex}_${index}_${item.hashCode()}" }) { index: Int, rowItem: BaseRowItem ->
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val isFocusedState by interactionSource.collectIsFocusedAsState()
+                                    var isFocusedInternal by remember { mutableStateOf(false) }
+                                    val isFocused = isFocusedState || isFocusedInternal
+                                    var showContextMenu by remember { mutableStateOf(false) }
 
-                            CompositionLocalProvider(LocalBringIntoViewSpec provides contentRowsBringIntoViewSpec) {
-                                LazyRow(
-                                    modifier = Modifier.focusRestorer(),
-                                    contentPadding = PaddingValues(horizontal = 56.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    itemsIndexed(validRowItems, key = { index, item -> "row_item_${rowIndex}_${index}_${item.hashCode()}" }) { index: Int, rowItem: BaseRowItem ->
-                                        val interactionSource = remember { MutableInteractionSource() }
-                                        val isFocusedState by interactionSource.collectIsFocusedAsState()
-                                        var isFocusedInternal by remember { mutableStateOf(false) }
-                                        val isFocused = isFocusedState || isFocusedInternal
-                                        var showContextMenu by remember { mutableStateOf(false) }
+                                    val cardFocusRequester = remember { FocusRequester() }
+                                    val cardBringIntoViewRequester = remember { BringIntoViewRequester() }
 
-                                        val cardFocusRequester = remember { FocusRequester() }
-                                        val cardBringIntoViewRequester = remember { BringIntoViewRequester() }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .focusRequester(cardFocusRequester)
-                                                .zIndex(if (isFocused) 1f else 0f)
-                                                .bringIntoViewRequester(cardBringIntoViewRequester)
-                                                .onFocusChanged { focusState ->
-                                                    isFocusedInternal = focusState.isFocused
-                                                    if (focusState.isFocused) {
-                                                        coroutineScope.launch {
-                                                            try { cardBringIntoViewRequester.bringIntoView() } catch (e: Exception) {}
-                                                        }
+                                    Box(
+                                        modifier = Modifier
+                                            .focusRequester(cardFocusRequester)
+                                            .zIndex(if (isFocused) 1f else 0f)
+                                            .bringIntoViewRequester(cardBringIntoViewRequester)
+                                            .onFocusChanged { focusState ->
+                                                isFocusedInternal = focusState.isFocused
+                                                if (focusState.isFocused) {
+                                                    coroutineScope.launch {
+                                                        try { cardBringIntoViewRequester.bringIntoView() } catch (e: Exception) {}
                                                     }
                                                 }
-                                                .itemCardClickable(
-                                                    interactionSource = interactionSource,
-                                                    onClick = { onItemClick(rowItem) },
-                                                    onLongClick = { showContextMenu = true }
-                                                )
-                                        ) {
-                                            BaseRowItemCard(
-                                                item = rowItem,
-                                                focused = isFocused,
-                                                showInfo = true
-                                            )
-
-                                            if (showContextMenu) {
-                                                ItemContextMenu(
-                                                    item = rowItem,
-                                                    expanded = showContextMenu,
-                                                    onDismissRequest = { showContextMenu = false },
-                                                    focusRequester = cardFocusRequester,
-                                                    onItemUpdated = { updatedItem ->
-                                                        rowState.adapter.set(index, updatedItem)
-                                                    }
-                                                )
                                             }
+                                            .itemCardClickable(
+                                                interactionSource = interactionSource,
+                                                onClick = { onItemClick(rowItem) },
+                                                onLongClick = { showContextMenu = true }
+                                            )
+                                    ) {
+                                        BaseRowItemCard(
+                                            item = rowItem,
+                                            focused = isFocused,
+                                            showInfo = true
+                                        )
+
+                                        if (showContextMenu) {
+                                            ItemContextMenu(
+                                                item = rowItem,
+                                                expanded = showContextMenu,
+                                                onDismissRequest = { showContextMenu = false },
+                                                focusRequester = cardFocusRequester,
+                                                onItemUpdated = { updatedItem ->
+                                                    rowState.adapter.set(index, updatedItem)
+                                                }
+                                            )
                                         }
                                     }
                                 }

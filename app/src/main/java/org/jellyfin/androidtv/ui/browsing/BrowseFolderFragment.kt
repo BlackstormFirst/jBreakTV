@@ -374,6 +374,39 @@ fun BrowseFolderScreen(
 		}
 	}
 
+	LaunchedEffect(rows) {
+		val lifecycle = lifecycleOwner.lifecycle
+		rows.forEachIndexed { rowIndex, def ->
+			if (rowAdapters[rowIndex] == null) {
+				val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
+				rowAdapters[rowIndex] = adapter
+				adapter.setRetrieveFinishedListener {
+					if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@setRetrieveFinishedListener
+					val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
+					rowData[rowIndex] = loaded
+					if (!userHasInteracted && loaded.isNotEmpty()) {
+						val currentSelectedRow = selectedRowIndex
+						if (currentSelectedRow == null || rowIndex < currentSelectedRow) {
+							selectedRowIndex = rowIndex
+							selectedItem = loaded.first()
+							onItemFocused(loaded.first())
+						}
+					}
+				}
+				adapter.Retrieve()
+			}
+		}
+	}
+
+	val activeRows = remember(rows, rowData.toMap()) {
+		rows.mapIndexedNotNull { index, def ->
+			val items = rowData[index]
+			if (!items.isNullOrEmpty()) {
+				Triple(index, def, items)
+			} else null
+		}
+	}
+
 	Box(modifier = Modifier.fillMaxSize()) {
 		Column(modifier = Modifier.fillMaxSize()) {
 			// Top Header Row: Title on TOP LEFT (32sp), Home Button + Clock on TOP RIGHT
@@ -458,33 +491,8 @@ fun BrowseFolderScreen(
 					verticalArrangement = Arrangement.spacedBy(16.dp),
 					contentPadding = PaddingValues(bottom = 64.dp)
 				) {
-				itemsIndexed(rows, key = { rowIndex, row -> "${row.headerText}_$rowIndex" }) { rowIndex, def ->
-					val lifecycle = LocalLifecycleOwner.current.lifecycle
-					val itemsState = rowData[rowIndex] ?: emptyList()
-
-					LaunchedEffect(def) {
-						if (rowAdapters[rowIndex] == null) {
-							val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
-							rowAdapters[rowIndex] = adapter
-							adapter.setRetrieveFinishedListener {
-								if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@setRetrieveFinishedListener
-								val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
-								rowData[rowIndex] = loaded
-								if (!userHasInteracted && loaded.isNotEmpty()) {
-									val currentSelectedRow = selectedRowIndex
-									if (currentSelectedRow == null || rowIndex < currentSelectedRow) {
-										selectedRowIndex = rowIndex
-										selectedItem = loaded.first()
-										onItemFocused(loaded.first())
-									}
-								}
-							}
-							adapter.Retrieve()
-						}
-					}
-
-					if (itemsState.isNotEmpty()) {
-						Column {
+				itemsIndexed(activeRows, key = { _, (rowIndex, def, _) -> "${def.headerText}_$rowIndex" }) { _, (rowIndex, def, itemsState) ->
+					Column {
 							Text(
 								text = def.headerText,
 								style = JellyfinTheme.typography.listHeader.copy(color = JellyfinTheme.colorScheme.listHeader),
@@ -587,5 +595,4 @@ fun BrowseFolderScreen(
 			}
 		}
 	}
-}
 }
