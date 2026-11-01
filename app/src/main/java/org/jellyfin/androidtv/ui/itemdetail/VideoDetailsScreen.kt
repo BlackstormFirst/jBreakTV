@@ -87,6 +87,7 @@ import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.base.popover.Popover
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenu
 import org.jellyfin.androidtv.ui.base.popover.PopoverMenuCheckboxItem
+import androidx.compose.foundation.basicMarquee
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
 import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
@@ -99,6 +100,8 @@ import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.MediaStream
 import org.jellyfin.sdk.model.api.MediaStreamType
+import org.jellyfin.sdk.model.api.VideoRange
+import org.jellyfin.sdk.model.api.VideoRangeType
 import org.koin.compose.koinInject
 import java.util.Locale
 import java.util.UUID
@@ -362,29 +365,48 @@ fun TextUnderButton(
 }
 
 @Composable
-fun MediaInfoRowText(label: String, value: String) {
+fun MediaInfoRowText(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    isMarquee: Boolean = false,
+    isFocused: Boolean = false
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
             style = TextStyle(
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Normal,
                 color = Color.White.copy(alpha = 0.6f)
             )
         )
+        Spacer(Modifier.width(4.dp))
+        val marqueeModifier = if (isMarquee && isFocused) {
+            Modifier.basicMarquee(
+                iterations = Int.MAX_VALUE,
+                initialDelayMillis = 800
+            )
+        } else {
+            Modifier
+        }
         Text(
             text = value,
             style = TextStyle(
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White
+                color = Color.White,
+                textAlign = TextAlign.End
             ),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .then(marqueeModifier)
         )
     }
 }
@@ -416,6 +438,8 @@ fun MediaStreamCard(
         else -> stream.type.name.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
     }
 
+    val streamTitle = stream.displayTitle?.ifBlank { null } ?: stream.title?.ifBlank { null }
+
     Box(
         modifier = modifier
             .width(180.dp)
@@ -424,32 +448,37 @@ fun MediaStreamCard(
             .background(cardBg)
             .border(2.dp, borderColor, RoundedCornerShape(10.dp))
             .focusable(interactionSource = interactionSource)
-            .padding(10.dp)
+            .padding(8.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
             ) {
                 // Header (e.g. "VIDÉO", "AUDIO", "SOUS-TITRES")
                 Text(
                     text = streamTypeTitle.uppercase(Locale.ROOT),
                     style = TextStyle(
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = JellyfinTheme.colorScheme.buttonFocused
                     )
                 )
 
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(2.dp))
 
                 // Language
                 if (!stream.language.isNullOrBlank() && stream.type != MediaStreamType.VIDEO) {
                     MediaInfoRowText(
                         label = "Langue",
-                        value = stream.language?.uppercase(Locale.ROOT) ?: ""
+                        value = stream.language?.uppercase(Locale.ROOT) ?: "",
+                        isFocused = isFocused
                     )
                 }
 
@@ -457,7 +486,18 @@ fun MediaStreamCard(
                 if (!stream.codec.isNullOrBlank()) {
                     MediaInfoRowText(
                         label = "Codec",
-                        value = stream.codec?.uppercase(Locale.ROOT) ?: ""
+                        value = stream.codec?.uppercase(Locale.ROOT) ?: "",
+                        isFocused = isFocused
+                    )
+                }
+
+                // Subtitle Titre (below Codec for subtitles)
+                if (stream.type == MediaStreamType.SUBTITLE && streamTitle != null) {
+                    MediaInfoRowText(
+                        label = "Titre",
+                        value = streamTitle,
+                        isMarquee = true,
+                        isFocused = isFocused
                     )
                 }
 
@@ -465,7 +505,20 @@ fun MediaStreamCard(
                 if (!stream.profile.isNullOrBlank()) {
                     MediaInfoRowText(
                         label = "Profile",
-                        value = stream.profile ?: ""
+                        value = stream.profile ?: "",
+                        isFocused = isFocused
+                    )
+                }
+
+                // Plage vidéo (below Profile for video streams)
+                if (stream.type == MediaStreamType.VIDEO) {
+                    val isHdr = stream.videoRange == VideoRange.HDR ||
+                        stream.videoRangeType != VideoRangeType.SDR
+                    val videoRangeStr = if (isHdr) "HDR" else "SDR"
+                    MediaInfoRowText(
+                        label = "La plage vidéo",
+                        value = videoRangeStr,
+                        isFocused = isFocused
                     )
                 }
 
@@ -475,19 +528,22 @@ fun MediaStreamCard(
                         if (stream.width != null && stream.height != null) {
                             MediaInfoRowText(
                                 label = "Resolution",
-                                value = "${stream.width}x${stream.height}"
+                                value = "${stream.width}x${stream.height}",
+                                isFocused = isFocused
                             )
                         }
                         if (stream.realFrameRate != null && stream.realFrameRate!! > 0f) {
                             MediaInfoRowText(
                                 label = "Framerate",
-                                value = "%.3f fps".format(Locale.US, stream.realFrameRate)
+                                value = "%.3f fps".format(Locale.US, stream.realFrameRate),
+                                isFocused = isFocused
                             )
                         }
                         if (stream.aspectRatio != null) {
                             MediaInfoRowText(
                                 label = "Aspect",
-                                value = stream.aspectRatio ?: ""
+                                value = stream.aspectRatio ?: "",
+                                isFocused = isFocused
                             )
                         }
                     }
@@ -496,12 +552,14 @@ fun MediaStreamCard(
                         if (!stream.channelLayout.isNullOrBlank()) {
                             MediaInfoRowText(
                                 label = "Layout",
-                                value = stream.channelLayout?.uppercase(Locale.ROOT) ?: ""
+                                value = stream.channelLayout?.uppercase(Locale.ROOT) ?: "",
+                                isFocused = isFocused
                             )
                         } else if (stream.channels != null) {
                             MediaInfoRowText(
                                 label = "Chaînes",
-                                value = "${stream.channels} ch"
+                                value = "${stream.channels} ch",
+                                isFocused = isFocused
                             )
                         }
                     }
@@ -519,7 +577,18 @@ fun MediaStreamCard(
                     }
                     MediaInfoRowText(
                         label = "Bitrate",
-                        value = bitrateStr
+                        value = bitrateStr,
+                        isFocused = isFocused
+                    )
+                }
+
+                // Video and Audio Titre (below Bitrate for video and audio streams)
+                if ((stream.type == MediaStreamType.VIDEO || stream.type == MediaStreamType.AUDIO) && streamTitle != null) {
+                    MediaInfoRowText(
+                        label = "Titre",
+                        value = streamTitle,
+                        isMarquee = true,
+                        isFocused = isFocused
                     )
                 }
             }
@@ -535,10 +604,11 @@ fun MediaStreamCard(
                 Text(
                     text = flags.joinToString(" • "),
                     style = TextStyle(
-                        fontSize = 11.sp,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White.copy(alpha = 0.6f)
-                    )
+                    ),
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
         }
