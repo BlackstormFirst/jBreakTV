@@ -10,6 +10,7 @@ import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
 import coil3.memory.MemoryCache
 import coil3.network.NetworkFetcher
+import coil3.network.HttpException
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ErrorResult
 import coil3.serviceLoaderEnabled
@@ -173,7 +174,9 @@ val appModule = module {
 						val isOtherDecodeException = throwable is java.io.IOException ||
 							throwable is IllegalArgumentException ||
 							throwable is NullPointerException ||
-							throwable.javaClass.name.contains("DecodeException")
+							throwable is HttpException ||
+							throwable.javaClass.name.contains("DecodeException") ||
+							throwable.javaClass.name.contains("HttpException")
 						if (isImageDecoderException || isOtherDecodeException) {
 							val cacheKey = chain.request.diskCacheKey ?: chain.request.data.toString()
 							diskCacheInstance.remove(cacheKey)

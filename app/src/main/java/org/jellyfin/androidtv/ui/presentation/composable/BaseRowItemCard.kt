@@ -167,7 +167,16 @@ private fun CardViewHolderContent(
 						aspectRatio = aspectRatio,
 						scaleType = displayConfig.scaleType ?: ImageView.ScaleType.CENTER_CROP,
 						modifier = Modifier
-							.fillMaxSize()
+							.fillMaxSize(),
+						errorContent = {
+							Image(
+								painter = painterResource(displayConfig.iconRes),
+								contentDescription = null,
+								modifier = Modifier
+									.fillMaxSize(0.4f)
+									.align(Alignment.Center)
+							)
+						}
 					)
 				} else if (item is UsbBaseRowItem || item.baseItem?.id == USB_TILE_UUID) {
 					Image(

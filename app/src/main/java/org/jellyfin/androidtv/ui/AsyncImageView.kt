@@ -140,7 +140,7 @@ class AsyncImageView @JvmOverloads constructor(
 				data(url)
 				memoryCacheKey(url)
 				if (initialPlaceholder != null) placeholder(initialPlaceholder.asImage())
-				if (placeholder != null) error(placeholder.asImage())
+				error((initialPlaceholder ?: androidx.core.content.ContextCompat.getDrawable(context, R.drawable.placeholder_icon))?.asImage())
 				if (circleCrop) transformations(CircleCropTransformation())
 			}.build()
 
