@@ -48,15 +48,33 @@ fun BaseItemDto.getDisplayName(context: Context): String {
 }
 
 
-fun BaseItemDto?.canPlay() = this != null
-	&& playAccess != PlayAccess.NONE
-	&& isPlaceHolder != true
-	&& locationType != LocationType.VIRTUAL
-	&& type != BaseItemKind.PERSON
-	&& (if (isFolder == true) (childCount ?: 0) > 0 else (mediaSourceCount ?: mediaSources?.size ?: 0) > 0)
+fun BaseItemDto.isNonexistentOrVirtualMedia(): Boolean {
+	if (locationType == LocationType.VIRTUAL || locationType == LocationType.OFFLINE) return true
+	if (isPlaceHolder == true) return true
+	if (type == BaseItemKind.EPISODE) {
+		if (mediaSourceCount == 0 && mediaSources.isNullOrEmpty()) return true
+	}
+	val premiere = premiereDate
+	if (premiere != null && premiere.isAfter(LocalDateTime.now())) {
+		return true
+	}
+	return false
+}
+
+fun BaseItemDto?.canPlay(): Boolean {
+	if (this == null) return false
+	if (playAccess == PlayAccess.NONE) return false
+	if (type == BaseItemKind.PERSON) return false
+	if (isNonexistentOrVirtualMedia()) return false
+	return if (isFolder == true) {
+		(childCount ?: 0) > 0
+	} else {
+		(mediaSourceCount ?: mediaSources?.size ?: 0) > 0
+	}
+}
 
 fun BaseItemDto.isRealAvailableMedia(): Boolean {
-	if (isPlaceHolder == true) return false
+	if (isNonexistentOrVirtualMedia()) return false
 	return when (type) {
 		BaseItemKind.SEASON,
 		BaseItemKind.SERIES,
@@ -70,7 +88,7 @@ fun BaseItemDto.isRealAvailableMedia(): Boolean {
 		BaseItemKind.PERSON,
 		BaseItemKind.CHANNEL,
 		BaseItemKind.CHANNEL_FOLDER_ITEM -> true
-		else -> locationType != LocationType.VIRTUAL
+		else -> locationType != LocationType.VIRTUAL && locationType != LocationType.OFFLINE
 	}
 }
 

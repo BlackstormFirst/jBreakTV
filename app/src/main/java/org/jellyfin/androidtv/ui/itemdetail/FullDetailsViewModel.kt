@@ -44,6 +44,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
+import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.MediaSourceInfo
 import org.jellyfin.sdk.model.api.PersonKind
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
@@ -438,7 +439,15 @@ class FullDetailsViewModel(
                 BaseItemKind.SEASON -> {
                     // Episodes of this Season
                     runCatching {
-                        val query = GetItemsRequest(parentId = baseItem.id, userId = userId, fields = ItemRepository.browseFields)
+                        val displayMissing = userRepository.currentUser.value?.configuration?.displayMissingEpisodes == true
+                        val query = GetItemsRequest(
+                            parentId = baseItem.id,
+                            userId = userId,
+                            fields = ItemRepository.browseFields,
+                            isMissing = if (displayMissing) null else false,
+                            isUnaired = if (displayMissing) null else false,
+                            excludeLocationTypes = if (displayMissing) null else setOf(LocationType.VIRTUAL)
+                        )
                         val def = BrowseRowDef(context.getString(R.string.lbl_episodes), query, 0)
                         val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
                         adapter.Retrieve()

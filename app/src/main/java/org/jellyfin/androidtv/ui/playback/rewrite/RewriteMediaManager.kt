@@ -26,6 +26,8 @@ import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
+import org.jellyfin.androidtv.util.sdk.canPlay
+import org.jellyfin.androidtv.util.sdk.isNonexistentOrVirtualMedia
 
 @Suppress("TooManyFunctions")
 class RewriteMediaManager(
@@ -154,9 +156,10 @@ class RewriteMediaManager(
 	}
 
 	override fun addToAudioQueue(items: List<BaseItemDto>) {
-		if (items.isEmpty()) return
+		val playableItems = items.filter { it.canPlay() && !it.isNonexistentOrVirtualMedia() }
+		if (playableItems.isEmpty()) return
 
-		playbackManager.queue.addSupplier(BaseItemQueueSupplier(api, items, true))
+		playbackManager.queue.addSupplier(BaseItemQueueSupplier(api, playableItems, true))
 		playbackManager.state.setPlaybackOrder(if (isShuffleMode) PlaybackOrder.SHUFFLE else PlaybackOrder.DEFAULT)
 
 		if (playbackManager.state.playState.value != PlayState.PLAYING) playbackManager.state.play()

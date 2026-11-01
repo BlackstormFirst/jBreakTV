@@ -92,6 +92,7 @@ import org.jellyfin.androidtv.ui.base.popover.PopoverMenuCheckboxItem
 import androidx.compose.foundation.basicMarquee
 import org.jellyfin.androidtv.ui.browsing.composable.inforow.BaseItemInfoRow
 import org.jellyfin.androidtv.util.sdk.getSeasonEpisodeName
+import org.jellyfin.androidtv.util.sdk.isNonexistentOrVirtualMedia
 import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
 import org.jellyfin.androidtv.ui.home.collectAsStateAny
@@ -737,6 +738,20 @@ fun VideoDetailsScreen(
         item.type == BaseItemKind.PERSON
     }
 
+    val isNonexistentMedia = remember(item) {
+        item.isNonexistentOrVirtualMedia()
+    }
+
+    var initialFocusAssigned by remember(item.id) { mutableStateOf(false) }
+    val getInitialFocusModifier = {
+        if (!initialFocusAssigned) {
+            initialFocusAssigned = true
+            initialFocusModifier
+        } else {
+            Modifier
+        }
+    }
+
     // Smoothly scroll LazyColumn back to top (item 0, offset 0) whenever an action button receives focus from below
     val scrollToHeaderTop = {
         if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
@@ -1019,7 +1034,7 @@ fun VideoDetailsScreen(
                                                 .focusRestorer()
                                         ) {
                                             // 1. Resume
-                                            if (state.canResume && !isPerson) {
+                                            if (state.canResume && !isPerson && !isNonexistentMedia) {
                                                 item {
                                                     val resumeLabel = if (!state.resumePositionText.isNullOrEmpty()) {
                                                         stringResource(R.string.lbl_resume_from, state.resumePositionText)
@@ -1032,13 +1047,13 @@ fun VideoDetailsScreen(
                                                         label = resumeLabel,
                                                         onClick = onResumeClick,
                                                         onFocused = { scrollToHeaderTop() },
-                                                        modifier = initialFocusModifier
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
 
                                             // 2. Play
-                                            if (!isPerson) {
+                                            if (!isPerson && !isNonexistentMedia) {
                                                 item {
                                                     val playLabel = if (item.type == BaseItemKind.SERIES) {
                                                         stringResource(R.string.lbl_play_next_up)
@@ -1053,56 +1068,60 @@ fun VideoDetailsScreen(
                                                         label = playLabel,
                                                         onClick = onPlayClick,
                                                         onFocused = { scrollToHeaderTop() },
-                                                        modifier = if (!state.canResume) initialFocusModifier else Modifier
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
 
                                             // 3. Add to Queue (Music)
-                                            if (isMusic && !isPerson) {
+                                            if (isMusic && !isPerson && !isNonexistentMedia) {
                                                 item {
                                                     TextUnderButton(
                                                         iconRes = R.drawable.ic_add,
                                                         label = stringResource(R.string.lbl_add_to_queue),
                                                         onClick = onQueueClick,
-                                                        onFocused = { scrollToHeaderTop() }
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
 
                                             // 4. Shuffle (Folder or Music)
-                                            if (isFolderOrMusic && !isPerson) {
+                                            if (isFolderOrMusic && !isPerson && !isNonexistentMedia) {
                                                 item {
                                                     TextUnderButton(
                                                         iconRes = R.drawable.ic_shuffle,
                                                         label = stringResource(R.string.lbl_shuffle_all),
                                                         onClick = onShuffleClick,
-                                                        onFocused = { scrollToHeaderTop() }
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
 
                                             // Version Selection (shown when item has multiple versions/media sources)
                                             val versions = item.mediaSources
-                                            if (!isPerson && !versions.isNullOrEmpty() && versions.size > 1) {
+                                            if (!isPerson && !isNonexistentMedia && !versions.isNullOrEmpty() && versions.size > 1) {
                                                 item {
                                                     TextUnderButton(
                                                         iconRes = R.drawable.ic_control_select,
                                                         label = stringResource(R.string.select_version),
                                                         onClick = { showVersionPicker = true },
-                                                        onFocused = { scrollToHeaderTop() }
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
 
                                             // 5. Trailers
-                                            if (hasTrailers && !isPerson) {
+                                            if (hasTrailers && !isPerson && !isNonexistentMedia) {
                                                 item {
                                                     TextUnderButton(
                                                         iconRes = R.drawable.ic_trailer,
                                                         label = stringResource(R.string.lbl_play_trailers),
                                                         onClick = onTrailerClick,
-                                                        onFocused = { scrollToHeaderTop() }
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
@@ -1115,7 +1134,8 @@ fun VideoDetailsScreen(
                                                         label = stringResource(R.string.lbl_watched),
                                                         onClick = onPlayedClick,
                                                         onFocused = { scrollToHeaderTop() },
-                                                        isActivated = state.isPlayed
+                                                        isActivated = state.isPlayed,
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
@@ -1128,7 +1148,7 @@ fun VideoDetailsScreen(
                                                     onClick = onFavoriteClick,
                                                     onFocused = { scrollToHeaderTop() },
                                                     isActivated = state.isFavorite,
-                                                    modifier = if (isPerson) initialFocusModifier else Modifier
+                                                    modifier = getInitialFocusModifier()
                                                 )
                                             }
 
@@ -1140,7 +1160,8 @@ fun VideoDetailsScreen(
                                                         iconRes = R.drawable.ic_previous_episode,
                                                         label = stringResource(R.string.lbl_previous_episode),
                                                         onClick = { onPreviousEpisodeClick(prevId) },
-                                                        onFocused = { scrollToHeaderTop() }
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
@@ -1152,7 +1173,8 @@ fun VideoDetailsScreen(
                                                         iconRes = R.drawable.ic_tv,
                                                         label = stringResource(R.string.lbl_goto_series),
                                                         onClick = onGoToSeriesClick,
-                                                        onFocused = { scrollToHeaderTop() }
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }
@@ -1164,7 +1186,8 @@ fun VideoDetailsScreen(
                                                         iconRes = R.drawable.ic_delete,
                                                         label = stringResource(R.string.lbl_delete),
                                                         onClick = onDeleteClick,
-                                                        onFocused = { scrollToHeaderTop() }
+                                                        onFocused = { scrollToHeaderTop() },
+                                                        modifier = getInitialFocusModifier()
                                                     )
                                                 }
                                             }

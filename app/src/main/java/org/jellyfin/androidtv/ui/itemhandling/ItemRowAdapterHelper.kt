@@ -52,6 +52,7 @@ import org.jellyfin.sdk.model.api.request.GetSeasonsRequest
 import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
 import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
 import org.jellyfin.androidtv.util.sdk.isRealAvailableMedia
+import org.jellyfin.androidtv.util.sdk.isNonexistentOrVirtualMedia
 import coil3.ImageLoader
 import coil3.request.ImageRequest
 import org.jellyfin.androidtv.util.apiclient.getUrl
@@ -203,7 +204,7 @@ fun ItemRowAdapter.retrieveNextUpItems(api: ApiClient, query: GetNextUpRequest) 
 					add(firstNextUp)
 					addAll(
 						episodesResponse.items
-							.filter { it.id != firstNextUp.id && it.isRealAvailableMedia() }
+							.filter { it.id != firstNextUp.id && it.isRealAvailableMedia() && !it.isNonexistentOrVirtualMedia() }
 							.distinctBy { it.id }
 					)
 				}.distinctBy { it.id }
@@ -330,9 +331,9 @@ fun ItemRowAdapter.retrieveNextEpisodes(api: ApiClient, query: GetNextEpisodesRe
 				).content
 			}
 
-			// Filter out current episode (startItemId) and deduplicate next episodes
+			// Filter out current episode (startItemId), missing/virtual/unaired episodes, and deduplicate
 			val nextEpisodes = response.items
-				.filter { it.id != query.startItemId }
+				.filter { it.id != query.startItemId && it.isRealAvailableMedia() && !it.isNonexistentOrVirtualMedia() }
 				.distinctBy { it.id }
 
 			setInitialItems(

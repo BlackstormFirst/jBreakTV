@@ -31,6 +31,8 @@ import org.jellyfin.androidtv.ui.playback.PlaybackController
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.androidtv.util.Utils
+import org.jellyfin.androidtv.util.sdk.canPlay
+import org.jellyfin.androidtv.util.sdk.isNonexistentOrVirtualMedia
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.api.client.extensions.playlistsApi
@@ -196,11 +198,15 @@ class ItemListFragment : Fragment() {
 	}
 
 	private fun playItems(items: List<BaseItemDto>, index: Int, shuffle: Boolean) {
+		val playableItems = items.filter { it.canPlay() && !it.isNonexistentOrVirtualMedia() }
+		if (playableItems.isEmpty()) return
+		val targetItem = if (index in items.indices) items[index] else null
+		val newIndex = if (targetItem != null) playableItems.indexOfFirst { it.id == targetItem.id }.coerceAtLeast(0) else 0
+		val item = playableItems.getOrNull(newIndex)
 		var pos = 0
-		val item = if (index in items.indices) items[index] else null
 		if (item?.userData != null) {
 			pos = Math.toIntExact((item.userData?.playbackPositionTicks ?: 0L) / 10000L)
 		}
-		playbackLauncher.launch(requireContext(), items, pos, false, index, shuffle)
+		playbackLauncher.launch(requireContext(), playableItems, pos, false, newIndex, shuffle)
 	}
 }
