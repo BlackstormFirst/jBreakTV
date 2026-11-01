@@ -361,6 +361,8 @@ class ExoPlayerBackend(
 		override fun onPlaybackStateChanged(playbackState: Int) {
 			if (playbackState == Player.STATE_READY) {
 				isPreparingItem = false
+			} else if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
+				vsyncScheduler.stopVsyncLoop()
 			}
 			checkPendingInitialSeek()
 			checkPendingTrackSelectionParameters()
@@ -594,6 +596,7 @@ class ExoPlayerBackend(
 		pendingInitialSeekMs = null
 		setSubtitleView(null)
 		vsyncScheduler.reset()
+		vsyncScheduler.stopVsyncLoop()
 		if (exoPlayerOptions.enableLibass) {
 			AssFontManager.cancelPreload()
 		}

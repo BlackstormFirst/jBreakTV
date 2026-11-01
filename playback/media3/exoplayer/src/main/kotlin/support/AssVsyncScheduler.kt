@@ -55,6 +55,7 @@ class AssVsyncScheduler(
     @Volatile
     private var isVsyncRunning = false
 
+    private var emptyTicks = 0
     private var timeCallback: ((Long) -> Unit)? = null
 
     init {
@@ -158,6 +159,7 @@ class AssVsyncScheduler(
 
     @Synchronized
     fun startVsyncLoop() {
+        emptyTicks = 0
         if ((isVsyncRunning) && (vsyncThread != null)) return
 
         if (vsyncThread == null) {
@@ -182,6 +184,7 @@ class AssVsyncScheduler(
     @Synchronized
     fun stopVsyncLoop() {
         isVsyncRunning = false
+        emptyTicks = 0
         val thread = vsyncThread
         vsyncThread = null
         vsyncHandler = null
@@ -230,6 +233,7 @@ class AssVsyncScheduler(
         val finalEntry = selectedEntry ?: fallbackOlderEntry
 
         if (finalEntry != null) {
+            emptyTicks = 0
             val targetPureUs = finalEntry.pureTimestampUs
             val targetPtsMs = finalEntry.ptsMs
 
@@ -269,6 +273,14 @@ class AssVsyncScheduler(
                     break
                 }
             }
+
+            // Auto-stop VSYNC loop if buffer remains empty for ~30 consecutive ticks (~0.5s at 60Hz)
+            if (ringBuffer.isEmpty()) {
+                emptyTicks++
+                if (emptyTicks >= 30) {
+                    stopVsyncLoop()
+                }
+            }
         }
     }
 
@@ -298,6 +310,7 @@ class AssVsyncScheduler(
         lastPureTimestampUs = C.TIME_UNSET
         lastRenderedTimeMs = -1L
         pendingVsyncLeadSteps = null
+        emptyTicks = 0
     }
 
     fun release() {

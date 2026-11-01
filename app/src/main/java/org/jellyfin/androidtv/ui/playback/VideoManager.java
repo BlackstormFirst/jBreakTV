@@ -252,9 +252,12 @@ public class VideoManager {
                     }
                 }
 
-                if (playbackState == Player.STATE_ENDED) {
-                    if (mPlaybackControllerNotifiable != null) mPlaybackControllerNotifiable.onCompletion();
-                    stopProgressLoop();
+                if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
+                    mVsyncScheduler.stopVsyncLoop();
+                    if (playbackState == Player.STATE_ENDED) {
+                        if (mPlaybackControllerNotifiable != null) mPlaybackControllerNotifiable.onCompletion();
+                        stopProgressLoop();
+                    }
                 }
             }
 
@@ -558,6 +561,7 @@ public class VideoManager {
     public void stopPlayback() {
         hasNotifiedPrepared = false;
         mVsyncScheduler.reset();
+        mVsyncScheduler.stopVsyncLoop();
         if (mExoPlayer != null) {
             mExoPlayer.stop();
         }
