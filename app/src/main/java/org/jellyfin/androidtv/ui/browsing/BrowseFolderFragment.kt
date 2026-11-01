@@ -54,6 +54,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.zIndex
@@ -358,7 +359,7 @@ fun BrowseFolderScreen(
 		val observer = LifecycleEventObserver { _, event ->
 			if (event == Lifecycle.Event.ON_RESUME) {
 				if (selectedItem != null) {
-					try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+					selectedItemFocusRequester.safeRequestFocus()
 				}
 			}
 		}
@@ -370,7 +371,7 @@ fun BrowseFolderScreen(
 
 	LaunchedEffect(selectedItem) {
 		if (selectedItem != null && !userHasInteracted) {
-			try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+			selectedItemFocusRequester.safeRequestFocus()
 		}
 	}
 
@@ -528,7 +529,7 @@ fun BrowseFolderScreen(
 														.focusRequester(selectedItemFocusRequester)
 														.onGloballyPositioned {
 															if (!userHasInteracted) {
-																try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+																selectedItemFocusRequester.safeRequestFocus()
 															}
 														}
 												} else Modifier)

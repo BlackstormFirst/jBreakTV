@@ -35,7 +35,7 @@ class FocusPersistManager {
 	fun requestInitialFocus(requester: FocusRequester) {
 		if (!initialFocusAllowed || restoredFocusKey != null || initialFocusRequester !== requester) return
 
-		if (requester.requestFocus()) initialFocusAllowed = false
+		if (requester.safeRequestFocus()) initialFocusAllowed = false
 	}
 
 	fun save(): String? = lastFocusedKey
@@ -45,7 +45,7 @@ class FocusPersistManager {
 		if (key == null) return
 
 		initialFocusAllowed = false
-		requesters[key]?.requestFocus()
+		requesters[key]?.safeRequestFocus()
 	}
 }
 

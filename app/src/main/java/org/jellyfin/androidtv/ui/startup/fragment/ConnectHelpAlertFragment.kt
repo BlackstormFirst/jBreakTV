@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -103,7 +104,7 @@ private fun ConnectHelpAlert(
 	}
 
 	LaunchedEffect(focusRequester) {
-		focusRequester.requestFocus()
+		focusRequester.safeRequestFocus()
 	}
 }
 

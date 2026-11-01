@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -74,7 +75,7 @@ fun ServerAddScreen(
 
     LaunchedEffect(Unit) {
         if (initialAddress.isNullOrBlank()) {
-            focusRequester.requestFocus()
+            focusRequester.safeRequestFocus()
         }
     }
 

@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -255,7 +256,7 @@ fun LeanbackTitleBar(
                             if (event.type == KeyEventType.KeyDown) {
                                 if (event.key == Key.DirectionDown) {
                                     if (firstItemFocusRequester != null) {
-                                        try { firstItemFocusRequester.requestFocus() } catch (e: Exception) {}
+                                        firstItemFocusRequester.safeRequestFocus()
                                         true
                                     } else false
                                 } else if (event.key == Key.DirectionLeft || event.key == Key.DirectionRight || event.key == Key.DirectionUp) {
@@ -330,12 +331,7 @@ fun UsbFileExplorerScreen(
                             listState.scrollToItem(targetIndex)
                             delay(50)
                             if (targetPath != null) {
-                                try {
-                                    getFocusRequester(targetPath).requestFocus()
-                                } catch (e: Exception) {
-                                    delay(50)
-                                    try { getFocusRequester(targetPath).requestFocus() } catch (e2: Exception) {}
-                                }
+                                getFocusRequester(targetPath).safeRequestFocus()
                             }
                         }
                     }
@@ -435,7 +431,7 @@ fun UsbFileExplorerScreen(
                             }
                             .onPreviewKeyEvent { event ->
                                 if (isFirst && event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
-                                    try { homeFocusRequester.requestFocus() } catch (e: Exception) {}
+                                    homeFocusRequester.safeRequestFocus()
                                     true
                                 } else false
                             }
@@ -453,7 +449,7 @@ fun UsbFileExplorerScreen(
                                             listState.scrollToItem(targetIndex)
                                             delay(50)
                                             if (targetPath != null) {
-                                                try { getFocusRequester(targetPath).requestFocus() } catch (e: Exception) {}
+                                                getFocusRequester(targetPath).safeRequestFocus()
                                             }
                                         }
                                     }

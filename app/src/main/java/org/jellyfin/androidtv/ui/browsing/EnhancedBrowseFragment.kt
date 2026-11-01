@@ -53,6 +53,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
@@ -410,7 +411,7 @@ fun EnhancedBrowseScreen(
 		val observer = LifecycleEventObserver { _, event ->
 			if (event == Lifecycle.Event.ON_RESUME) {
 				if (selectedItem != null) {
-					try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+					selectedItemFocusRequester.safeRequestFocus()
 				}
 			}
 		}
@@ -422,7 +423,7 @@ fun EnhancedBrowseScreen(
 
 	LaunchedEffect(selectedItem) {
 		if (selectedItem != null && !userHasInteracted) {
-			try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+			selectedItemFocusRequester.safeRequestFocus()
 		}
 	}
 
@@ -580,7 +581,7 @@ fun EnhancedBrowseScreen(
 														.focusRequester(selectedItemFocusRequester)
 														.onGloballyPositioned {
 															if (!userHasInteracted) {
-																try { selectedItemFocusRequester.requestFocus() } catch (e: Exception) {}
+																selectedItemFocusRequester.safeRequestFocus()
 															}
 														}
 												} else Modifier)

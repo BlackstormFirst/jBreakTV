@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -146,14 +147,9 @@ fun HomeComposeScreen(
             var attempts = 0
             while (attempts < 5) {
                 val requester = focusRequesters[targetItemKey]
-                if (requester != null) {
-                    try {
-                        requester.requestFocus()
-                        Timber.d("HomeComposeScreen: focus set on $targetItemKey (trigger=$focusTrigger)")
-                        break
-                    } catch (e: Exception) {
-                        Timber.d("HomeComposeScreen: attempt ${attempts + 1} failed for $targetItemKey: ${e.message}")
-                    }
+                if (requester != null && requester.safeRequestFocus()) {
+                    Timber.d("HomeComposeScreen: focus set on $targetItemKey (trigger=$focusTrigger)")
+                    break
                 }
                 attempts++
                 delay(100)

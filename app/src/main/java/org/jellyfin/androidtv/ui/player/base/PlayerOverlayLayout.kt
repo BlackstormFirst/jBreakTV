@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusTarget
@@ -132,7 +133,7 @@ fun PlayerOverlayLayout(
 	LaunchedEffect(visibilityState.visible) {
 		if (visibilityState.visible) {
 			delay(50.milliseconds)
-			runCatching { controlsFocusRequester.requestFocus() }
+			controlsFocusRequester.safeRequestFocus()
 		}
 	}
 

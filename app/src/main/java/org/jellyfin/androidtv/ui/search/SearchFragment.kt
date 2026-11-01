@@ -29,6 +29,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -79,9 +80,9 @@ class SearchFragment : Fragment() {
 			if (!extraQuery.isNullOrBlank()) {
 				query = query.copy(text = extraQuery)
 				viewModel.searchImmediately(extraQuery)
-				resultFocusRequester.requestFocus()
+				resultFocusRequester.safeRequestFocus()
 			} else {
-				textInputFocusRequester.requestFocus()
+				textInputFocusRequester.safeRequestFocus()
 			}
 		}
 
@@ -101,7 +102,7 @@ class SearchFragment : Fragment() {
 						onQueryChange = { query = query.copy(text = it) },
 						onQuerySubmit = {
 							viewModel.searchImmediately(query.text)
-							resultFocusRequester.requestFocus()
+							resultFocusRequester.safeRequestFocus()
 						}
 					)
 				}
@@ -116,7 +117,7 @@ class SearchFragment : Fragment() {
 						viewModel.searchImmediately(query.text)
 						// Note: We MUST change the focus to somewhere else when the keyboard is submitted because some vendors (like Amazon)
 						// will otherwise just keep showing a (fullscreen) keyboard, soft-locking the app.
-						resultFocusRequester.requestFocus()
+						resultFocusRequester.safeRequestFocus()
 					},
 					modifier = Modifier
 						.weight(1f)

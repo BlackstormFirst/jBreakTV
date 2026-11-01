@@ -37,6 +37,7 @@ import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.koin.compose.koinInject
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 
 fun updateItemWithUserData(item: BaseRowItem, userData: UserItemDataDto): BaseRowItem {
 	val baseItem = item.baseItem ?: return item
@@ -66,7 +67,7 @@ fun ItemContextMenu(
 
 	DisposableEffect(focusRequester) {
 		onDispose {
-			runCatching { focusRequester?.requestFocus() }
+			focusRequester.safeRequestFocus()
 		}
 	}
 

@@ -12,6 +12,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.onGloballyPositioned
 
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
+
 @Composable
 @Stable
 fun BaseScreen(
@@ -28,8 +30,9 @@ fun BaseScreen(
 			.focusGroup()
 			.onGloballyPositioned {
 				if (!hasRequestedFocus) {
-					hasRequestedFocus = true
-					runCatching { focusRequester.requestFocus() }
+					if (focusRequester.safeRequestFocus()) {
+						hasRequestedFocus = true
+					}
 				}
 			}
 	) {

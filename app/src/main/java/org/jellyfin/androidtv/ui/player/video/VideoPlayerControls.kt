@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -132,7 +133,7 @@ fun VideoPlayerControls(
 	LaunchedEffect(hasPrevious) {
 		if (prevHasPrevious && !hasPrevious) {
 			delay(50.milliseconds)
-			runCatching { playPauseFocusRequester.requestFocus() }
+			playPauseFocusRequester.safeRequestFocus()
 		}
 		prevHasPrevious = hasPrevious
 	}
@@ -140,7 +141,7 @@ fun VideoPlayerControls(
 	LaunchedEffect(hasNext) {
 		if (prevHasNext && !hasNext) {
 			delay(50.milliseconds)
-			runCatching { playPauseFocusRequester.requestFocus() }
+			playPauseFocusRequester.safeRequestFocus()
 		}
 		prevHasNext = hasNext
 	}

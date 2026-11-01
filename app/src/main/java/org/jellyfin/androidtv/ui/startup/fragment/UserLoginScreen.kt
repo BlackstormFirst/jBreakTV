@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -224,9 +225,9 @@ private fun CredentialsContent(
 
     LaunchedEffect(Unit) {
         if (!isUsernameFixed) {
-            focusRequester.requestFocus()
+            focusRequester.safeRequestFocus()
         } else {
-            passwordFocusRequester.requestFocus()
+            passwordFocusRequester.safeRequestFocus()
         }
     }
 
@@ -274,7 +275,7 @@ private fun CredentialsContent(
                     imeAction = ImeAction.Next,
                     showKeyboardOnFocus = true
                 ),
-                keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.requestFocus() }),
+                keyboardActions = KeyboardActions(onNext = { passwordFocusRequester.safeRequestFocus() }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)

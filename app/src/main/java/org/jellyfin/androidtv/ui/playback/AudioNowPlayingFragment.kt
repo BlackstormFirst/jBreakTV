@@ -41,6 +41,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -172,7 +173,7 @@ fun AudioNowPlayingScreen(
 							}
 							.onPreviewKeyEvent { keyEvent ->
 								if (keyEvent.type == KeyEventType.KeyDown && keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-									try { playPauseFocusRequester.requestFocus() } catch (_: Exception) {}
+									playPauseFocusRequester.safeRequestFocus()
 									true
 								} else {
 									false

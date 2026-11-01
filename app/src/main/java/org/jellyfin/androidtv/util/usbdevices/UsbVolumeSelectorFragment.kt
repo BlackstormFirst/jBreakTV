@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -134,7 +135,7 @@ fun UsbVolumeSelectorScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 if (volumes.isNotEmpty()) {
-                    try { firstItemFocusRequester.requestFocus() } catch (e: Exception) {}
+                    firstItemFocusRequester.safeRequestFocus()
                 }
             }
         }
@@ -200,7 +201,7 @@ fun UsbVolumeSelectorScreen(
                         }
                         .onPreviewKeyEvent { event ->
                             if (isFirst && event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
-                                try { homeFocusRequester.requestFocus() } catch (e: Exception) {}
+                                homeFocusRequester.safeRequestFocus()
                                 true
                             } else false
                         }
@@ -209,8 +210,9 @@ fun UsbVolumeSelectorScreen(
                                 .focusRequester(firstItemFocusRequester)
                                 .onGloballyPositioned {
                                     if (!hasRequestedFocus) {
-                                        hasRequestedFocus = true
-                                        try { firstItemFocusRequester.requestFocus() } catch (e: Exception) {}
+                                        if (firstItemFocusRequester.safeRequestFocus()) {
+                                            hasRequestedFocus = true
+                                        }
                                     }
                                 }
                             else Modifier

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -159,8 +160,9 @@ fun ServerScreen(
                                                         .focusRequester(userFocusRequester)
                                                         .onGloballyPositioned {
                                                             if (requestedFocusUserId != user.id) {
-                                                                requestedFocusUserId = user.id
-                                                                try { userFocusRequester.requestFocus() } catch (_: Exception) {}
+                                                                if (userFocusRequester.safeRequestFocus()) {
+                                                                    requestedFocusUserId = user.id
+                                                                }
                                                             }
                                                         }
                                                 } else Modifier
@@ -216,8 +218,9 @@ fun ServerScreen(
                                         .focusRequester(addUserFocusRequester)
                                         .onGloballyPositioned {
                                             if (!hasRequestedAddUserFocus) {
-                                                hasRequestedAddUserFocus = true
-                                                try { addUserFocusRequester.requestFocus() } catch (_: Exception) {}
+                                                if (addUserFocusRequester.safeRequestFocus()) {
+                                                    hasRequestedAddUserFocus = true
+                                                }
                                             }
                                         }
                                 } else Modifier.focusRequester(addUserFocusRequester)

@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
@@ -429,7 +430,7 @@ fun BrowseGridScreen(
 				}
 
 				if (hasRequestedFocus) {
-					try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+					firstCardFocusRequester.safeRequestFocus()
 				}
 			}
 		}
@@ -927,8 +928,9 @@ fun BrowseGridScreen(
 										.zIndex(if (isFocused) 1f else 0f)
 										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester).onGloballyPositioned {
 											if (!hasRequestedFocus) {
-												hasRequestedFocus = true
-												try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+												if (firstCardFocusRequester.safeRequestFocus()) {
+													hasRequestedFocus = true
+												}
 											}
 										} else Modifier)
 										.onFocusChanged { focusState ->
@@ -1012,8 +1014,9 @@ fun BrowseGridScreen(
 										.zIndex(if (isFocused) 1f else 0f)
 										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester).onGloballyPositioned {
 											if (!hasRequestedFocus) {
-												hasRequestedFocus = true
-												try { firstCardFocusRequester.requestFocus() } catch (e: Exception) {}
+												if (firstCardFocusRequester.safeRequestFocus()) {
+													hasRequestedFocus = true
+												}
 											}
 										} else Modifier)
 										.onFocusChanged { focusState ->

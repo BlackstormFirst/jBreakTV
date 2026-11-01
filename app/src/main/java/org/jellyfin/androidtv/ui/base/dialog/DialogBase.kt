@@ -29,6 +29,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.interactionTracker
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 
 @Composable
 fun DialogBase(
@@ -68,8 +69,9 @@ fun DialogBase(
 					.focusRequester(focusRequester)
 					.onGloballyPositioned {
 						if (!hasRequestedFocus) {
-							hasRequestedFocus = true
-							try { focusRequester.requestFocus() } catch (e: Exception) {}
+							if (focusRequester.safeRequestFocus()) {
+								hasRequestedFocus = true
+							}
 						}
 					}
 					.focusGroup()

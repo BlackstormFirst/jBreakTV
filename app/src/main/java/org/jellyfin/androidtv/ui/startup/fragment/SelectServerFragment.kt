@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
@@ -180,8 +181,9 @@ class SelectServerFragment : Fragment() {
 													.focusRequester(firstServerFocusRequester)
 													.onGloballyPositioned {
 														if (!hasRequestedFocus) {
-															hasRequestedFocus = true
-															try { firstServerFocusRequester.requestFocus() } catch (_: Exception) {}
+															if (firstServerFocusRequester.safeRequestFocus()) {
+																hasRequestedFocus = true
+															}
 														}
 													}
 											} else Modifier
@@ -214,8 +216,9 @@ class SelectServerFragment : Fragment() {
 										.focusRequester(manualConnectFocusRequester)
 										.onGloballyPositioned {
 											if (!hasRequestedFocus) {
-												hasRequestedFocus = true
-												try { manualConnectFocusRequester.requestFocus() } catch (_: Exception) {}
+												if (manualConnectFocusRequester.safeRequestFocus()) {
+													hasRequestedFocus = true
+												}
 											}
 										}
 								} else Modifier

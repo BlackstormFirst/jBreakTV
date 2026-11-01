@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -215,9 +216,9 @@ fun VideoPlayerOverlay(
 		if (!visibilityState.visible) {
 			delay(50.milliseconds)
 			if (activeSegment != null) {
-				runCatching { skipFocusRequester.requestFocus() }
+				skipFocusRequester.safeRequestFocus()
 			} else {
-				runCatching { rootFocusRequester.requestFocus() }
+				rootFocusRequester.safeRequestFocus()
 			}
 		}
 	}
@@ -229,7 +230,7 @@ fun VideoPlayerOverlay(
 			visibilityState = visibilityState,
 			rootFocusRequester = rootFocusRequester,
 			isSkipButtonPresent = activeSegment != null,
-			onFocusSkipButton = { runCatching { skipFocusRequester.requestFocus() } },
+			onFocusSkipButton = { skipFocusRequester.safeRequestFocus() },
 			header = {
 				Column {
 					VideoPlayerHeader(
@@ -325,7 +326,7 @@ fun VideoPlayerOverlay(
 								true
 							}
 							Key.DirectionLeft, Key.MediaRewind -> {
-								runCatching { rootFocusRequester.requestFocus() }
+								rootFocusRequester.safeRequestFocus()
 								true
 							}
 							Key.DirectionRight, Key.MediaFastForward -> {
@@ -339,7 +340,7 @@ fun VideoPlayerOverlay(
 								if (visibilityState.visible) {
 									visibilityState.hide()
 								} else {
-									runCatching { rootFocusRequester.requestFocus() }
+									rootFocusRequester.safeRequestFocus()
 								}
 								true
 							}

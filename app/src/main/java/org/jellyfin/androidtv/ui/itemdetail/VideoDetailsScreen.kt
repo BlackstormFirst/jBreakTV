@@ -56,6 +56,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -722,15 +723,16 @@ fun VideoDetailsScreen(
     LaunchedEffect(item.id) {
         initialFocusRequested = false
         delay(100)
-        try { initialPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+        initialPlayButtonFocusRequester.safeRequestFocus()
     }
 
     val initialFocusModifier = Modifier
         .focusRequester(initialPlayButtonFocusRequester)
         .onGloballyPositioned {
             if (!initialFocusRequested) {
-                initialFocusRequested = true
-                try { initialPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+                if (initialPlayButtonFocusRequester.safeRequestFocus()) {
+                    initialFocusRequested = true
+                }
             }
         }
 
@@ -768,7 +770,7 @@ fun VideoDetailsScreen(
                 listState.animateScrollToItem(0, 0)
             }
             delay(50)
-            try { actionButtonsFocusRequester.requestFocus() } catch (e: Exception) {}
+            actionButtonsFocusRequester.safeRequestFocus()
         }
     }
 

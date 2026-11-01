@@ -43,6 +43,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
@@ -123,8 +124,9 @@ fun ItemListScreen(
 		.focusRequester(playButtonFocusRequester)
 		.onGloballyPositioned {
 			if (!initialFocusRequested && baseItem != null) {
-				initialFocusRequested = true
-				try { playButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+				if (playButtonFocusRequester.safeRequestFocus()) {
+					initialFocusRequested = true
+				}
 			}
 		}
 
@@ -245,7 +247,7 @@ fun ItemListScreen(
 						}
 						.onPreviewKeyEvent { keyEvent ->
 							if (keyEvent.type == KeyEventType.KeyDown && keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-								try { playButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+								playButtonFocusRequester.safeRequestFocus()
 								true
 							} else {
 								false
