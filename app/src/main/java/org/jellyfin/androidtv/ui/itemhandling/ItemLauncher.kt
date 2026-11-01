@@ -158,11 +158,15 @@ class ItemLauncher {
 											val list = ArrayList(response)
 											list.add(0, targetItem)
 											finalItems = list
+											itemsPosition = 0
+										} else {
+											val firstUnwatched = finalItems.indexOfFirst { it.userData?.played == false }
+											itemsPosition = if (firstUnwatched != -1) firstUnwatched else 0
 										}
-										itemsPosition = 0
 									}
+									val targetEpisode = finalItems.getOrNull(itemsPosition)
 									var pos = 0
-									val ticks = targetItem.userData?.playbackPositionTicks
+									val ticks = targetEpisode?.userData?.playbackPositionTicks ?: targetItem.userData?.playbackPositionTicks
 									if (ticks != null && ticks > 0) {
 										pos = (ticks / 10000).toInt()
 									}

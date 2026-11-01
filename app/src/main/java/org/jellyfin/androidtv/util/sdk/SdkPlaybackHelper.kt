@@ -324,12 +324,21 @@ class SdkPlaybackHelper(
 				var items = getItems(item, allowIntros, shuffle)
 				var targetIndex = items.indexOfFirst { it.id == item.id }
 				if (targetIndex == -1) {
-					items = if (item.canPlay() && item.isFolder != true) listOf(item) + items else items
-					targetIndex = items.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
+					if (item.canPlay() && item.isFolder != true) {
+						items = listOf(item) + items
+						targetIndex = items.indexOfFirst { it.id == item.id }.coerceAtLeast(0)
+					} else {
+						targetIndex = if (!shuffle) {
+							items.indexOfFirst { it.userData?.played == false }.takeIf { it != -1 } ?: 0
+						} else {
+							0
+						}
+					}
 				}
 
+				val effectiveStartPosition = if (item.isFolder == true) null else startPosition
 				val targetItem = items.getOrNull(targetIndex) ?: item
-				val pos = startPosition?.ticks ?: targetItem.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration)?.coerceAtLeast(Duration.ZERO) ?: Duration.ZERO
+				val pos = effectiveStartPosition?.ticks ?: targetItem.userData?.playbackPositionTicks?.ticks?.minus(resumeSubtractDuration)?.coerceAtLeast(Duration.ZERO) ?: Duration.ZERO
 
 				Triple(items, pos, targetIndex)
 			}.fold(

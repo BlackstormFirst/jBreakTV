@@ -62,7 +62,8 @@ class FullDetailsFragment : Fragment() {
                         onPlayClick = {
                             state.item?.let { item ->
                                 val targetId = state.selectedMediaSource?.id?.let { Utils.uuidOrNull(it) } ?: item.id
-                                playbackHelper.retrieveAndPlay(targetId, false, requireContext(), 0L)
+                                val startPos = if (item.isFolder == true) null else 0L
+                                playbackHelper.retrieveAndPlay(targetId, false, requireContext(), startPos)
                             }
                         },
                         onResumeClick = {
