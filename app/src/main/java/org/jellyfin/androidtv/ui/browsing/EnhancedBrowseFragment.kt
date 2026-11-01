@@ -162,6 +162,7 @@ abstract class EnhancedBrowseFragment : Fragment(), RowLoader {
 				JellyfinTheme {
 					EnhancedBrowseScreen(
 						title = mFolder?.name,
+						folder = mFolder,
 						rows = rowsState,
 						onItemClick = { item: BaseRowItem, adapter: ItemRowAdapter ->
 							if (item is GridButtonBaseRowItem) {
@@ -341,6 +342,7 @@ private fun rememberPivotBringIntoViewSpec(): BringIntoViewSpec {
 @Composable
 fun EnhancedBrowseScreen(
 	title: String?,
+	folder: BaseItemDto? = null,
 	rows: List<BrowseRowDef>,
 	onItemClick: (BaseRowItem, ItemRowAdapter) -> Unit,
 	onItemFocused: (BaseRowItem?) -> Unit,
@@ -352,6 +354,21 @@ fun EnhancedBrowseScreen(
 	var selectedRowIndex by remember { mutableStateOf<Int?>(null) }
 	var userHasInteracted by remember { mutableStateOf(false) }
 	val selectedItemFocusRequester = remember { FocusRequester() }
+
+	val currentItem = displayedSelectedItem?.baseItem ?: folder
+	val currentTitle = remember(displayedSelectedItem, folder, title, context) {
+		if (displayedSelectedItem != null) {
+			displayedSelectedItem?.getCardName(context) ?: title ?: ""
+		} else if (folder != null) {
+			if (folder.type == BaseItemKind.SEASON && !folder.seriesName.isNullOrBlank()) {
+				"${folder.seriesName} - ${folder.name}"
+			} else {
+				folder.name ?: title ?: ""
+			}
+		} else {
+			title ?: ""
+		}
+	}
 
 	LaunchedEffect(selectedItem) {
 		val target = selectedItem
@@ -408,7 +425,7 @@ fun EnhancedBrowseScreen(
 				verticalAlignment = Alignment.CenterVertically
 			) {
 				Text(
-					text = displayedSelectedItem?.getCardName(context) ?: title ?: "",
+					text = currentTitle,
 					style = JellyfinTheme.typography.default.copy(
 						fontSize = 32.sp,
 						fontWeight = FontWeight.Light
@@ -442,7 +459,7 @@ fun EnhancedBrowseScreen(
 					.fillMaxWidth()
 			) {
 				Box(modifier = Modifier.height(20.dp)) {
-					displayedSelectedItem?.baseItem?.let { baseItem ->
+					currentItem?.let { baseItem ->
 						BaseItemInfoRow(
 							item = baseItem,
 							mediaSource = null,
@@ -454,7 +471,7 @@ fun EnhancedBrowseScreen(
 				Spacer(Modifier.height(12.dp))
 
 				Box(modifier = Modifier.height(150.dp).width(570.dp)) {
-					val summary = displayedSelectedItem?.getSummary(context) ?: ""
+					val summary = displayedSelectedItem?.getSummary(context) ?: folder?.overview ?: ""
 					if (summary.isNotBlank()) {
 						Text(
 							text = summary,

@@ -850,6 +850,20 @@ fun VideoDetailsScreen(
                             Spacer(Modifier.width(170.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
+                                if (item.type == BaseItemKind.SEASON && !item.seriesName.isNullOrBlank()) {
+                                    Text(
+                                        text = item.seriesName!!,
+                                        style = TextStyle(
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            color = Color.White.copy(alpha = 0.7f)
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                }
+
                                 Text(
                                     text = item.name ?: "",
                                     style = TextStyle(
@@ -1097,8 +1111,8 @@ fun VideoDetailsScreen(
                                                 }
                                             }
 
-                                            // 9. Go to Series (Episode)
-                                            if (item.type == BaseItemKind.EPISODE && item.seriesId != null && !isPerson) {
+                                            // 9. Go to Series (Episode or Season)
+                                            if ((item.type == BaseItemKind.EPISODE || item.type == BaseItemKind.SEASON) && item.seriesId != null && !isPerson) {
                                                 item {
                                                     TextUnderButton(
                                                         iconRes = R.drawable.ic_tv,

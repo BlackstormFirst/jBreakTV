@@ -20,8 +20,8 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.composable.getResolutionName
 import org.jellyfin.androidtv.util.TimeUtils
+import org.jellyfin.androidtv.util.sdk.getDisplayName
 import org.jellyfin.androidtv.util.sdk.getProgramSubText
-import org.jellyfin.androidtv.util.sdk.getSeasonEpisodeName
 import org.jellyfin.androidtv.util.sdk.isNew
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -127,7 +127,7 @@ fun BaseItemInfoRowRuntime(
 @Composable
 fun InfoRowSeasonEpisode(item: BaseItemDto) {
 	val context = LocalContext.current
-	val displayName = item.getSeasonEpisodeName(context)
+	val displayName = item.getDisplayName(context)
 
 	if (displayName.isNotBlank()) {
 		InfoRowItem(contentDescription = null) {
@@ -304,6 +304,20 @@ fun BaseItemInfoRow(
 				InfoRowDate(item)
 				if (includeRuntime) item.runTimeTicks?.ticks?.let { BaseItemInfoRowRuntime(it) }
 				InfoRowSeriesStatus(item)
+				item.officialRating?.let { InfoRowParentalRating(it) }
+				resolvedMediaSource?.let { InfoRowMediaDetails(it) }
+			}
+
+			BaseItemKind.SEASON -> {
+				InfoRowDate(item)
+				val episodes = item.childCount ?: 0
+				if (episodes > 0) {
+					InfoRowItem(contentDescription = null) {
+						Text(pluralStringResource(R.plurals.episodes, episodes, episodes))
+					}
+				}
+				val runtime = item.cumulativeRunTimeTicks ?: item.runTimeTicks
+				if (includeRuntime && runtime != null) BaseItemInfoRowRuntime(runtime.ticks)
 				item.officialRating?.let { InfoRowParentalRating(it) }
 				resolvedMediaSource?.let { InfoRowMediaDetails(it) }
 			}
