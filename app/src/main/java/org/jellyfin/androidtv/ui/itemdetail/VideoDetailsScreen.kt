@@ -753,7 +753,6 @@ fun VideoDetailsScreen(
                 listState.animateScrollToItem(0, 0)
             }
             delay(50)
-            try { initialPlayButtonFocusRequester.requestFocus() } catch (e: Exception) {}
             try { actionButtonsFocusRequester.requestFocus() } catch (e: Exception) {}
         }
     }

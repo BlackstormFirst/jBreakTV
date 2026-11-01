@@ -312,8 +312,6 @@ fun BrowseGridScreen(
 	onHomeClick: () -> Unit
 ) {
 	val context = LocalContext.current
-	@Suppress("DEPRECATION")
-	val lifecycle = LocalLifecycleOwner.current.lifecycle
 	val itemsState = remember { mutableStateListOf<BaseRowItem>() }
 	val adapterRef = remember { mutableStateOf<ItemRowAdapter?>(null) }
 
@@ -531,17 +529,22 @@ fun BrowseGridScreen(
 			QueryType.Items
 		)
 		adapterRef.value = adapter
-		adapter.setRetrieveFinishedListener {
-			if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@setRetrieveFinishedListener
+		val updateLoadedItems = {
 			val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
-			itemsState.clear()
-			itemsState.addAll(loaded)
-			if (selectedItem == null && loaded.isNotEmpty()) {
-				selectedItem = loaded.first()
-				onItemFocused(loaded.first())
+			if (loaded.isNotEmpty()) {
+				itemsState.clear()
+				itemsState.addAll(loaded)
+				if (selectedItem == null) {
+					selectedItem = loaded.first()
+					onItemFocused(loaded.first())
+				}
 			}
 		}
+		adapter.setRetrieveFinishedListener {
+			updateLoadedItems()
+		}
 		adapter.Retrieve()
+		updateLoadedItems()
 	}
 
 	Box(modifier = Modifier.fillMaxSize()) {

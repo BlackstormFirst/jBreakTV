@@ -374,32 +374,38 @@ fun BrowseFolderScreen(
 		}
 	}
 
-	LaunchedEffect(rows) {
-		val lifecycle = lifecycleOwner.lifecycle
-		rows.forEachIndexed { rowIndex, def ->
+	val rowsList = rows.toList()
+
+	LaunchedEffect(rowsList) {
+		rowsList.forEachIndexed { rowIndex, def ->
 			if (rowAdapters[rowIndex] == null) {
 				val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
 				rowAdapters[rowIndex] = adapter
-				adapter.setRetrieveFinishedListener {
-					if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@setRetrieveFinishedListener
+				val updateLoadedItems = {
 					val loaded = (0 until adapter.size()).mapNotNull { adapter.get(it) as? BaseRowItem }
-					rowData[rowIndex] = loaded
-					if (!userHasInteracted && loaded.isNotEmpty()) {
-						val currentSelectedRow = selectedRowIndex
-						if (currentSelectedRow == null || rowIndex < currentSelectedRow) {
-							selectedRowIndex = rowIndex
-							selectedItem = loaded.first()
-							onItemFocused(loaded.first())
+					if (loaded.isNotEmpty()) {
+						rowData[rowIndex] = loaded
+						if (!userHasInteracted) {
+							val currentSelectedRow = selectedRowIndex
+							if (currentSelectedRow == null || rowIndex < currentSelectedRow) {
+								selectedRowIndex = rowIndex
+								selectedItem = loaded.first()
+								onItemFocused(loaded.first())
+							}
 						}
 					}
 				}
+				adapter.setRetrieveFinishedListener {
+					updateLoadedItems()
+				}
 				adapter.Retrieve()
+				updateLoadedItems()
 			}
 		}
 	}
 
-	val activeRows = remember(rows, rowData.toMap()) {
-		rows.mapIndexedNotNull { index, def ->
+	val activeRows = remember(rowsList, rowData.toMap()) {
+		rowsList.mapIndexedNotNull { index, def ->
 			val items = rowData[index]
 			if (!items.isNullOrEmpty()) {
 				Triple(index, def, items)
