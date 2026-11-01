@@ -444,7 +444,7 @@ fun MediaStreamCard(
         else -> stream.type.name.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
     }
 
-    val streamTitle = stream.displayTitle?.ifBlank { null } ?: stream.title?.ifBlank { null }
+    val streamTitle = stream.title?.ifBlank { null }
 
     Box(
         modifier = modifier
