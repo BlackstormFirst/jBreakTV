@@ -36,32 +36,33 @@ fun InfoRowItem(
 	content: @Composable RowScope.() -> Unit,
 ) {
 	val (backgroundColor, foregroundColor) = colors
+	val isBadge = backgroundColor.alpha > 0f
 
-	val modifier = when {
-		backgroundColor.alpha > 0f -> Modifier
+	val modifier = if (isBadge) {
+		Modifier
 			.background(backgroundColor, RoundedCornerShape(3.dp))
-			.padding(horizontal = 5.dp)
-
-		else -> Modifier
+			.padding(horizontal = 6.dp, vertical = 3.dp)
+	} else {
+		Modifier.fillMaxHeight()
 	}
 
 	ProvideTextStyle(
 		value = TextStyle(
 			color = foregroundColor,
-			fontSize = if (backgroundColor.alpha > 0f) 10.sp else 16.sp,
-			fontWeight = if (backgroundColor.alpha > 0f) FontWeight.W600 else FontWeight.W500,
+			fontSize = if (isBadge) 10.sp else 16.sp,
+			fontWeight = if (isBadge) FontWeight.W600 else FontWeight.W500,
 		)
 	) {
 		Row(
 			horizontalArrangement = Arrangement.spacedBy(3.dp),
 			verticalAlignment = Alignment.CenterVertically,
-			modifier = modifier.fillMaxHeight(),
+			modifier = modifier,
 		) {
 			if (icon != null) {
 				Icon(
 					imageVector = icon,
 					contentDescription = contentDescription,
-					modifier = Modifier.size(if (backgroundColor.alpha > 0f) 16.dp else 18.dp),
+					modifier = Modifier.size(if (isBadge) 16.dp else 18.dp),
 					tint = iconTint ?: LocalTextStyle.current.color,
 				)
 			}
