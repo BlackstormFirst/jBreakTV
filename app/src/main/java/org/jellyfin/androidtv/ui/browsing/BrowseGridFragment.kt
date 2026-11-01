@@ -324,6 +324,14 @@ fun BrowseGridScreen(
 	var selectedIndex by rememberSaveable { mutableStateOf(0) }
 	val firstCardFocusRequester = remember { FocusRequester() }
 	var hasRequestedFocus by rememberSaveable { mutableStateOf(false) }
+	var userHasInteracted by rememberSaveable { mutableStateOf(false) }
+	val selectedItemFocusRequester = remember { FocusRequester() }
+
+	LaunchedEffect(selectedItem) {
+		if (selectedItem != null && !userHasInteracted) {
+			selectedItemFocusRequester.safeRequestFocus()
+		}
+	}
 
 	LaunchedEffect(selectedItem) {
 		val target = selectedItem
@@ -432,8 +440,8 @@ fun BrowseGridScreen(
 					}
 				}
 
-				if (hasRequestedFocus) {
-					firstCardFocusRequester.safeRequestFocus()
+				if (selectedItem != null) {
+					selectedItemFocusRequester.safeRequestFocus()
 				}
 			}
 		}
@@ -917,6 +925,7 @@ fun BrowseGridScreen(
 								val isFocused = isFocusedState || isFocusedInternal
 								var showContextMenu by remember { mutableStateOf(false) }
 								val isFirstCard = index == 0
+								val isSelectedItem = (item == selectedItem)
 
 								if (isFirstCard) {
 									LaunchedEffect(itemsState.isNotEmpty()) {
@@ -931,18 +940,33 @@ fun BrowseGridScreen(
 									modifier = Modifier
 										.focusRequester(cardFocusRequester)
 										.zIndex(if (isFocused) 1f else 0f)
-										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester).onGloballyPositioned {
-											if (!hasRequestedFocus) {
-												if (firstCardFocusRequester.safeRequestFocus()) {
-													hasRequestedFocus = true
-												}
+										.then(
+											when {
+												isSelectedItem -> Modifier
+													.focusRequester(selectedItemFocusRequester)
+													.onGloballyPositioned {
+														if (!userHasInteracted) {
+															selectedItemFocusRequester.safeRequestFocus()
+														}
+													}
+												isFirstCard -> Modifier
+													.focusRequester(firstCardFocusRequester)
+													.onGloballyPositioned {
+														if (!hasRequestedFocus) {
+															if (firstCardFocusRequester.safeRequestFocus()) {
+																hasRequestedFocus = true
+															}
+														}
+													}
+												else -> Modifier
 											}
-										} else Modifier)
+										)
 										.onFocusChanged { focusState ->
 											isFocusedInternal = focusState.isFocused
 											if (focusState.isFocused) {
 												selectedItem = item
 												selectedIndex = index
+												userHasInteracted = true
 												adapterRef.value?.loadMoreItemsIfNeeded(index)
 												onItemFocused(item)
 											}
@@ -1004,6 +1028,7 @@ fun BrowseGridScreen(
 								val isFocused = isFocusedState || isFocusedInternal
 								var showContextMenu by remember { mutableStateOf(false) }
 								val isFirstCard = index == 0
+								val isSelectedItem = (item == selectedItem)
 
 								if (isFirstCard) {
 									LaunchedEffect(itemsState.isNotEmpty()) {
@@ -1018,18 +1043,33 @@ fun BrowseGridScreen(
 									modifier = Modifier
 										.focusRequester(cardFocusRequester)
 										.zIndex(if (isFocused) 1f else 0f)
-										.then(if (isFirstCard) Modifier.focusRequester(firstCardFocusRequester).onGloballyPositioned {
-											if (!hasRequestedFocus) {
-												if (firstCardFocusRequester.safeRequestFocus()) {
-													hasRequestedFocus = true
-												}
+										.then(
+											when {
+												isSelectedItem -> Modifier
+													.focusRequester(selectedItemFocusRequester)
+													.onGloballyPositioned {
+														if (!userHasInteracted) {
+															selectedItemFocusRequester.safeRequestFocus()
+														}
+													}
+												isFirstCard -> Modifier
+													.focusRequester(firstCardFocusRequester)
+													.onGloballyPositioned {
+														if (!hasRequestedFocus) {
+															if (firstCardFocusRequester.safeRequestFocus()) {
+																hasRequestedFocus = true
+															}
+														}
+													}
+												else -> Modifier
 											}
-										} else Modifier)
+										)
 										.onFocusChanged { focusState ->
 											isFocusedInternal = focusState.isFocused
 											if (focusState.isFocused) {
 												selectedItem = item
 												selectedIndex = index
+												userHasInteracted = true
 												adapterRef.value?.loadMoreItemsIfNeeded(index)
 												onItemFocused(item)
 											}

@@ -301,6 +301,11 @@ class FullDetailsViewModel(
         viewModelScope.launch {
             val rows = mutableListOf<DetailsRowState>()
 
+            fun addRow(row: DetailsRowState) {
+                rows.add(row)
+                _uiState.value = _uiState.value.copy(rows = rows.toList().distinctBy { it.title })
+            }
+
             when (baseItem.type) {
                 BaseItemKind.MOVIE -> {
                     // Additional Parts
@@ -309,7 +314,7 @@ class FullDetailsViewModel(
                             val query = GetAdditionalPartsRequest(baseItem.id)
                             val adapter = ItemRowAdapter(context, query, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_additional_parts), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_additional_parts), adapter))
                         }
                     }
 
@@ -318,7 +323,7 @@ class FullDetailsViewModel(
                         runCatching {
                             val adapter = ItemRowAdapter(peopleList, context, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
                         }
                     }
 
@@ -328,7 +333,7 @@ class FullDetailsViewModel(
                             val chapterItems = baseItem.buildChapterItems()
                             val adapter = ItemRowAdapter(context, chapterItems, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_chapters), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_chapters), adapter))
                         }
                     }
 
@@ -338,7 +343,7 @@ class FullDetailsViewModel(
                             val query = GetSpecialsRequest(baseItem.id)
                             val adapter = ItemRowAdapter(context, query, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
                         }
                     }
 
@@ -348,7 +353,7 @@ class FullDetailsViewModel(
                             val query = GetTrailersRequest(baseItem.id)
                             val adapter = ItemRowAdapter(context, query, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_trailers), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_trailers), adapter))
                         }
                     }
 
@@ -358,7 +363,7 @@ class FullDetailsViewModel(
                         val similarDef = BrowseRowDef(context.getString(R.string.lbl_more_like_this), similarQuery, QueryType.SimilarMovies)
                         val adapter = BrowseRowAdapterFactory.createAdapter(context, similarDef)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
                     }
                 }
 
@@ -368,7 +373,7 @@ class FullDetailsViewModel(
                         runCatching {
                             val adapter = ItemRowAdapter(peopleList, context, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
                         }
                     }
 
@@ -378,7 +383,7 @@ class FullDetailsViewModel(
                         val similarDef = BrowseRowDef(context.getString(R.string.lbl_more_like_this), similarQuery, QueryType.SimilarMovies)
                         val adapter = BrowseRowAdapterFactory.createAdapter(context, similarDef)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
                     }
                 }
 
@@ -388,7 +393,7 @@ class FullDetailsViewModel(
                         val nextUpQuery = GetNextUpRequest(seriesId = baseItem.id, userId = userId, fields = ItemRepository.nextUpFields)
                         val adapter = ItemRowAdapter(context, nextUpQuery, false, null)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_next_up), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_next_up), adapter))
                     }
 
                     // Seasons
@@ -396,7 +401,7 @@ class FullDetailsViewModel(
                         val seasonsQuery = GetSeasonsRequest(seriesId = baseItem.id, userId = userId, fields = ItemRepository.browseFields)
                         val adapter = ItemRowAdapter(context, seasonsQuery, null)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_seasons), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_seasons), adapter))
                     }
 
                     // Upcoming Episodes
@@ -404,7 +409,7 @@ class FullDetailsViewModel(
                         val upcomingQuery = GetUpcomingEpisodesRequest(parentId = baseItem.id, userId = userId, fields = ItemRepository.browseFields)
                         val adapter = ItemRowAdapter(context, upcomingQuery, null)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_upcoming), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_upcoming), adapter))
                     }
 
                     // Specials
@@ -413,7 +418,7 @@ class FullDetailsViewModel(
                             val query = GetSpecialsRequest(baseItem.id)
                             val adapter = ItemRowAdapter(context, query, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
                         }
                     }
 
@@ -422,7 +427,7 @@ class FullDetailsViewModel(
                         runCatching {
                             val adapter = ItemRowAdapter(peopleList, context, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
                         }
                     }
 
@@ -432,7 +437,7 @@ class FullDetailsViewModel(
                         val similarDef = BrowseRowDef(context.getString(R.string.lbl_more_like_this), similarQuery, QueryType.SimilarSeries)
                         val adapter = BrowseRowAdapterFactory.createAdapter(context, similarDef)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_more_like_this), adapter))
                     }
                 }
 
@@ -451,7 +456,7 @@ class FullDetailsViewModel(
                         val def = BrowseRowDef(context.getString(R.string.lbl_episodes), query, 0)
                         val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_episodes), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_episodes), adapter))
                     }
 
                     // Seasons of parent Series (if seriesId present)
@@ -460,7 +465,7 @@ class FullDetailsViewModel(
                             val seasonsQuery = GetSeasonsRequest(seriesId = seriesId, userId = userId, fields = ItemRepository.browseFields)
                             val adapter = ItemRowAdapter(context, seasonsQuery, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_seasons), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_seasons), adapter))
                         }
                     }
 
@@ -470,7 +475,7 @@ class FullDetailsViewModel(
                             val query = GetSpecialsRequest(baseItem.id)
                             val adapter = ItemRowAdapter(context, query, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_specials), adapter))
                         }
                     }
 
@@ -488,7 +493,7 @@ class FullDetailsViewModel(
                         runCatching {
                             val adapter = ItemRowAdapter(people, context, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
                         }
                     }
                 }
@@ -500,7 +505,7 @@ class FullDetailsViewModel(
                             val query = GetAdditionalPartsRequest(baseItem.id)
                             val adapter = ItemRowAdapter(context, query, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_additional_parts), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_additional_parts), adapter))
                         }
                     }
 
@@ -510,7 +515,7 @@ class FullDetailsViewModel(
                             val query = GetNextEpisodesRequest(baseItem.seriesId!!, baseItem.seasonId!!, baseItem.id)
                             val adapter = ItemRowAdapter(context, query, true, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_next_episode), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_next_episode), adapter))
                         }
                     }
 
@@ -519,7 +524,7 @@ class FullDetailsViewModel(
                         runCatching {
                             val adapter = ItemRowAdapter(guests, context, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_guest_stars), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_guest_stars), adapter))
                         }
                     }
 
@@ -529,7 +534,7 @@ class FullDetailsViewModel(
                             val chapterItems = baseItem.buildChapterItems()
                             val adapter = ItemRowAdapter(context, chapterItems, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_chapters), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_chapters), adapter))
                         }
                     }
                 }
@@ -540,7 +545,7 @@ class FullDetailsViewModel(
                         val query = BrowsingUtils.createPersonItemsRequest(baseItem.id, BaseItemKind.MOVIE)
                         val adapter = ItemRowAdapter(context, query, 100, false, null)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_movies), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_movies), adapter))
                     }
 
                     // TV Series
@@ -548,7 +553,7 @@ class FullDetailsViewModel(
                         val query = BrowsingUtils.createPersonItemsRequest(baseItem.id, BaseItemKind.SERIES)
                         val adapter = ItemRowAdapter(context, query, 100, false, null)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_tv_series), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_tv_series), adapter))
                     }
 
                     // Episodes
@@ -556,7 +561,7 @@ class FullDetailsViewModel(
                         val query = BrowsingUtils.createPersonItemsRequest(baseItem.id, BaseItemKind.EPISODE)
                         val adapter = ItemRowAdapter(context, query, 100, false, null)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_episodes), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_episodes), adapter))
                     }
                 }
 
@@ -566,7 +571,7 @@ class FullDetailsViewModel(
                         val query = BrowsingUtils.createArtistItemsRequest(baseItem.id, BaseItemKind.MUSIC_ALBUM)
                         val adapter = ItemRowAdapter(context, query, 100, false, null)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_albums), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_albums), adapter))
                     }
                 }
 
@@ -577,7 +582,7 @@ class FullDetailsViewModel(
                         val def = BrowseRowDef(context.getString(R.string.lbl_songs), query, 100)
                         val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_songs), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_songs), adapter))
                     }
 
                     // Cast / Crew
@@ -585,7 +590,7 @@ class FullDetailsViewModel(
                         runCatching {
                             val adapter = ItemRowAdapter(peopleList, context, null)
                             adapter.Retrieve()
-                            rows.add(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
+                            addRow(DetailsRowState(context.getString(R.string.lbl_cast_crew), adapter))
                         }
                     }
                 }
@@ -597,14 +602,12 @@ class FullDetailsViewModel(
                         val def = BrowseRowDef(context.getString(R.string.lbl_items), query, 100)
                         val adapter = BrowseRowAdapterFactory.createAdapter(context, def)
                         adapter.Retrieve()
-                        rows.add(DetailsRowState(context.getString(R.string.lbl_items), adapter))
+                        addRow(DetailsRowState(context.getString(R.string.lbl_items), adapter))
                     }
                 }
 
                 else -> Unit
             }
-
-            _uiState.value = _uiState.value.copy(rows = rows.distinctBy { it.title })
         }
     }
 
