@@ -164,7 +164,7 @@ class SearchFragment : Fragment() {
 											.onFocusChanged { focusState ->
 												isFocusedInternal = focusState.isFocused
 												if (focusState.isFocused) {
-													backgroundService.setBackground(baseItem)
+													backgroundService.setBackground(baseItem, fallbackToSplashscreen = true)
 												}
 											}
 											.itemCardClickable(

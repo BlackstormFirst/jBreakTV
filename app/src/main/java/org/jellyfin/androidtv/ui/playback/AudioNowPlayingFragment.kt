@@ -122,7 +122,7 @@ fun AudioNowPlayingScreen(
 
 	LaunchedEffect(currentItem) {
 		if (currentItem != null) {
-			backgroundService.setBackground(currentItem)
+			backgroundService.setBackground(currentItem, fallbackToSplashscreen = true)
 		} else {
 			if (navigationRepository.canGoBack) navigationRepository.goBack()
 			else navigationRepository.navigate(Destinations.home)

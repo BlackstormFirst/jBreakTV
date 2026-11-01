@@ -82,7 +82,7 @@ fun NextUpScreen(
 	if (item == null) return
 
 	LaunchedEffect(item?.baseItem) {
-		backgroundService.setBackground(item?.baseItem)
+		backgroundService.setBackground(item?.baseItem, fallbackToSplashscreen = true)
 	}
 
 	LaunchedEffect(state) {

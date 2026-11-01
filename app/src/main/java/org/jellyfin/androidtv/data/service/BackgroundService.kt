@@ -22,10 +22,15 @@ import org.jellyfin.androidtv.preference.constant.BackdropBehavior
 import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
+import org.jellyfin.androidtv.util.apiclient.albumPrimaryImage
+import org.jellyfin.androidtv.util.apiclient.itemImages
+import org.jellyfin.androidtv.util.apiclient.parentImages
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.ImageType
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -113,7 +118,7 @@ class BackgroundService(
 	fun setBackground(
 		baseItem: BaseItemDto?,
 		debounceMs: Long = DEFAULT_DEBOUNCE_MS,
-		fallbackToSplashscreen: Boolean = false,
+		fallbackToSplashscreen: Boolean = true,
 	) {
 		val backdropBehavior = userPreferences[UserPreferences.backdropBehavior]
 
@@ -126,11 +131,23 @@ class BackgroundService(
 		_blurBackground.value = backdropBehavior == BackdropBehavior.BACKDROP_WITH_BLUR
 
 		// Get all backdrop urls
-		val backdropUrls = baseItem?.let { item ->
+		var backdropUrls = baseItem?.let { item ->
 			(item.itemBackdropImages + item.parentBackdropImages)
 				.map { it.getUrl(api) }
 				.toSet()
 		} ?: emptySet()
+
+		if (backdropUrls.isEmpty() && baseItem != null) {
+			val isAudioOrAlbum = baseItem.type == BaseItemKind.AUDIO || baseItem.type == BaseItemKind.MUSIC_ALBUM
+			if (isAudioOrAlbum) {
+				val fallbackImage = baseItem.itemImages[ImageType.PRIMARY]
+					?: baseItem.albumPrimaryImage
+					?: baseItem.parentImages[ImageType.PRIMARY]
+				if (fallbackImage != null) {
+					backdropUrls = setOf(fallbackImage.getUrl(api))
+				}
+			}
+		}
 
 		if (backdropUrls.isNotEmpty()) {
 			val itemId = baseItem?.id?.toString() ?: backdropUrls.first()

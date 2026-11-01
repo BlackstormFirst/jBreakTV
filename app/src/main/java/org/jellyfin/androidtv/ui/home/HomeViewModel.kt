@@ -472,16 +472,6 @@ class HomeViewModel(
         lastFocusedRowIndex = 0
     }
 
-    private fun isLibraryRow(rowIndex: Int, item: Any?): Boolean {
-        if (item is UsbBaseRowItem) return true
-        if (item is BaseRowItem && item.baseItem?.type == BaseItemKind.USER_VIEW) return true
-        val rowStates = (uiState.value as? HomeUiState.Success)?.rows ?: _directRowStates
-        val rowState = rowStates.getOrNull(rowIndex) ?: return false
-        return rowState.sectionType == HomeSectionType.LIBRARY_TILES_SMALL ||
-                rowState.sectionType == HomeSectionType.LIBRARY_BUTTONS ||
-                rowState.id.startsWith("views_row_")
-    }
-
     fun onItemSelected(item: Any?, rowIndex: Int) {
         if (item != null) {
             lastFocusedItemKey = getItemKey(item)
@@ -489,15 +479,10 @@ class HomeViewModel(
         }
         currentItem = item
 
-        val isLibraryRow = isLibraryRow(rowIndex, item)
         if (item !is BaseRowItem) {
-            if (isLibraryRow) {
-                backgroundService.setSplashscreenBackground()
-            } else {
-                backgroundService.clearBackgrounds()
-            }
+            backgroundService.setSplashscreenBackground()
         } else {
-            backgroundService.setBackground(item.baseItem, fallbackToSplashscreen = isLibraryRow)
+            backgroundService.setBackground(item.baseItem, fallbackToSplashscreen = true)
         }
     }
 

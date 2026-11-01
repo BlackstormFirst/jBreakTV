@@ -175,9 +175,9 @@ abstract class BrowseFolderFragment : Fragment(), RowLoader {
 						},
 						onItemFocused = { item ->
 							if (item != null) {
-								backgroundService.setBackground(item.baseItem)
+								backgroundService.setBackground(item.baseItem, fallbackToSplashscreen = true)
 							} else {
-								backgroundService.clearBackgrounds()
+								backgroundService.setSplashscreenBackground()
 							}
 						},
 						onHomeClick = {

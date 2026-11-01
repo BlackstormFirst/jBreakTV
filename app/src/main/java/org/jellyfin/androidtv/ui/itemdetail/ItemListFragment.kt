@@ -86,7 +86,7 @@ class ItemListFragment : Fragment() {
 						api.userLibraryApi.getItem(itemId).content
 					}
 					baseItem = loadedItem
-					backgroundService.setBackground(loadedItem)
+					backgroundService.setBackground(loadedItem, fallbackToSplashscreen = true)
 
 					val loadedItems = withContext(Dispatchers.IO) {
 						when {

@@ -808,12 +808,12 @@ fun VideoDetailsScreen(
     DisposableEffect(lifecycleOwner, item) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                backgroundService.setBackground(item)
+                backgroundService.setBackground(item, fallbackToSplashscreen = true)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-            backgroundService.setBackground(item)
+            backgroundService.setBackground(item, fallbackToSplashscreen = true)
         }
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
