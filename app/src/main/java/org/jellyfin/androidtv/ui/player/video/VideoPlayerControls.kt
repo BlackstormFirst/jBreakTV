@@ -796,11 +796,7 @@ private fun AudioButton(
 								videoQueueManager.setSelectedAudioStreamIndex(track.mediaStreamIndex)
 								entry?.preferredAudioIndex = track.mediaStreamIndex
 
-								val currentPlayableStream = entry?.mediaStream
-								val isTranscodingOrRemux = currentPlayableStream?.conversionMethod != null && currentPlayableStream.conversionMethod != MediaConversionMethod.None
-								val isTrackInExoPlayer = track.group != null
-
-								if (!isTranscodingOrRemux && isTrackInExoPlayer) {
+								if (!isTranscodingOrRemux) {
 									backend.selectTrack(1, track)
 								} else {
 									val currentPos = backend.getPositionInfo().active

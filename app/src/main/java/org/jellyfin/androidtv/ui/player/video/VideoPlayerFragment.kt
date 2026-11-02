@@ -35,6 +35,8 @@ import org.jellyfin.playback.core.mediastream.PlayableMediaStream
 import org.jellyfin.playback.core.mediastream.mediaStream
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.VideoSize
+import org.jellyfin.playback.core.queue.preferredAudioIndex
+import org.jellyfin.playback.core.queue.preferredSubtitleIndex
 import org.jellyfin.playback.core.queue.preferredVideoIndex
 import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.core.ui.PlayerSurfaceView
@@ -339,10 +341,10 @@ class VideoPlayerFragment : Fragment() {
 
 						// Perform track index calculation on Dispatchers.Default (background thread pool)
 						val trackSelection = withContext(Dispatchers.Default) {
-							val audioIndex = playbackIndexManager.getBestAudioIndex(mediaSource)
+							val audioIndex = entry.preferredAudioIndex ?: playbackIndexManager.getBestAudioIndex(mediaSource)
 							val activeAudioLang = baseItem.mediaStreams?.firstOrNull { it.index == audioIndex }?.language
-							val subIndex = playbackIndexManager.getBestSubtitleIndex(mediaSource, ctx, activeAudioLang)
-							val videoIndex = playbackIndexManager.getBestVideoIndex(mediaSource)
+							val subIndex = entry.preferredSubtitleIndex ?: playbackIndexManager.getBestSubtitleIndex(mediaSource, ctx, activeAudioLang)
+							val videoIndex = entry.preferredVideoIndex ?: playbackIndexManager.getBestVideoIndex(mediaSource)
 
 							val targetVideoTrack = if (videoIndex != null) {
 								videoTracks.firstOrNull { it.mediaStreamIndex == videoIndex } ?: videoTracks.firstOrNull()
