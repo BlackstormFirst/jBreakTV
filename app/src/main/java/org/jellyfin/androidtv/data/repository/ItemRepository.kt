@@ -23,9 +23,8 @@ object ItemRepository {
 		ItemFields.TRICKPLAY,
 	)
 
-	// Lighter field set for browsing rows & grids - excludes heavy fields like
-	// MediaSources, MediaStreams, Chapters, Trickplay that aren't needed for display.
-	// Includes Overview for description text in Leanback headers/summaries.
+	// Field set for browsing rows & grids - includes MediaSources, MediaStreams, Tags,
+	// Genres, Overview, etc. for displaying media tags and metadata in library headers/rows.
 	// Full item data is fetched when user selects an item.
 	val browseFields = setOf(
 		ItemFields.CAN_DELETE,
@@ -33,9 +32,12 @@ object ItemRepository {
 		ItemFields.CUMULATIVE_RUN_TIME_TICKS,
 		ItemFields.DATE_CREATED,
 		ItemFields.GENRES,
+		ItemFields.MEDIA_SOURCES,
+		ItemFields.MEDIA_STREAMS,
 		ItemFields.OVERVIEW,
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
 		ItemFields.TAGLINES,
+		ItemFields.TAGS,
 	)
 
 	// Light field set for Android TV background channel worker (LeanbackChannelWorker).
@@ -64,11 +66,14 @@ object ItemRepository {
 		ItemFields.TRICKPLAY,
 	)
 
-	// Field set for Next Up - includes Overview for episode description in headers.
+	// Field set for Next Up - includes Overview, MediaSources, MediaStreams, Tags for episode headers.
 	val nextUpFields = setOf(
 		ItemFields.CAN_DELETE,
 		ItemFields.DATE_CREATED,
+		ItemFields.MEDIA_SOURCES,
+		ItemFields.MEDIA_STREAMS,
 		ItemFields.OVERVIEW,
 		ItemFields.PRIMARY_IMAGE_ASPECT_RATIO,
+		ItemFields.TAGS,
 	)
 }
