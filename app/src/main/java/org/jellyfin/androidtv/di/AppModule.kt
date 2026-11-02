@@ -173,13 +173,14 @@ val appModule = module {
 						val isImageDecoderException = (AndroidVersion.isAtLeastP && throwable is android.graphics.ImageDecoder.DecodeException)
 						val isOtherDecodeException = throwable is java.io.IOException ||
 							throwable is IllegalArgumentException ||
+							throwable is IllegalStateException ||
 							throwable is NullPointerException ||
 							throwable is HttpException ||
 							throwable.javaClass.name.contains("DecodeException") ||
 							throwable.javaClass.name.contains("HttpException")
 						if (isImageDecoderException || isOtherDecodeException) {
-							val cacheKey = chain.request.diskCacheKey ?: chain.request.data.toString()
-							diskCacheInstance.remove(cacheKey)
+							chain.request.diskCacheKey?.let { diskCacheInstance.remove(it) }
+							diskCacheInstance.remove(chain.request.data.toString())
 						}
 					}
 					result

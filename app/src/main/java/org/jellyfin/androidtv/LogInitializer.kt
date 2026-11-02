@@ -20,7 +20,20 @@ class LogInitializer : Initializer<Unit> {
 		}
 
 		// Initialize the logging library
-		Timber.plant(Timber.DebugTree())
+		Timber.plant(object : Timber.DebugTree() {
+			override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+				val isWebSocketEof = (message.contains("WebSocket has failed") || tag?.contains("Connection") == true) &&
+					(t is java.io.EOFException || t is java.net.SocketException || t?.cause is java.io.EOFException)
+
+				val adjustedPriority = if (isWebSocketEof && priority >= android.util.Log.WARN) {
+					android.util.Log.DEBUG
+				} else {
+					priority
+				}
+
+				super.log(adjustedPriority, tag, message, t)
+			}
+		})
 		Timber.i("Debug tree planted")
 	}
 
