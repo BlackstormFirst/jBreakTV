@@ -1,5 +1,6 @@
 package org.jellyfin.playback.jellyfin
 
+import android.content.Context
 import androidx.lifecycle.Lifecycle
 import org.jellyfin.playback.core.plugin.playbackPlugin
 import org.jellyfin.playback.jellyfin.lyrics.LyricsPlayerService
@@ -18,6 +19,7 @@ import org.jellyfin.sdk.model.api.MediaSourceInfo
 fun jellyfinPlugin(
 	api: ApiClient,
 	deviceProfileBuilder: () -> DeviceProfile,
+	context: Context? = null,
 	mediaSegmentSkipTypes: Set<MediaSegmentType> = emptySet(),
 	lifecycle: Lifecycle? = null,
 	mediaSegmentProvider: (suspend (BaseItemDto) -> List<MediaSegmentDto>)? = null,
@@ -30,7 +32,7 @@ fun jellyfinPlugin(
 ) = playbackPlugin {
 	provide(JellyfinMediaStreamResolver(api, deviceProfileBuilder, localItemInspector, streamIndexResolver, maxBitrateProvider, subtitlesBurnDuringTranscodeProvider))
 
-	val playSessionService = PlaySessionService(api, onPlaybackStop)
+	val playSessionService = PlaySessionService(api, onPlaybackStop, context)
 	provide(playSessionService)
 	provide(PlaySessionSocketService(api, playSessionService, lifecycle))
 

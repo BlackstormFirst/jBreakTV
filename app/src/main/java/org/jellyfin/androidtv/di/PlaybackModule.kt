@@ -142,6 +142,7 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 		jellyfinPlugin(
 			api = get(),
 			deviceProfileBuilder = deviceProfileBuilder,
+			context = androidContext(),
 			segmentAutoSkipPredicate = { segment -> mediaSegmentRepository.getMediaSegmentAction(segment) == MediaSegmentAction.SKIP },
 			lifecycle = ProcessLifecycleOwner.get().lifecycle,
 			mediaSegmentProvider = { item -> mediaSegmentRepository.getSegmentsForItem(item) },

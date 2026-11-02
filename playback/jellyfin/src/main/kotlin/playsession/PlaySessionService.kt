@@ -1,5 +1,11 @@
 package org.jellyfin.playback.jellyfin.playsession
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.PowerManager
+import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -40,6 +46,7 @@ import org.jellyfin.sdk.model.api.RepeatMode as SdkRepeatMode
 class PlaySessionService(
 	private val api: ApiClient,
 	private val onPlaybackStop: ((BaseItemDto) -> Unit)? = null,
+	private val context: Context? = null,
 ) : PlayerService() {
 	private data class ActiveSessionInfo(
 		val itemId: UUID,
@@ -57,12 +64,54 @@ class PlaySessionService(
 	private var activeItem: BaseItemDto? = null
 	private var hasLastPlaybackFailed = false
 	private var activeUpdateJob: Job? = null
+	private var isConnectionWarningShown = false
+
+	private val powerManager by lazy {
+		context?.getSystemService(Context.POWER_SERVICE) as? PowerManager
+	}
+
+	private fun isScreenInteractive(): Boolean {
+		return powerManager?.isInteractive != false
+	}
+
+	private fun showToast(message: String) {
+		context?.let { ctx ->
+			coroutineScope.launch(Dispatchers.Main) {
+				runCatching { Toast.makeText(ctx, message, Toast.LENGTH_LONG).show() }
+			}
+		}
+	}
 
 	private fun isLocalMedia(item: BaseItemDto): Boolean {
 		return isLocalPath(item.path)
 	}
 
 	override suspend fun onInitialize() {
+		if (context != null) {
+			val filter = IntentFilter().apply {
+				addAction(Intent.ACTION_SCREEN_OFF)
+				addAction(Intent.ACTION_SCREEN_ON)
+			}
+			val receiver = object : BroadcastReceiver() {
+				override fun onReceive(ctx: Context?, intent: Intent?) {
+					when (intent?.action) {
+						Intent.ACTION_SCREEN_OFF -> {
+							Timber.i("TV screen turned off (standby). Pausing playback and skipping session updates.")
+							if (state.playState.value == PlayState.PLAYING) {
+								coroutineScope.launch(Dispatchers.Main) {
+									state.pause()
+								}
+							}
+						}
+						Intent.ACTION_SCREEN_ON -> {
+							Timber.i("TV screen turned on.")
+						}
+					}
+				}
+			}
+			runCatching { context?.registerReceiver(receiver, filter) }
+		}
+
 		manager.queue.entry.onEach { entry ->
 			if (entry != null) {
 				activeEntry = entry
@@ -88,6 +137,7 @@ class PlaySessionService(
 					}
 				}
 				PlayState.STOPPED -> {
+					isConnectionWarningShown = false
 					sendStreamStop(failed = hasLastPlaybackFailed)
 					hasLastPlaybackFailed = false
 				}
@@ -98,6 +148,9 @@ class PlaySessionService(
 			var pauseTimerMs = 0L
 			while (isActive) {
 				delay(3.seconds)
+				if (!isScreenInteractive()) {
+					continue
+				}
 				when (state.playState.value) {
 					PlayState.PLAYING -> {
 						pauseTimerMs = 0L
@@ -133,7 +186,7 @@ class PlaySessionService(
 		}
 
 	suspend fun sendUpdateIfActive() {
-		if (state.playState.value != PlayState.STOPPED) {
+		if (state.playState.value != PlayState.STOPPED && isScreenInteractive()) {
 			coroutineScope.launch { sendStreamUpdate() }
 		}
 	}
@@ -165,6 +218,7 @@ class PlaySessionService(
 	}
 
 	private suspend fun sendStreamStart() {
+		if (!isScreenInteractive()) return
 		val entry = manager.queue.entry.value ?: activeEntry ?: return
 		val stream = entry.mediaStream ?: return
 		val item = entry.baseItem ?: activeItem ?: return
@@ -216,12 +270,32 @@ class PlaySessionService(
 				)
 				isSessionStarted = true
 				Timber.i("Reported playback start for ${item.name} at reportMs=$reportMs (mediaSourceId=$mediaSourceId, playSessionId=${stream.identifier})")
-			}.onFailure { error -> Timber.w(error, "Failed to send playback start event") }
+			}.onSuccess {
+				if (isConnectionWarningShown) {
+					isConnectionWarningShown = false
+					showToast("Connexion au serveur rétablie")
+				}
+			}.onFailure { error ->
+				if (!isScreenInteractive()) {
+					Timber.d("Playback start event report skipped while screen is off")
+					return@onFailure
+				}
+
+				if (state.playState.value == PlayState.PLAYING && !isConnectionWarningShown) {
+					isConnectionWarningShown = true
+					coroutineScope.launch(Dispatchers.Main) {
+						state.pause()
+					}
+					showToast("Impossible de se connecter au serveur")
+				}
+
+				Timber.w("Failed to send playback start event: ${error.message}")
+			}
 		}
 	}
 
 	private suspend fun sendStreamUpdate() {
-		if (state.playState.value == PlayState.STOPPED) return
+		if (state.playState.value == PlayState.STOPPED || !isScreenInteractive()) return
 		val entry = manager.queue.entry.value ?: activeEntry ?: return
 		val stream = entry.mediaStream ?: return
 		val item = entry.baseItem ?: activeItem ?: return
@@ -277,7 +351,27 @@ class PlaySessionService(
 					)
 				)
 				Timber.d("Reported playback progress for ${item.name} at reportMs=$reportMs")
-			}.onFailure { error -> Timber.w(error, "Failed to send playback update event") }
+			}.onSuccess {
+				if (isConnectionWarningShown) {
+					isConnectionWarningShown = false
+					showToast("Connexion au serveur rétablie")
+				}
+			}.onFailure { error ->
+				if (!isScreenInteractive()) {
+					Timber.d("Playback update report skipped while screen is off")
+					return@onFailure
+				}
+
+				if (state.playState.value == PlayState.PLAYING && !isConnectionWarningShown) {
+					isConnectionWarningShown = true
+					coroutineScope.launch(Dispatchers.Main) {
+						state.pause()
+					}
+					showToast("Impossible de se connecter au serveur")
+				}
+
+				Timber.w("Failed to send playback update event: ${error.message}")
+			}
 		}
 		activeUpdateJob = updateJob
 	}
