@@ -97,17 +97,11 @@ object UsbStorageManager {
 
     fun getMountedVolumes(context: Context? = null): List<UsbVolumeInfo> {
         val current = _mountedVolumes.value
-        if (current.isNotEmpty()) {
-            val validCurrent = current.filter { it.path.exists() }
-            if (validCurrent.isNotEmpty()) return validCurrent
+        return if (current.isNotEmpty()) {
+            current.filter { it.path.exists() }
+        } else {
+            emptyList()
         }
-
-        if (context != null) {
-            val syncList = scanVolumesSync(context)
-            _mountedVolumes.value = syncList
-            return syncList
-        }
-        return emptyList()
     }
 
     fun scanVolumesSync(context: Context): List<UsbVolumeInfo> {
