@@ -12,7 +12,6 @@ import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.integration.dream.visibleInScreensaver
 import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
-import org.jellyfin.androidtv.ui.playback.PlaybackController
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.PlaybackOrder
@@ -99,14 +98,7 @@ class RewriteMediaManager(
 	private suspend fun watchPlaybackStateChanges() = coroutineScope {
 		playbackManager.state.playState.onEach { playState ->
 			notifyListeners {
-				onPlaybackStateChange(
-					when (playState) {
-						PlayState.STOPPED -> PlaybackController.PlaybackState.IDLE
-						PlayState.PLAYING -> PlaybackController.PlaybackState.PLAYING
-						PlayState.PAUSED -> PlaybackController.PlaybackState.PAUSED
-						PlayState.ERROR -> PlaybackController.PlaybackState.ERROR
-					}, currentAudioItem
-				)
+				onPlaybackStateChange(playState == PlayState.PLAYING, currentAudioItem)
 			}
 		}.launchIn(this)
 

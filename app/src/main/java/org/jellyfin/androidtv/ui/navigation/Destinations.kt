@@ -16,7 +16,6 @@ import org.jellyfin.androidtv.ui.itemdetail.ItemListFragment
 import org.jellyfin.androidtv.ui.itemdetail.MusicFavoritesListFragment
 import org.jellyfin.androidtv.ui.livetv.LiveTvGuideFragment
 import org.jellyfin.androidtv.ui.playback.AudioNowPlayingFragment
-import org.jellyfin.androidtv.ui.playback.CustomPlaybackOverlayFragment
 import org.jellyfin.androidtv.ui.playback.nextup.NextUpFragment
 import org.jellyfin.androidtv.ui.playback.stillwatching.StillWatchingFragment
 import org.jellyfin.androidtv.ui.player.photo.PhotoPlayerFragment
@@ -123,13 +122,11 @@ object Destinations {
 		putBoolean(PhotoPlayerFragment.ARGUMENT_AUTO_PLAY, autoPlay)
 	}
 
-	fun videoPlayer(position: Int?) = fragmentDestination<CustomPlaybackOverlayFragment> {
-		if (position != null) putInt("Position", position)
-	}
-
-	fun videoPlayerNew(position: Int?) = fragmentDestination<VideoPlayerFragment> {
+	fun videoPlayer(position: Int?) = fragmentDestination<VideoPlayerFragment> {
 		if (position != null) putInt(VideoPlayerFragment.EXTRA_POSITION, position)
 	}
+
+	fun videoPlayerNew(position: Int?) = videoPlayer(position)
 
 	fun nextUp(item: UUID) = fragmentDestination<NextUpFragment> {
 		putString(NextUpFragment.ARGUMENT_ITEM_ID, item.toString())

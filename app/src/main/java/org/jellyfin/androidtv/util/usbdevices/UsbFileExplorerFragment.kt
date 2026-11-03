@@ -213,7 +213,7 @@ fun calculateMaxItemWidthDp(items: List<File>): Dp {
 }
 
 @Composable
-fun LeanbackTitleBar(
+fun UsbTitleBar(
     visible: Boolean,
     titleText: String,
     onHomeClick: () -> Unit,
@@ -460,7 +460,7 @@ fun UsbFileExplorerScreen(
             }
         }
 
-        LeanbackTitleBar(
+        UsbTitleBar(
             visible = isFirstItemFocused,
             titleText = breadcrumbStr,
             onHomeClick = {

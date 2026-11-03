@@ -19,9 +19,13 @@ import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
-import org.jellyfin.androidtv.ui.playback.PlaybackControllerContainer
-import org.jellyfin.androidtv.ui.playback.setSubtitleIndex
 import org.jellyfin.androidtv.util.PlaybackHelper
+import org.jellyfin.playback.core.PlaybackManager
+import org.jellyfin.playback.core.mediastream.MediaStreamService
+import org.jellyfin.playback.core.model.PlayState
+import org.jellyfin.playback.core.queue.preferredAudioIndex
+import org.jellyfin.playback.core.queue.preferredSubtitleIndex
+import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.extensions.sessionApi
@@ -44,13 +48,14 @@ import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import timber.log.Timber
 import java.time.Instant
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 class SocketHandler(
 	private val context: Context,
 	private val api: ApiClient,
 	private val dataRefreshService: DataRefreshService,
 	private val mediaManager: MediaManager,
-	private val playbackControllerContainer: PlaybackControllerContainer,
+	private val playbackManager: PlaybackManager,
 	private val navigationRepository: NavigationRepository,
 	private val audioManager: AudioManager,
 	private val itemLauncher: ItemLauncher,
@@ -111,7 +116,6 @@ class SocketHandler(
 				subscribe<LibraryChangedMessage>()
 					.onEach { message ->
 						message.data?.let(::onLibraryChanged)
-						//preferencesRepository.refreshServerUserSettings()
 					}
 					.catch { err -> Timber.w(err, "LibraryChangedMessage WebSocket error") }
 					.launchIn(coroutineScope)
@@ -132,7 +136,11 @@ class SocketHandler(
 						val index = message["index"]?.toIntOrNull() ?: return@onEach
 
 						withContext(Dispatchers.Main) {
-							playbackControllerContainer.playbackController?.setSubtitleIndex(index)
+							val entry = playbackManager.queue.entry.value
+							if (entry != null) {
+								entry.preferredSubtitleIndex = index
+								playbackManager.getService<MediaStreamService>()?.reloadStream(entry)
+							}
 						}
 					}
 					.catch { err -> Timber.w(err, "SET_SUBTITLE_STREAM_INDEX WebSocket error") }
@@ -143,7 +151,11 @@ class SocketHandler(
 						val index = message["index"]?.toIntOrNull() ?: return@onEach
 
 						withContext(Dispatchers.Main) {
-							playbackControllerContainer.playbackController?.switchAudioStream(index)
+							val entry = playbackManager.queue.entry.value
+							if (entry != null) {
+								entry.preferredAudioIndex = index
+								playbackManager.getService<MediaStreamService>()?.reloadStream(entry)
+							}
 						}
 					}
 					.catch { err -> Timber.w(err, "SET_AUDIO_STREAM_INDEX WebSocket error") }
@@ -213,38 +225,36 @@ class SocketHandler(
 	private suspend fun onPlayStateMessage(message: PlaystateMessage) = withContext(Dispatchers.Main) {
 		Timber.i("Received PlayStateMessage with command ${message.data?.command}")
 
-		// Audio playback uses (Rewrite)MediaManager, (legacy) video playback uses playbackController
-		when {
-			mediaManager.hasAudioQueueItems() -> {
-				Timber.i("Ignoring PlayStateMessage: should be handled by PlaySessionSocketService")
-				return@withContext
-			}
+		if (mediaManager.hasAudioQueueItems()) {
+			Timber.i("Ignoring PlayStateMessage: should be handled by PlaySessionSocketService")
+			return@withContext
+		}
 
-			// PlaybackController
-			else -> {
-				val playbackController = playbackControllerContainer.playbackController
-				when (message.data?.command) {
-					PlaystateCommand.STOP -> playbackController?.endPlayback(true)
-					PlaystateCommand.PAUSE, PlaystateCommand.UNPAUSE, PlaystateCommand.PLAY_PAUSE -> playbackController?.playPause()
-					PlaystateCommand.NEXT_TRACK -> playbackController?.next()
-					PlaystateCommand.PREVIOUS_TRACK -> playbackController?.prev()
-					PlaystateCommand.SEEK -> playbackController?.seek(
-						message.data?.seekPositionTicks?.ticks?.inWholeMilliseconds ?: 0
-					)
-
-					PlaystateCommand.REWIND -> playbackController?.rewind()
-					PlaystateCommand.FAST_FORWARD -> playbackController?.fastForward()
-
-					null -> Unit
+		when (message.data?.command) {
+			PlaystateCommand.STOP -> playbackManager.state.stop()
+			PlaystateCommand.PAUSE -> playbackManager.state.pause()
+			PlaystateCommand.UNPAUSE -> playbackManager.state.unpause()
+			PlaystateCommand.PLAY_PAUSE -> {
+				if (playbackManager.state.playState.value == PlayState.PLAYING) {
+					playbackManager.state.pause()
+				} else {
+					playbackManager.state.unpause()
 				}
 			}
+			PlaystateCommand.NEXT_TRACK -> playbackManager.queue.next()
+			PlaystateCommand.PREVIOUS_TRACK -> playbackManager.queue.previous()
+			PlaystateCommand.SEEK -> {
+				val seekMs = message.data?.seekPositionTicks?.ticks?.inWholeMilliseconds ?: 0
+				playbackManager.state.seek(seekMs.milliseconds)
+			}
+			PlaystateCommand.REWIND -> playbackManager.state.rewind()
+			PlaystateCommand.FAST_FORWARD -> playbackManager.state.fastForward()
+			null -> Unit
 		}
 	}
 
 	private suspend fun onDisplayContent(itemId: UUID, itemKind: BaseItemKind) = withContext(Dispatchers.Main) {
-		val playbackController = playbackControllerContainer.playbackController
-
-		if (playbackController?.isPlaying == true || playbackController?.isPaused == true) {
+		if (playbackManager.state.playState.value == PlayState.PLAYING || playbackManager.state.playState.value == PlayState.PAUSED) {
 			Timber.i("Not launching $itemId: playback in progress")
 			return@withContext
 		}

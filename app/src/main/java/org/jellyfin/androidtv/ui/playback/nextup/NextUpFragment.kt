@@ -69,7 +69,6 @@ fun NextUpScreen(
 	val api = koinInject<ApiClient>()
 	val navigationRepository = koinInject<NavigationRepository>()
 	val backgroundService = koinInject<BackgroundService>()
-	val userPreferences = koinInject<UserPreferences>()
 	val viewModel = koinViewModel<NextUpViewModel>()
 
 	val state by viewModel.state.collectAsState()
@@ -89,11 +88,7 @@ fun NextUpScreen(
 		when (state) {
 			// Open next item
 			NextUpState.PLAY_NEXT -> {
-				val destination = if (userPreferences[UserPreferences.playbackRewriteVideoEnabled]) {
-					Destinations.videoPlayerNew(0)
-				} else {
-					Destinations.videoPlayer(0)
-				}
+				val destination = Destinations.videoPlayer(0)
 				navigationRepository.navigate(destination, true)
 			}
 			// Close activity

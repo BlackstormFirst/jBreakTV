@@ -5,7 +5,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.core.content.FileProvider
-import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.DataReader
@@ -29,8 +28,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.compat.StreamInfo
-import org.jellyfin.androidtv.ui.playback.VideoManager
-import org.jellyfin.androidtv.ui.playback.getSubtitleMediaStreamCodec
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.LocationType
@@ -101,68 +98,6 @@ object LocalVideoManager {
             FileProvider.getUriForFile(this, "$packageName.provider", file).toString()
         } catch (_: Exception) {
             Uri.fromFile(file).toString()
-        }
-    }
-
-    /**
-     * Legacy helper used exclusively by PlaybackController (standard player)
-     * to configure ExoPlayer directly for local USB playback.
-     */
-    @JvmOverloads
-    @UnstableApi
-    fun configureAndPlayLocal(videoManager: VideoManager, streamInfo: StreamInfo, startPositionMs: Long = 0L) {
-        val tStart = System.currentTimeMillis()
-        Timber.d("Benchmark: configureAndPlayLocal started (0ms) at $startPositionMs ms")
-        val path = streamInfo.mediaUrl ?: return
-
-        val player = videoManager.mExoPlayer ?: return
-
-        try {
-            val subtitleConfigurations = mutableListOf<MediaItem.SubtitleConfiguration>()
-            streamInfo.mediaSource?.mediaStreams?.forEach { mediaStream ->
-                if (mediaStream.type == MediaStreamType.SUBTITLE &&
-                    mediaStream.deliveryMethod == SubtitleDeliveryMethod.EXTERNAL &&
-                    mediaStream.deliveryUrl != null
-                ) {
-                    val url = mediaStream.deliveryUrl ?: ""
-                    if (url.startsWith("file:") || url.startsWith("content:") || url.startsWith("/mnt/") || url.startsWith("/storage/")) {
-                        runCatching {
-                            val subtitleUri = if (url.startsWith("file:") || url.startsWith("content:")) {
-                                url.toUri()
-                            } else {
-                                Uri.fromFile(File(url))
-                            }
-                            val subtitleConfiguration = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
-                                .setId("JF_EXTERNAL:${mediaStream.index}")
-                                .setMimeType(getSubtitleMediaStreamCodec(mediaStream))
-                                .setLanguage(mediaStream.language)
-                                .setLabel(mediaStream.displayTitle)
-                                .build()
-                            subtitleConfigurations.add(subtitleConfiguration)
-                        }
-                    } else {
-                        Timber.w("UsbDebug: Ignoring non-local external subtitle URL: $url")
-                    }
-                }
-            }
-
-            val mediaItem = MediaItem.Builder()
-                .setUri(path.toUri())
-                .setSubtitleConfigurations(subtitleConfigurations)
-                .build()
-
-            val audioAttributes = AudioAttributes.Builder()
-                .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                .build()
-            player.setAudioAttributes(audioAttributes, false)
-
-            player.setMediaItem(mediaItem, startPositionMs.coerceAtLeast(0L))
-            player.prepare()
-            player.playWhenReady = true
-            Timber.d("Benchmark: player.setMediaItem and prepare() triggered in ${System.currentTimeMillis() - tStart}ms")
-        } catch (t: Throwable) {
-            Timber.e(t, "LocalVideoManager: Error in configureAndPlayLocal")
         }
     }
 
@@ -538,8 +473,7 @@ object LocalVideoManager {
     }
 
     /**
-     * Legacy helper used by PlaybackController (standard player) to build a StreamInfo
-     * instance from a BaseItemDto for local playback.
+     * Helper used to build a StreamInfo instance from a BaseItemDto for local playback.
      */
     fun buildLocalStreamInfo(item: BaseItemDto): StreamInfo {
         val file = File(item.path ?: "")

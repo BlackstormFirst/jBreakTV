@@ -48,8 +48,6 @@ import org.koin.dsl.module
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import org.jellyfin.androidtv.ui.playback.PlaybackManager as LegacyPlaybackManager
-
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import org.jellyfin.sdk.model.api.MediaProtocol
@@ -58,7 +56,6 @@ import org.jellyfin.sdk.model.api.MediaSourceType
 import org.jellyfin.sdk.model.api.MediaStreamProtocol
 
 val playbackModule = module {
-	single { LegacyPlaybackManager(get(), get(), get(), androidContext()) }
 	single { VideoQueueManager() }
 	single { PlaybackIndexManager() }
 	single<MediaManager> { RewriteMediaManager(get(), get()) }

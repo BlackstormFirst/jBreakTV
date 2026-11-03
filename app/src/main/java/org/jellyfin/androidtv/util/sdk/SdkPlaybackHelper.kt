@@ -12,7 +12,6 @@ import timber.log.Timber
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.preference.UserPreferences
-import org.jellyfin.androidtv.ui.playback.PlaybackControllerContainer
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.util.PlaybackHelper
@@ -37,7 +36,6 @@ class SdkPlaybackHelper(
 	private val api: ApiClient,
 	private val userPreferences: UserPreferences,
 	private val playbackLauncher: PlaybackLauncher,
-	private val playbackControllerContainer: PlaybackControllerContainer,
 	private val videoQueueManager: VideoQueueManager,
 ) : PlaybackHelper {
 	companion object {
@@ -348,7 +346,7 @@ class SdkPlaybackHelper(
 						context,
 						items,
 						pos.inWholeMilliseconds.toInt(),
-						playbackControllerContainer.playbackController?.hasFragment() == true,
+						false,
 						targetIndex,
 						shuffle,
 					)
@@ -391,7 +389,7 @@ class SdkPlaybackHelper(
 						context,
 						items,
 						pos.inWholeMilliseconds.toInt(),
-						playbackControllerContainer.playbackController?.hasFragment() == true,
+						false,
 						index ?: 0,
 						shuffle,
 					)

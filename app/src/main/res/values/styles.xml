@@ -5,7 +5,7 @@
         <item name="android:datePickerMode">spinner</item>
     </style>
 
-    <style name="Widget.Jellyfin.Row.Header" parent="Widget.Leanback.Row.Header">
+    <style name="Widget.Jellyfin.Row.Header" parent="Widget.AppCompat.TextView">
         <item name="android:textColor">?attr/headerTextColor</item>
     </style>
 

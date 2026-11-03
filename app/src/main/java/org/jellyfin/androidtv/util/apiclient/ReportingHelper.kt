@@ -7,7 +7,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.data.compat.StreamInfo
 import org.jellyfin.androidtv.data.model.DataRefreshService
-import org.jellyfin.androidtv.ui.playback.PlaybackController
+import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.playStateApi
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -26,13 +26,14 @@ class ReportingHelper(
 ) {
 	fun reportStart(
 		lifecycleOwner: LifecycleOwner,
-		playbackController: PlaybackController?,
 		item: BaseItemDto,
 		streamInfo: StreamInfo,
 		position: Long,
-		paused: Boolean
+		paused: Boolean,
+		audioStreamIndex: Int? = null,
+		subtitleStreamIndex: Int? = null,
 	) {
-		if (PlaybackController.isCurrentItemLocal(item)) {
+		if (LocalVideoManager.isLocalItem(item)) {
 			Timber.d("UsbDebug: Skipping reportStart for local file ${item.name}")
 			return
 		}
@@ -45,8 +46,8 @@ class ReportingHelper(
 			liveStreamId = streamInfo.mediaSource?.liveStreamId,
 			playSessionId = streamInfo.playSessionId,
 			playMethod = streamInfo.playMethod,
-			audioStreamIndex = playbackController?.audioStreamIndex,
-			subtitleStreamIndex = playbackController?.subtitleStreamIndex,
+			audioStreamIndex = audioStreamIndex,
+			subtitleStreamIndex = subtitleStreamIndex,
 			isMuted = false,
 			repeatMode = RepeatMode.REPEAT_NONE,
 			playbackOrder = PlaybackOrder.DEFAULT,
@@ -63,13 +64,14 @@ class ReportingHelper(
 
 	fun reportProgress(
 		lifecycleOwner: LifecycleOwner,
-		playbackController: PlaybackController?,
 		item: BaseItemDto,
 		streamInfo: StreamInfo,
 		position: Long,
-		paused: Boolean
+		paused: Boolean,
+		audioStreamIndex: Int? = null,
+		subtitleStreamIndex: Int? = null,
 	) {
-		if (PlaybackController.isCurrentItemLocal(item)) {
+		if (LocalVideoManager.isLocalItem(item)) {
 			return
 		}
 
@@ -81,8 +83,8 @@ class ReportingHelper(
 			liveStreamId = streamInfo.mediaSource?.liveStreamId,
 			playSessionId = streamInfo.playSessionId,
 			playMethod = streamInfo.playMethod,
-			audioStreamIndex = playbackController?.audioStreamIndex,
-			subtitleStreamIndex = playbackController?.subtitleStreamIndex,
+			audioStreamIndex = audioStreamIndex,
+			subtitleStreamIndex = subtitleStreamIndex,
 			isMuted = false,
 			repeatMode = RepeatMode.REPEAT_NONE,
 			playbackOrder = PlaybackOrder.DEFAULT,
@@ -98,7 +100,7 @@ class ReportingHelper(
 	}
 
 	fun reportStopped(lifecycleOwner: LifecycleOwner, item: BaseItemDto, streamInfo: StreamInfo, position: Long?) {
-		if (PlaybackController.isCurrentItemLocal(item)) {
+		if (LocalVideoManager.isLocalItem(item)) {
 			Timber.d("UsbDebug: Skipping reportStopped for local file ${item.name}")
 			return
 		}

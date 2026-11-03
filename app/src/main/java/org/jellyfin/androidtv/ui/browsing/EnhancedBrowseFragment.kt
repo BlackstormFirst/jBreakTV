@@ -94,7 +94,6 @@ import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.presentation.composable.BaseRowItemCard
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
-import org.jellyfin.androidtv.ui.playback.overlay.presentation.PositionableListRowPresenter
 import org.jellyfin.androidtv.ui.shared.toolbar.Toolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarButtons
 import org.jellyfin.androidtv.ui.shared.toolbar.ToolbarClock

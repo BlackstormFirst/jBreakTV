@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.jellyfin.androidtv.preference.UserPreferences
-import org.jellyfin.androidtv.ui.playback.PlaybackControllerContainer
+import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import kotlin.time.Duration
@@ -19,7 +19,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class InteractionTrackerViewModel(
 	private val userPreferences: UserPreferences,
-	private val playbackControllerContainer: PlaybackControllerContainer
+	private val playbackManager: PlaybackManager,
 ) : ViewModel() {
 	// Screensaver
 
@@ -80,7 +80,7 @@ class InteractionTrackerViewModel(
 
 	fun onEpisodeWatched() {
 		if (!episodeWasInterrupted) episodeCount++
-		watchTime += playbackControllerContainer.playbackController?.duration ?: 0
+		watchTime += playbackManager.state.positionInfo.duration.inWholeMilliseconds
 		episodeWasInterrupted = false
 	}
 

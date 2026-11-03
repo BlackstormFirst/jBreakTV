@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <attr name="defaultSearchColor" format="reference|color" />
+    <attr name="rowHeaderStyle" format="reference" />
+    <attr name="overlayDimDimmedLevel" format="reference|string|fraction" />
+
     <declare-styleable name="JellyfinTheme">
         <!-- Header Text Color -->
         <attr name="headerTextColor" format="reference|color" />

@@ -23,7 +23,6 @@ import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
-import org.jellyfin.androidtv.ui.playback.PlaybackController
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.util.Utils
 import org.jellyfin.sdk.api.client.ApiClient
@@ -100,8 +99,8 @@ class MusicFavoritesListFragment : Fragment() {
 
 		DisposableEffect(Unit) {
 			val listener = object : AudioEventListener {
-				override fun onPlaybackStateChange(newState: PlaybackController.PlaybackState, currentItem: BaseItemDto?) {
-					if (newState == PlaybackController.PlaybackState.PLAYING && currentItem != null) {
+				override fun onPlaybackStateChange(isPlaying: Boolean, currentItem: BaseItemDto?) {
+					if (isPlaying && currentItem != null) {
 						currentlyPlayingItemId = currentItem.id
 					} else {
 						currentlyPlayingItemId = null

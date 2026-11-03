@@ -15,7 +15,6 @@ androidx-compose-ui = "1.12.1"
 androidx-constraintlayout = "2.2.2"
 androidx-core = "1.19.1"
 androidx-fragment = "1.9.1"
-androidx-leanback = "1.2.0"
 androidx-lifecycle = "2.11.0"
 androidx-media3 = "1.11.1"
 androidx-navigation3 = "1.1.7"
@@ -75,8 +74,6 @@ androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayo
 androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
 androidx-fragment = { module = "androidx.fragment:fragment-ktx", version.ref = "androidx-fragment" }
 androidx-fragment-compose = { module = "androidx.fragment:fragment-compose", version.ref = "androidx-fragment" }
-androidx-leanback-core = { module = "androidx.leanback:leanback", version.ref = "androidx-leanback" }
-androidx-leanback-preference = { module = "androidx.leanback:leanback-preference", version.ref = "androidx-leanback" }
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "androidx-lifecycle" }

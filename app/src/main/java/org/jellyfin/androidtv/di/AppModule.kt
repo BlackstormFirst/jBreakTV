@@ -41,7 +41,6 @@ import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.navigation.NavigationRepositoryImpl
-import org.jellyfin.androidtv.ui.playback.PlaybackControllerContainer
 import org.jellyfin.androidtv.ui.playback.external.DefaultExternalPlayerApi
 import org.jellyfin.androidtv.ui.playback.external.ExternalPlayerApi
 import org.jellyfin.androidtv.ui.playback.external.MpvExternalPlayerApi
@@ -191,7 +190,6 @@ val appModule = module {
 
 	// Non API related
 	single { DataRefreshService() }
-	single { PlaybackControllerContainer() }
 	single { InteractionTrackerViewModel(get(), get()) }
 
 	single<UserRepository> { UserRepositoryImpl() }
@@ -231,5 +229,5 @@ val appModule = module {
 	single { ItemLauncher() }
 	single { KeyProcessor() }
 	single { ReportingHelper(get(), get()) }
-	single<PlaybackHelper> { SdkPlaybackHelper(get(), get(), get(), get(), get()) }
+	single<PlaybackHelper> { SdkPlaybackHelper(get(), get(), get(), get()) }
 }

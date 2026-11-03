@@ -221,7 +221,7 @@ fun UsbVolumeSelectorScreen(
             }
         }
 
-        LeanbackTitleBar(
+        UsbTitleBar(
             visible = isFirstItemFocused,
             titleText = "Local or USB Devices Selection",
             onHomeClick = {

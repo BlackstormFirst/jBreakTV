@@ -138,8 +138,6 @@ dependencies {
 	implementation(libs.androidx.activity.compose)
 	implementation(libs.androidx.fragment)
 	implementation(libs.androidx.fragment.compose)
-	implementation(libs.androidx.leanback.core)
-	implementation(libs.androidx.leanback.preference)
 	implementation(libs.androidx.navigation3.ui)
 	implementation(libs.androidx.preference)
 	implementation(libs.androidx.appcompat)
