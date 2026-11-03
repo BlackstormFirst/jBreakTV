@@ -617,8 +617,13 @@ class FullDetailsViewModel(
         _uiState.value = _uiState.value.copy(isFavorite = newFav)
         viewModelScope.launch {
             runCatching {
-                itemMutationRepository.setFavorite(currentItem.id, newFav)
+                val updatedUserData = itemMutationRepository.setFavorite(currentItem.id, newFav)
                 dataRefreshService.lastFavoriteUpdate = Instant.now()
+                val updatedItem = currentItem.copy(userData = updatedUserData)
+                _uiState.value = _uiState.value.copy(item = updatedItem)
+                if (currentItem.isFolder == true || currentItem.type == BaseItemKind.SERIES || currentItem.type == BaseItemKind.SEASON) {
+                    refresh()
+                }
             }.onFailure {
                 _uiState.value = _uiState.value.copy(isFavorite = !newFav)
             }
@@ -634,8 +639,13 @@ class FullDetailsViewModel(
         )
         viewModelScope.launch {
             runCatching {
-                itemMutationRepository.setPlayed(currentItem.id, newPlayed)
+                val updatedUserData = itemMutationRepository.setPlayed(currentItem.id, newPlayed)
                 dataRefreshService.lastPlayback = Instant.now()
+                val updatedItem = currentItem.copy(userData = updatedUserData)
+                _uiState.value = _uiState.value.copy(item = updatedItem)
+                if (currentItem.isFolder == true || currentItem.type == BaseItemKind.SERIES || currentItem.type == BaseItemKind.SEASON) {
+                    refresh()
+                }
             }.onFailure {
                 _uiState.value = _uiState.value.copy(
                     isPlayed = !newPlayed,
