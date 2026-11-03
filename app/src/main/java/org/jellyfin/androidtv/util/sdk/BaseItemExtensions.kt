@@ -54,10 +54,6 @@ fun BaseItemDto.isNonexistentOrVirtualMedia(): Boolean {
 	if (type == BaseItemKind.EPISODE) {
 		if (mediaSourceCount == 0 && mediaSources.isNullOrEmpty()) return true
 	}
-	val premiere = premiereDate
-	if (premiere != null && premiere.isAfter(LocalDateTime.now())) {
-		return true
-	}
 	return false
 }
 
