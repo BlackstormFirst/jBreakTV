@@ -2,6 +2,8 @@ package org.jellyfin.androidtv.integration.dream
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.PowerManager
+import androidx.core.content.getSystemService
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil3.ImageLoader
@@ -92,6 +94,11 @@ class DreamViewModel(
 		initialValue = _mediaContent.value ?: _libraryContent.value ?: DreamContent.Logo,
 	)
 
+	private fun isScreenInteractive(): Boolean {
+		val powerManager = context.getSystemService<PowerManager>()
+		return powerManager?.isInteractive ?: true
+	}
+
 	private fun getRandomLibraryShowcaseItems(
 		requireParentalRating: Boolean,
 		maxParentalRating: Int,
@@ -103,6 +110,13 @@ class DreamViewModel(
 		var currentErrorDelay = initialErrorDelay
 
 		while (true) {
+			if (!isScreenInteractive()) {
+				emit(null)
+				delay(30.seconds)
+				currentErrorDelay = initialErrorDelay
+				continue
+			}
+
 			if (userRepository.currentUser.value == null) {
 				emit(null)
 				delay(noItemsDelay)

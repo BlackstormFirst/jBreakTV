@@ -49,6 +49,19 @@ abstract class DreamServiceCompat : DreamService(), SavedStateRegistryOwner, Vie
 		lifecycleRegistry.currentState = Lifecycle.State.CREATED
 	}
 
+	override fun onDetachedFromWindow() {
+		lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+		viewModelStore.clear()
+		super.onDetachedFromWindow()
+	}
+
+	@CallSuper
+	override fun onDestroy() {
+		lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+		viewModelStore.clear()
+		super.onDestroy()
+	}
+
 	fun setContent(content: @Composable () -> Unit) {
 		val view = ComposeView(this)
 		// Set composition strategy
