@@ -1,6 +1,8 @@
 package org.jellyfin.androidtv.ui.itemhandling
 
 import android.content.Context
+import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.apiclient.JellyfinImage
 import org.jellyfin.androidtv.util.apiclient.albumPrimaryImage
 import org.jellyfin.androidtv.util.apiclient.itemImages
@@ -14,6 +16,7 @@ import org.jellyfin.androidtv.util.sdk.getSubName
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.SeriesStatus
 import org.jellyfin.androidtv.util.usbdevices.USB_TILE_UUID
 import java.time.format.DateTimeFormatter
@@ -102,11 +105,22 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 			}
 			val seCode = listOfNotNull(seasonStr, episodeStr).joinToString(":")
 			val title = baseItem.name.orEmpty()
-			when {
+			val baseSubText = when {
 				seCode.isNotEmpty() && title.isNotEmpty() -> "$seCode - $title"
 				seCode.isNotEmpty() -> seCode
 				title.isNotEmpty() -> title
 				else -> null
+			}
+
+			if (baseItem.locationType == LocationType.VIRTUAL && baseItem.premiereDate != null) {
+				val formattedDate = TimeUtils.getFriendlyDate(context, baseItem.premiereDate!!)
+				if (!baseSubText.isNullOrEmpty()) {
+					context.getString(R.string.lbl_name_date, baseSubText, formattedDate)
+				} else {
+					formattedDate
+				}
+			} else {
+				baseSubText
 			}
 		}
 

@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.composable.item
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,9 +14,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import org.jellyfin.androidtv.R
@@ -33,8 +36,10 @@ import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.LocationType
 import org.jellyfin.sdk.model.api.MediaType
 import org.koin.compose.koinInject
+import java.time.LocalDateTime
 
 @Composable
 @Stable
@@ -42,43 +47,52 @@ fun ItemCardBaseItemOverlay(
 	item: BaseItemDto,
 	footer: (@Composable () -> Unit)? = null,
 ) = Box(
-	modifier = Modifier
-		.fillMaxSize()
-		.padding(Tokens.Space.spaceXs)
+	modifier = Modifier.fillMaxSize()
 ) {
-	StateIndicator(
+	CornerBanner(
 		item = item,
-		modifier = Modifier.align(Alignment.TopStart),
+		modifier = Modifier.align(Alignment.TopEnd),
 	)
 
 	Box(
-		modifier = Modifier.align(Alignment.TopEnd)
+		modifier = Modifier
+			.fillMaxSize()
+			.padding(Tokens.Space.spaceXs)
 	) {
-		WatchIndicator(
+		StateIndicator(
 			item = item,
-		)
-	}
-
-	if (item.userData?.isFavorite == true) {
-		Icon(
-			imageVector = ImageVector.vectorResource(R.drawable.ic_heart),
-			contentDescription = null,
-			tint = Tokens.Color.colorRed500,
-			modifier = Modifier
-				.align(Alignment.BottomEnd)
-				.size(20.dp)
-		)
-	}
-
-	Column(
-		modifier = Modifier.align(Alignment.BottomCenter),
-		verticalArrangement = Arrangement.spacedBy(Tokens.Space.spaceXs)
-	) {
-		ProgressIndicator(
-			item = item,
+			modifier = Modifier.align(Alignment.TopStart),
 		)
 
-		if (footer != null) footer()
+		Box(
+			modifier = Modifier.align(Alignment.TopEnd)
+		) {
+			WatchIndicator(
+				item = item,
+			)
+		}
+
+		if (item.userData?.isFavorite == true) {
+			Icon(
+				imageVector = ImageVector.vectorResource(R.drawable.ic_heart),
+				contentDescription = null,
+				tint = Tokens.Color.colorRed500,
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.size(20.dp)
+			)
+		}
+
+		Column(
+			modifier = Modifier.align(Alignment.BottomCenter),
+			verticalArrangement = Arrangement.spacedBy(Tokens.Space.spaceXs)
+		) {
+			ProgressIndicator(
+				item = item,
+			)
+
+			if (footer != null) footer()
+		}
 	}
 }
 
@@ -176,5 +190,41 @@ private fun ProgressIndicator(
 					.height(4.dp)
 			)
 		}
+	}
+}
+
+@Composable
+@Stable
+private fun CornerBanner(
+	item: BaseItemDto,
+	modifier: Modifier = Modifier,
+) {
+	val bannerRes = remember(item) {
+		when {
+			item.isPlaceHolder == true -> R.drawable.banner_edge_disc
+			item.type == BaseItemKind.EPISODE && item.locationType == LocationType.VIRTUAL -> {
+				val premiereDate = item.premiereDate
+				if (premiereDate == null || premiereDate.isAfter(LocalDateTime.now())) {
+					R.drawable.banner_edge_future
+				} else {
+					R.drawable.banner_edge_missing
+				}
+			}
+			(item.type == BaseItemKind.PROGRAM || item.type == BaseItemKind.LIVE_TV_PROGRAM || item.type == BaseItemKind.TV_PROGRAM) && item.locationType == LocationType.VIRTUAL -> {
+				val startDate = item.startDate
+				if (startDate != null && startDate.isAfter(LocalDateTime.now())) {
+					R.drawable.banner_edge_future
+				} else null
+			}
+			else -> null
+		}
+	}
+
+	if (bannerRes != null) {
+		Image(
+			painter = painterResource(bannerRes),
+			contentDescription = null,
+			modifier = modifier.size(50.dp)
+		)
 	}
 }
