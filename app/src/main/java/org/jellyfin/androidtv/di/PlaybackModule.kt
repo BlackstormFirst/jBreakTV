@@ -79,8 +79,17 @@ val playbackModule = module {
 }
 
 fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
-	val activityIntent = Intent(get(), MainActivity::class.java)
-	val pendingIntent = PendingIntent.getActivity(get(), 0, activityIntent, PendingIntent.FLAG_IMMUTABLE)
+	val activityIntent = Intent(get(), MainActivity::class.java).apply {
+		action = org.jellyfin.androidtv.constant.Extras.ActionShowNowPlaying
+		putExtra(org.jellyfin.androidtv.constant.Extras.OpenNowPlaying, true)
+		flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+	}
+	val pendingIntent = PendingIntent.getActivity(
+		get(),
+		0,
+		activityIntent,
+		PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+	)
 
 	val notificationChannelId = "session"
 	if (AndroidVersion.isAtLeastO) {

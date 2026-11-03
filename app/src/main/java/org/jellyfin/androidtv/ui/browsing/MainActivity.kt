@@ -44,6 +44,11 @@ import org.jellyfin.androidtv.util.updater.ApkInstaller
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.PreferencesRepository
 
+import org.jellyfin.androidtv.constant.Extras
+import org.jellyfin.androidtv.ui.navigation.Destinations
+import org.jellyfin.playback.core.PlaybackManager
+import org.jellyfin.playback.core.queue.queue
+
 class MainActivity : FragmentActivity() {
 	private val navigationRepository by inject<NavigationRepository>()
 	private val sessionRepository by inject<SessionRepository>()
@@ -52,6 +57,7 @@ class MainActivity : FragmentActivity() {
 	private val workManager by inject<WorkManager>()
 	private val userPreferences by inject<UserPreferences>()
 	private val preferencesRepository by inject<PreferencesRepository>()
+	private val playbackManager by inject<PlaybackManager>()
 	private var hasCheckUpdateThisSession = false
 
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +74,8 @@ class MainActivity : FragmentActivity() {
 			}.launchIn(lifecycleScope)
 
 		if (savedInstanceState == null && navigationRepository.canGoBack) navigationRepository.reset(clearHistory = true)
+
+		handleIntent(intent)
 
 		navigationRepository.currentAction
 			.flowWithLifecycle(lifecycle, Lifecycle.State.STARTED)
@@ -205,4 +213,21 @@ class MainActivity : FragmentActivity() {
 
 	override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean =
 		onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)
+
+	override fun onNewIntent(intent: Intent) {
+		super.onNewIntent(intent)
+		setIntent(intent)
+		handleIntent(intent)
+	}
+
+	private fun handleIntent(intent: Intent?) {
+		if (intent == null) return
+		val isOpenNowPlaying = intent.getBooleanExtra(Extras.OpenNowPlaying, false) || intent.action == Extras.ActionShowNowPlaying
+		if (isOpenNowPlaying) {
+			val hasActiveEntry = runCatching { playbackManager.queue.entry.value != null }.getOrDefault(false)
+			if (hasActiveEntry) {
+				navigationRepository.navigate(Destinations.nowPlaying)
+			}
+		}
+	}
 }

@@ -85,13 +85,16 @@ class MediaSessionService(
 
 			// Add branding & art
 			setSmallIcon(options.iconSmall)
-			item.metadata.artworkUri?.toUri()?.let { artworkUri ->
-				runCatching {
-					session.bitmapLoader.loadBitmap(artworkUri).await()
-				}.fold(
-					onSuccess = ::setLargeIcon,
-					onFailure = { error -> Timber.w(error, "Failed to retrieve artwork") },
-				)
+			item.metadata.artworkUri?.let { uriString ->
+				val artworkUri = runCatching { uriString.toUri() }.getOrNull()
+				if (artworkUri != null) {
+					runCatching {
+						session.bitmapLoader.loadBitmap(artworkUri).await()
+					}.fold(
+						onSuccess = ::setLargeIcon,
+						onFailure = { error -> Timber.w(error, "Failed to retrieve artwork") },
+					)
+				}
 			}
 		}.build()
 

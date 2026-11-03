@@ -99,13 +99,16 @@ internal class MediaSessionPlayer(
 			val next = if (currentIndex >= 0 && currentIndex + 1 < allEntries.size) allEntries[currentIndex + 1] else null
 
 			val playlist = listOfNotNull(previous, current, next)
-				.distinctBy { it.metadata.mediaId }
-				.map {
-					MediaItemData.Builder(requireNotNull(it.metadata.mediaId)).apply {
-						setMediaItem(it.metadata.toMediaItem())
-						setDurationUs(it.metadata.duration?.inWholeMicroseconds ?: C.TIME_UNSET)
+				.map { entry ->
+					val mediaId = entry.metadata.mediaId ?: entry.hashCode().toString()
+
+					MediaItemData.Builder(mediaId).apply {
+						setMediaItem(entry.metadata.toMediaItem())
+						setDurationUs(entry.metadata.duration?.inWholeMicroseconds ?: C.TIME_UNSET)
 					}.build()
 				}
+				.distinctBy { it.uid }
+
 			setPlaylist(playlist)
 
 			setPlaybackState(when (state.playState.value) {
@@ -117,6 +120,7 @@ internal class MediaSessionPlayer(
 
 			setCurrentMediaItemIndex(if (previous == null || playlist.size <= 1) 0 else 1)
 		} else {
+			setPlaylist(emptyList())
 			setPlaybackState(STATE_IDLE)
 			setCurrentMediaItemIndex(C.INDEX_UNSET)
 		}

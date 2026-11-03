@@ -16,18 +16,22 @@ fun QueueEntryMetadata.toMediaItem() = MediaItem.Builder().apply {
 		setDisplayTitle(displayTitle)
 		setSubtitle(subtitle)
 		setDescription(description)
-		setArtworkUri(artworkUri?.toUri())
+		artworkUri?.let { uriString ->
+			runCatching { uriString.toUri() }.getOrNull()?.let { setArtworkUri(it) }
+		}
 		setTrackNumber(trackNumber)
 		setTotalTrackCount(totalTrackCount)
-		recordDate?.let {
-			setReleaseYear(it.year)
-			setReleaseMonth(it.monthValue)
-			setReleaseDay(it.dayOfMonth)
-		}
-		releaseDate?.let {
-			setReleaseYear(it.year)
-			setReleaseMonth(it.monthValue)
-			setReleaseDay(it.dayOfMonth)
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+			recordDate?.let {
+				setReleaseYear(it.year)
+				setReleaseMonth(it.monthValue)
+				setReleaseDay(it.dayOfMonth)
+			}
+			releaseDate?.let {
+				setReleaseYear(it.year)
+				setReleaseMonth(it.monthValue)
+				setReleaseDay(it.dayOfMonth)
+			}
 		}
 		setWriter(writer)
 		setComposer(composer)
