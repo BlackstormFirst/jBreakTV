@@ -41,6 +41,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import org.jellyfin.androidtv.ui.navigation.focus.focusKey
 import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
@@ -120,16 +121,17 @@ fun AudioNowPlayingScreen(
 	var isRepeatMode by remember { mutableStateOf(mediaManager.isRepeatMode) }
 	var isShuffleMode by remember { mutableStateOf(mediaManager.isShuffleMode) }
 
+	val playPauseFocusRequester = remember { FocusRequester() }
+
 	LaunchedEffect(currentItem) {
 		if (currentItem != null) {
 			backgroundService.setBackground(currentItem, fallbackToSplashscreen = true)
+			playPauseFocusRequester.safeRequestFocus()
 		} else {
 			if (navigationRepository.canGoBack) navigationRepository.goBack()
 			else navigationRepository.navigate(Destinations.home)
 		}
 	}
-
-	val playPauseFocusRequester = remember { FocusRequester() }
 
 	Box(
 		modifier = Modifier.fillMaxSize()
@@ -272,7 +274,7 @@ fun AudioNowPlayingScreen(
 								}
 								IconButton(
 									onClick = { mediaManager.togglePlayPause() },
-									modifier = Modifier.focusRequester(playPauseFocusRequester)
+									modifier = Modifier.focusKey("play_pause", focusRequester = playPauseFocusRequester, initialFocus = true)
 								) {
 									Icon(
 										painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
