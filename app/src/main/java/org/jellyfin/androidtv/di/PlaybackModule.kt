@@ -32,7 +32,9 @@ import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentRepository
 import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.profile.createDeviceProfile
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
+import org.jellyfin.androidtv.ui.playback.ServerConnectionMonitorService
 import org.jellyfin.playback.core.playbackManager
+import org.jellyfin.playback.core.plugin.playbackPlugin
 import org.jellyfin.playback.jellyfin.jellyfinPlugin
 import org.jellyfin.playback.media3.exoplayer.ExoPlayerOptions
 import org.jellyfin.playback.media3.exoplayer.exoPlayerPlugin
@@ -72,6 +74,7 @@ val playbackModule = module {
 		OkHttpDataSource.Factory(okHttpFactory.createClient(httpClientOptions))
 	}
 
+	single { ServerConnectionMonitorService(get(), get(), get()) }
 	single { createPlaybackManager() }
 }
 
@@ -130,6 +133,7 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 		openIntent = pendingIntent,
 	)
 	install(media3SessionPlugin(get(), mediaSessionOptions))
+	install(playbackPlugin { provide(get<ServerConnectionMonitorService>()) })
 
 	val deviceProfileBuilder = { createDeviceProfile(androidContext(), userPreferences, get()) }
 	val mediaSegmentRepository = get<MediaSegmentRepository>()

@@ -23,6 +23,7 @@ import org.jellyfin.androidtv.ui.livetv.TvManager
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.PlaybackIndexManager
+import org.jellyfin.androidtv.ui.playback.ServerConnectionMonitorService
 import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.playback.rewrite.RewriteMediaManager
 import org.jellyfin.androidtv.util.RefreshRateHelper
@@ -80,6 +81,7 @@ class VideoPlayerFragment : Fragment() {
 	private val navigationRepository by inject<NavigationRepository>()
 	private val interactionTrackerViewModel by inject<InteractionTrackerViewModel>()
 	private val dataRefreshService by inject<DataRefreshService>()
+	private val serverConnectionMonitorService by inject<ServerConnectionMonitorService>()
 
 	private var refreshRateHelper: RefreshRateHelper? = null
 	private var playerEventListener: PlayerBackendEventListener? = null
@@ -452,6 +454,11 @@ class VideoPlayerFragment : Fragment() {
 		val entry = playbackManager.queue.entry.value
 		if (entry == null || playbackManager.state.playState.value == PlayState.STOPPED) {
 			Timber.w("Ignoring player error because playback is already stopped or queue entry is null")
+			return
+		}
+
+		if (serverConnectionMonitorService.isServerDisconnected()) {
+			Timber.i("Ignoring VideoPlayerFragment retry because server connection is lost. Managed by ServerConnectionMonitorService.")
 			return
 		}
 		val currentItem = entry.baseItem
