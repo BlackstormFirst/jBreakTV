@@ -116,7 +116,7 @@ private fun ExpandableAlbumOverviewText(
 							color = if (isFocused) JellyfinTheme.colorScheme.buttonFocused else Color.Transparent,
 							shape = RoundedCornerShape(6.dp)
 						)
-						.padding(horizontal = 8.dp, vertical = 4.dp)
+						.padding(vertical = 2.dp)
 						.onFocusChanged { isFocused = it.isFocused }
 						.clickable { showDialog = true }
 				} else Modifier

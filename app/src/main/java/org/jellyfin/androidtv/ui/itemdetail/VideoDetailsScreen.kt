@@ -201,7 +201,7 @@ fun ExpandableOverviewText(
                             color = if (isFocused) JellyfinTheme.colorScheme.buttonFocused else Color.Transparent,
                             shape = RoundedCornerShape(8.dp)
                         )
-                        .padding(6.dp)
+                        .padding(vertical = 2.dp)
                         .onFocusChanged { isFocused = it.isFocused }
                         .clickable { showDialog = true }
                 } else Modifier
