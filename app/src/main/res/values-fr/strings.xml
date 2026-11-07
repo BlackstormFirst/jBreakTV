@@ -117,7 +117,7 @@
     <string name="lbl_date_added">Date d\'ajout</string>
     <string name="lbl_premier_date">Date de sortie</string>
     <string name="lbl_critic_rating">Note des critiques</string>
-    <string name="lbl_rating">Critique</string>
+    <string name="lbl_rating">Classification</string>
     <string name="lbl_starting_with">Commençant par ceux dont le nom débute par</string>
     <string name="lbl_display_preferences">Préférences d\'affichage</string>
     <string name="lbl__continuing">EN PRODUCTION</string>

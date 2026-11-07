@@ -645,24 +645,44 @@ fun BrowseGridScreen(
 								maxHeight = 360.dp,
 								modifier = Modifier.widthIn(min = 220.dp)
 							) {
-								val sortOptions = listOf(
-									Triple(ItemSortBy.SORT_NAME, SortOrder.ASCENDING, R.string.lbl_name),
-									Triple(ItemSortBy.DATE_CREATED, SortOrder.DESCENDING, R.string.lbl_date_added),
-									Triple(ItemSortBy.PREMIERE_DATE, SortOrder.DESCENDING, R.string.lbl_premier_date),
-									Triple(ItemSortBy.COMMUNITY_RATING, SortOrder.DESCENDING, R.string.lbl_community_rating),
-									Triple(ItemSortBy.CRITIC_RATING, SortOrder.DESCENDING, R.string.lbl_critic_rating),
-									Triple(ItemSortBy.OFFICIAL_RATING, SortOrder.DESCENDING, R.string.lbl_rating),
-									Triple(ItemSortBy.DATE_PLAYED, SortOrder.DESCENDING, R.string.lbl_last_played),
-									Triple(ItemSortBy.RUNTIME, SortOrder.ASCENDING, R.string.lbl_runtime),
-									Triple(ItemSortBy.RANDOM, SortOrder.ASCENDING, R.string.random)
-								)
+								val isTvShows = folder?.collectionType == CollectionType.TVSHOWS
+								val sortOptions = remember(folder?.collectionType) {
+									if (isTvShows) {
+										listOf(
+											Triple(ItemSortBy.SORT_NAME, SortOrder.ASCENDING, R.string.lbl_name),
+											Triple(ItemSortBy.DATE_CREATED, SortOrder.DESCENDING, R.string.lbl_date_show_added),
+											Triple(ItemSortBy.DATE_LAST_CONTENT_ADDED, SortOrder.DESCENDING, R.string.lbl_date_episode_added),
+											Triple(ItemSortBy.PREMIERE_DATE, SortOrder.DESCENDING, R.string.lbl_premier_date),
+											Triple(ItemSortBy.COMMUNITY_RATING, SortOrder.DESCENDING, R.string.lbl_community_rating),
+											Triple(ItemSortBy.OFFICIAL_RATING, SortOrder.DESCENDING, R.string.lbl_rating),
+											Triple(ItemSortBy.SERIES_DATE_PLAYED, SortOrder.DESCENDING, R.string.lbl_last_played),
+											Triple(ItemSortBy.RANDOM, SortOrder.ASCENDING, R.string.random)
+										)
+									} else {
+										listOf(
+											Triple(ItemSortBy.SORT_NAME, SortOrder.ASCENDING, R.string.lbl_name),
+											Triple(ItemSortBy.DATE_CREATED, SortOrder.DESCENDING, R.string.lbl_date_added),
+											Triple(ItemSortBy.PREMIERE_DATE, SortOrder.DESCENDING, R.string.lbl_premier_date),
+											Triple(ItemSortBy.COMMUNITY_RATING, SortOrder.DESCENDING, R.string.lbl_community_rating),
+											Triple(ItemSortBy.CRITIC_RATING, SortOrder.DESCENDING, R.string.lbl_critic_rating),
+											Triple(ItemSortBy.OFFICIAL_RATING, SortOrder.DESCENDING, R.string.lbl_rating),
+											Triple(ItemSortBy.DATE_PLAYED, SortOrder.DESCENDING, R.string.lbl_last_played),
+											Triple(ItemSortBy.RUNTIME, SortOrder.ASCENDING, R.string.lbl_runtime),
+											Triple(ItemSortBy.RANDOM, SortOrder.ASCENDING, R.string.random)
+										)
+									}
+								}
 
 								val hasSelectedSort = sortOptions.any { (sortBy, _, _) ->
-									currentSortBy == sortBy || (sortBy == ItemSortBy.DATE_CREATED && currentSortBy == ItemSortBy.DATE_LAST_CONTENT_ADDED)
+									currentSortBy == sortBy ||
+										(!isTvShows && sortBy == ItemSortBy.DATE_CREATED && currentSortBy == ItemSortBy.DATE_LAST_CONTENT_ADDED) ||
+										(isTvShows && sortBy == ItemSortBy.SERIES_DATE_PLAYED && currentSortBy == ItemSortBy.DATE_PLAYED)
 								}
 
 								sortOptions.forEachIndexed { index, (sortBy, sortOrder, labelRes) ->
-									val isSelected = currentSortBy == sortBy || (sortBy == ItemSortBy.DATE_CREATED && currentSortBy == ItemSortBy.DATE_LAST_CONTENT_ADDED)
+									val isSelected = currentSortBy == sortBy ||
+										(!isTvShows && sortBy == ItemSortBy.DATE_CREATED && currentSortBy == ItemSortBy.DATE_LAST_CONTENT_ADDED) ||
+										(isTvShows && sortBy == ItemSortBy.SERIES_DATE_PLAYED && currentSortBy == ItemSortBy.DATE_PLAYED)
 									val itemFocusRequester = when {
 										isSelected -> selectedSortFocusRequester
 										!hasSelectedSort && index == 0 -> selectedSortFocusRequester
