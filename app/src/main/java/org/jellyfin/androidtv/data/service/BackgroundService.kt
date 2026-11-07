@@ -45,7 +45,7 @@ class BackgroundService(
 	private val serverRepository: ServerRepository,
 ) {
 	companion object {
-		val SLIDESHOW_DURATION = 30.seconds
+		val SLIDESHOW_DURATION = 10.seconds
 		val TRANSITION_DURATION = 800.milliseconds
 		const val DEFAULT_DEBOUNCE_MS = 180L
 	}
