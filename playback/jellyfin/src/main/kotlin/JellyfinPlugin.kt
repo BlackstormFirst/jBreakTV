@@ -29,10 +29,12 @@ fun jellyfinPlugin(
 	subtitlesBurnDuringTranscodeProvider: (() -> Boolean)? = null,
 	onPlaybackStop: ((BaseItemDto) -> Unit)? = null,
 	segmentAutoSkipPredicate: ((MediaSegmentDto) -> Boolean)? = null,
+	onNetworkError: (() -> Unit)? = null,
+	onNetworkSuccess: (() -> Unit)? = null,
 ) = playbackPlugin {
 	provide(JellyfinMediaStreamResolver(api, deviceProfileBuilder, localItemInspector, streamIndexResolver, maxBitrateProvider, subtitlesBurnDuringTranscodeProvider))
 
-	val playSessionService = PlaySessionService(api, onPlaybackStop, context)
+	val playSessionService = PlaySessionService(api, onPlaybackStop, context, onNetworkError, onNetworkSuccess)
 	provide(playSessionService)
 	provide(PlaySessionSocketService(api, playSessionService, lifecycle))
 

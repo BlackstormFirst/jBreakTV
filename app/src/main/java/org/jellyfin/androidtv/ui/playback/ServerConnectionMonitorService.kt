@@ -51,41 +51,53 @@ class ServerConnectionMonitorService(
 				wasPlayingBeforeDisconnect = true
 			}
 
-			if (playState != PlayState.STOPPED) {
-				startMonitoring()
-			} else {
-				stopMonitoring()
+			if (playState == PlayState.STOPPED) {
+				stopRecoveryMonitoring()
 				resetDisconnectionState()
 			}
 			lastPlayState = playState
 		}.launchIn(coroutineScope)
 
 		state.isBuffering.onEach { isBuffering ->
-			if (isBuffering && !isServerConnected && !bufferEndedState) {
-				coroutineScope.launch {
-					if (!checkServerConnection()) {
-						onBufferEndedUnderDisconnection()
-					}
-				}
+			if (isBuffering && !bufferEndedState) {
+				notifyNetworkFailure()
 			}
 		}.launchIn(coroutineScope)
 
 		manager.addListener(object : PlayerBackendEventListener() {
 			override fun onError(error: Throwable) {
-				if (!isServerConnected && !bufferEndedState) {
-					coroutineScope.launch {
-						if (!checkServerConnection()) {
-							onBufferEndedUnderDisconnection()
-						}
-					}
+				if (!bufferEndedState) {
+					notifyNetworkFailure()
 				}
 			}
 		})
 	}
 
-	private var failedCheckCount = 0
+	fun notifyNetworkFailure() {
+		coroutineScope.launch {
+			if (!checkServerConnection()) {
+				if (isServerConnected) {
+					Timber.w("Server disconnection detected after network/player failure.")
+					isServerConnected = false
+				}
+				onBufferEndedUnderDisconnection()
+				startRecoveryMonitoring()
+			}
+		}
+	}
 
-	private fun startMonitoring() {
+	fun notifyNetworkSuccess() {
+		if (!isServerConnected) {
+			coroutineScope.launch {
+				Timber.i("Server connection restored via network success.")
+				isServerConnected = true
+				stopRecoveryMonitoring()
+				onServerReconnected()
+			}
+		}
+	}
+
+	private fun startRecoveryMonitoring() {
 		if (activeMonitoringJob?.isActive == true) return
 
 		activeMonitoringJob = coroutineScope.launch {
@@ -96,29 +108,22 @@ class ServerConnectionMonitorService(
 				}
 
 				val connected = checkServerConnection()
-				if (!connected) {
-					failedCheckCount++
-					if (failedCheckCount >= 2 && isServerConnected) {
-						Timber.w("Server disconnection detected during active playback.")
-						isServerConnected = false
-					}
-
+				if (connected) {
+					Timber.i("Server connection restored via recovery ping.")
+					isServerConnected = true
+					stopRecoveryMonitoring()
+					onServerReconnected()
+					break
+				} else {
 					if (!bufferEndedState && (state.isBuffering.value || state.playState.value == PlayState.ERROR)) {
 						onBufferEndedUnderDisconnection()
-					}
-				} else {
-					failedCheckCount = 0
-					if (!isServerConnected) {
-						Timber.i("Server connection restored.")
-						isServerConnected = true
-						onServerReconnected()
 					}
 				}
 			}
 		}
 	}
 
-	private fun stopMonitoring() {
+	private fun stopRecoveryMonitoring() {
 		activeMonitoringJob?.cancel()
 		activeMonitoringJob = null
 	}
@@ -126,7 +131,6 @@ class ServerConnectionMonitorService(
 	private fun resetDisconnectionState() {
 		timeoutJob?.cancel()
 		timeoutJob = null
-		failedCheckCount = 0
 		isServerConnected = true
 		bufferEndedState = false
 		wasPlayingBeforeDisconnect = false

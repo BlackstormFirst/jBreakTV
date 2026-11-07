@@ -236,7 +236,8 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 					else -> Unit
 				}
 			},
-
+			onNetworkError = { get<ServerConnectionMonitorService>().notifyNetworkFailure() },
+			onNetworkSuccess = { get<ServerConnectionMonitorService>().notifyNetworkSuccess() },
 		)
 	)
 

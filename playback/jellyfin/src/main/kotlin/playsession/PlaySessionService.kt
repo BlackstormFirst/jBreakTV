@@ -47,6 +47,8 @@ class PlaySessionService(
 	private val api: ApiClient,
 	private val onPlaybackStop: ((BaseItemDto) -> Unit)? = null,
 	private val context: Context? = null,
+	private val onNetworkError: (() -> Unit)? = null,
+	private val onNetworkSuccess: (() -> Unit)? = null,
 ) : PlayerService() {
 	private data class ActiveSessionInfo(
 		val itemId: UUID,
@@ -271,6 +273,7 @@ class PlaySessionService(
 				isSessionStarted = true
 				Timber.i("Reported playback start for ${item.name} at reportMs=$reportMs (mediaSourceId=$mediaSourceId, playSessionId=${stream.identifier})")
 			}.onSuccess {
+				onNetworkSuccess?.invoke()
 				if (isConnectionWarningShown) {
 					isConnectionWarningShown = false
 					showToast("Connexion au serveur rétablie")
@@ -290,6 +293,7 @@ class PlaySessionService(
 				}
 
 				Timber.w("Failed to send playback start event: ${error.message}")
+				onNetworkError?.invoke()
 			}
 		}
 	}
@@ -352,6 +356,7 @@ class PlaySessionService(
 				)
 				Timber.d("Reported playback progress for ${item.name} at reportMs=$reportMs")
 			}.onSuccess {
+				onNetworkSuccess?.invoke()
 				if (isConnectionWarningShown) {
 					isConnectionWarningShown = false
 					showToast("Connexion au serveur rétablie")
@@ -363,6 +368,7 @@ class PlaySessionService(
 				}
 
 				Timber.w("Failed to send playback update event: ${error.message}")
+				onNetworkError?.invoke()
 			}
 		}
 		activeUpdateJob = updateJob
