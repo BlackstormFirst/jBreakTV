@@ -227,6 +227,14 @@ fun ExpandableOverviewText(
     }
 
     if (showDialog && !overviewText.isNullOrBlank()) {
+        val scrollState = rememberScrollState()
+        val focusRequester = remember { FocusRequester() }
+        val coroutineScope = rememberCoroutineScope()
+
+        LaunchedEffect(Unit) {
+            focusRequester.requestFocus()
+        }
+
         Dialog(
             onDismissRequest = { showDialog = false },
             properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -235,7 +243,10 @@ fun ExpandableOverviewText(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.85f))
-                    .clickable { showDialog = false },
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { showDialog = false },
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -244,18 +255,46 @@ fun ExpandableOverviewText(
                         .height(400.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(JellyfinTheme.colorScheme.surface)
+                        .focusRequester(focusRequester)
+                        .focusable()
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                when (keyEvent.nativeKeyEvent.keyCode) {
+                                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                                        coroutineScope.launch {
+                                            val target = (scrollState.value + 120).coerceAtMost(scrollState.maxValue)
+                                            scrollState.animateScrollTo(target)
+                                        }
+                                        true
+                                    }
+                                    KeyEvent.KEYCODE_DPAD_UP -> {
+                                        coroutineScope.launch {
+                                            val target = (scrollState.value - 120).coerceAtLeast(0)
+                                            scrollState.animateScrollTo(target)
+                                        }
+                                        true
+                                    }
+                                    KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                                        showDialog = false
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            } else false
+                        }
                         .padding(24.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(scrollState)
                     ) {
                         Text(
                             text = overviewText,
                             style = TextStyle(
                                 fontSize = 16.sp,
-                                fontWeight = FontWeight.Light,
+                                lineHeight = 22.sp,
+                                fontWeight = FontWeight.Normal,
                                 color = Color.White
                             )
                         )
