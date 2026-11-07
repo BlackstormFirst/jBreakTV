@@ -20,9 +20,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import org.jellyfin.androidtv.ui.composable.item.ItemContextMenu
 import org.jellyfin.androidtv.ui.composable.modifier.itemCardClickable
@@ -75,6 +82,116 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.compose.koinInject
 import java.util.UUID
+
+private sealed interface ItemListRow {
+	data class DiscHeader(val discNumber: Int) : ItemListRow
+	data class Track(val item: BaseItemDto, val index: Int) : ItemListRow
+}
+
+@Composable
+private fun ExpandableAlbumOverviewText(
+	overviewText: String?,
+	isMusicAlbum: Boolean,
+	modifier: Modifier = Modifier
+) {
+	var isEllipsized by remember { mutableStateOf(false) }
+	var isFocused by remember { mutableStateOf(false) }
+	var showDialog by remember { mutableStateOf(false) }
+
+	Box(
+		modifier = modifier
+			.padding(vertical = 4.dp)
+			.then(
+				if (isEllipsized) {
+					Modifier
+						.clip(RoundedCornerShape(6.dp))
+						.background(if (isFocused) JellyfinTheme.colorScheme.buttonFocused.copy(alpha = 0.2f) else Color.Transparent)
+						.border(
+							width = if (isFocused) 2.dp else 0.dp,
+							color = if (isFocused) JellyfinTheme.colorScheme.buttonFocused else Color.Transparent,
+							shape = RoundedCornerShape(6.dp)
+						)
+						.padding(horizontal = 8.dp, vertical = 4.dp)
+						.onFocusChanged { isFocused = it.isFocused }
+						.clickable { showDialog = true }
+				} else Modifier
+			)
+	) {
+		Text(
+			text = overviewText.orEmpty(),
+			style = JellyfinTheme.typography.listCaption,
+			color = JellyfinTheme.colorScheme.listCaption,
+			minLines = if (isMusicAlbum) 7 else 1,
+			maxLines = 7,
+			overflow = TextOverflow.Ellipsis,
+			onTextLayout = { textLayoutResult ->
+				if (textLayoutResult.hasVisualOverflow) {
+					isEllipsized = true
+				}
+			}
+		)
+	}
+
+	if (showDialog && !overviewText.isNullOrBlank()) {
+		Dialog(
+			onDismissRequest = { showDialog = false },
+			properties = DialogProperties(usePlatformDefaultWidth = false)
+		) {
+			Box(
+				modifier = Modifier
+					.fillMaxSize()
+					.background(Color.Black.copy(alpha = 0.85f))
+					.clickable { showDialog = false },
+				contentAlignment = Alignment.Center
+			) {
+				Box(
+					modifier = Modifier
+						.width(600.dp)
+						.height(400.dp)
+						.clip(RoundedCornerShape(12.dp))
+						.background(JellyfinTheme.colorScheme.surface)
+						.padding(24.dp)
+				) {
+					Column(
+						modifier = Modifier
+							.fillMaxSize()
+							.verticalScroll(rememberScrollState())
+					) {
+						Text(
+							text = overviewText,
+							style = TextStyle(
+								fontSize = 16.sp,
+								lineHeight = 22.sp,
+								fontWeight = FontWeight.Normal
+							),
+							color = Color.White
+						)
+					}
+				}
+
+				Row(
+					modifier = Modifier
+						.align(Alignment.BottomStart)
+						.padding(24.dp),
+					verticalAlignment = Alignment.CenterVertically,
+					horizontalArrangement = Arrangement.spacedBy(8.dp)
+				) {
+					Icon(
+						painter = painterResource(R.drawable.ic_control_select),
+						contentDescription = null,
+						tint = Color.White,
+						modifier = Modifier.size(20.dp)
+					)
+					Text(
+						text = stringResource(R.string.press_to_close),
+						style = JellyfinTheme.typography.listCaption,
+						color = Color.White
+					)
+				}
+			}
+		}
+	}
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -157,6 +274,25 @@ fun ItemListScreen(
 				compareBy<BaseItemDto> { it.parentIndexNumber ?: 1 }
 					.thenBy { it.indexNumber ?: Int.MAX_VALUE }
 			)
+		}
+	}
+
+	val listRowItems = remember(displayItems) {
+		val hasMultipleDiscs = displayItems.map { it.parentIndexNumber ?: 1 }.distinct().size > 1
+		if (!hasMultipleDiscs) {
+			displayItems.mapIndexed { index, item -> ItemListRow.Track(item, index) }
+		} else {
+			val rows = mutableListOf<ItemListRow>()
+			var currentDiscNumber: Int? = null
+			displayItems.forEachIndexed { index, item ->
+				val discNum = item.parentIndexNumber ?: 1
+				if (currentDiscNumber != discNum) {
+					currentDiscNumber = discNum
+					rows.add(ItemListRow.DiscHeader(discNum))
+				}
+				rows.add(ItemListRow.Track(item, index))
+			}
+			rows
 		}
 	}
 
@@ -336,14 +472,11 @@ fun ItemListScreen(
 							}
 
 							val overview = baseItem?.overview
-							if (!overview.isNullOrBlank()) {
-								Text(
-									text = overview,
-									style = JellyfinTheme.typography.listCaption,
-									color = JellyfinTheme.colorScheme.listCaption,
-									maxLines = 3,
-									overflow = TextOverflow.Ellipsis,
-									modifier = Modifier.padding(vertical = 4.dp)
+							val isMusicAlbum = baseItem == null || baseItem.type == BaseItemKind.MUSIC_ALBUM
+							if (isMusicAlbum || !overview.isNullOrBlank()) {
+								ExpandableAlbumOverviewText(
+									overviewText = overview,
+									isMusicAlbum = isMusicAlbum
 								)
 							}
 
@@ -423,164 +556,201 @@ fun ItemListScreen(
 				}
 
 				// Track List Items
-				itemsIndexed(
-					items = displayItems,
-					key = { _, item -> item.id }
-				) { index, item ->
-					var isFocused by remember { mutableStateOf(false) }
-					val isCurrentlyPlaying = remember(currentlyPlayingItemId, item.id) {
-						currentlyPlayingItemId != null && item.id == currentlyPlayingItemId
-					}
-
-					val artistName = remember(item) {
-						val artistList = item.artists
-						if (!artistList.isNullOrEmpty()) artistList.first()
-						else if (!item.albumArtist.isNullOrBlank()) item.albumArtist
-						else null
-					}
-
-					val formattedRunTime = remember(item.runTimeTicks) {
-						TimeUtils.formatMillis((item.runTimeTicks ?: 0L) / 10000L)
-					}
-
-					val displayName = remember(item) {
-						if (item.type != BaseItemKind.AUDIO && item.seriesName != null) {
-							item.getFullName(context)
-						} else {
-							item.name
+				items(
+					items = listRowItems,
+					key = { row ->
+						when (row) {
+							is ItemListRow.DiscHeader -> "disc_header_${row.discNumber}"
+							is ItemListRow.Track -> row.item.id
 						}
 					}
-
-					val isTrackFavorite = remember(item.userData?.isFavorite) {
-						item.userData?.isFavorite == true
-					}
-
-					val itemFocusRequester = remember { FocusRequester() }
-					var showContextMenu by remember { mutableStateOf(false) }
-
-					Box(
-						modifier = Modifier.fillMaxWidth(),
-						contentAlignment = Alignment.Center
-					) {
-						Box(
-							modifier = Modifier
-								.focusRequester(itemFocusRequester)
-								.clip(RoundedCornerShape(6.dp))
-								.background(
-									when {
-										isFocused -> JellyfinTheme.colorScheme.buttonFocused
-										isCurrentlyPlaying -> JellyfinTheme.colorScheme.buttonActive
-										else -> Color.Transparent
-									}
-								)
-								.onFocusChanged { isFocused = it.isFocused }
-								.itemCardClickable(
-									onClick = { onItemClick(item, index) },
-									onLongClick = { showContextMenu = true }
-								)
-								.padding(horizontal = 16.dp, vertical = 12.dp)
-						) {
+				) { row ->
+					when (row) {
+						is ItemListRow.DiscHeader -> {
 							Row(
+								modifier = Modifier
+									.fillMaxWidth()
+									.focusProperties { canFocus = false }
+									.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
 								verticalAlignment = Alignment.CenterVertically
 							) {
-								// Index / Playing Icon
+								Text(
+									text = stringResource(id = R.string.lbl_disc_number, row.discNumber),
+									style = JellyfinTheme.typography.listHeadline.copy(
+										fontWeight = FontWeight.Bold,
+										fontSize = 16.sp
+									),
+									color = JellyfinTheme.colorScheme.onBackground
+								)
+								Spacer(modifier = Modifier.width(16.dp))
 								Box(
-									modifier = Modifier.size(32.dp),
-									contentAlignment = Alignment.Center
-								) {
-									if (isCurrentlyPlaying) {
-										Icon(
-											painter = painterResource(id = R.drawable.ic_play),
-											contentDescription = null,
-											tint = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.onBackground,
-											modifier = Modifier.size(20.dp)
+									modifier = Modifier
+										.weight(1f)
+										.height(1.dp)
+										.background(JellyfinTheme.colorScheme.onBackground.copy(alpha = 0.2f))
+								)
+							}
+						}
+
+						is ItemListRow.Track -> {
+							val index = row.index
+							val item = row.item
+							var isFocused by remember { mutableStateOf(false) }
+							val isCurrentlyPlaying = remember(currentlyPlayingItemId, item.id) {
+								currentlyPlayingItemId != null && item.id == currentlyPlayingItemId
+							}
+
+							val artistName = remember(item) {
+								val artistList = item.artists
+								if (!artistList.isNullOrEmpty()) artistList.first()
+								else if (!item.albumArtist.isNullOrBlank()) item.albumArtist
+								else null
+							}
+
+							val formattedRunTime = remember(item.runTimeTicks) {
+								TimeUtils.formatMillis((item.runTimeTicks ?: 0L) / 10000L)
+							}
+
+							val displayName = remember(item) {
+								if (item.type != BaseItemKind.AUDIO && item.seriesName != null) {
+									item.getFullName(context)
+								} else {
+									item.name
+								}
+							}
+
+							val isTrackFavorite = remember(item.userData?.isFavorite) {
+								item.userData?.isFavorite == true
+							}
+
+							val itemFocusRequester = remember { FocusRequester() }
+							var showContextMenu by remember { mutableStateOf(false) }
+
+							Box(
+								modifier = Modifier.fillMaxWidth(),
+								contentAlignment = Alignment.Center
+							) {
+								Box(
+									modifier = Modifier
+										.focusRequester(itemFocusRequester)
+										.clip(RoundedCornerShape(6.dp))
+										.background(
+											when {
+												isFocused -> JellyfinTheme.colorScheme.buttonFocused
+												isCurrentlyPlaying -> JellyfinTheme.colorScheme.buttonActive
+												else -> Color.Transparent
+											}
 										)
-									} else {
-										val trackNumberText = item.indexNumber?.toString().orEmpty()
-										if (trackNumberText.isNotEmpty()) {
+										.onFocusChanged { isFocused = it.isFocused }
+										.itemCardClickable(
+											onClick = { onItemClick(item, index) },
+											onLongClick = { showContextMenu = true }
+										)
+										.padding(horizontal = 16.dp, vertical = 12.dp)
+								) {
+									Row(
+										verticalAlignment = Alignment.CenterVertically
+									) {
+										// Index / Playing Icon
+										Box(
+											modifier = Modifier.size(32.dp),
+											contentAlignment = Alignment.Center
+										) {
+											if (isCurrentlyPlaying) {
+												Icon(
+													painter = painterResource(id = R.drawable.ic_play),
+													contentDescription = null,
+													tint = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.onBackground,
+													modifier = Modifier.size(20.dp)
+												)
+											} else {
+												val trackNumberText = item.indexNumber?.toString().orEmpty()
+												if (trackNumberText.isNotEmpty()) {
+													Text(
+														text = trackNumberText,
+														style = JellyfinTheme.typography.listHeadline,
+														color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption
+													)
+												}
+											}
+										}
+
+										Spacer(modifier = Modifier.width(16.dp))
+
+										// Track Name & Artist
+										Column(
+											modifier = Modifier.width(dynamicTitleWidth),
+											horizontalAlignment = Alignment.Start
+										) {
 											Text(
-												text = trackNumberText,
-												style = JellyfinTheme.typography.listHeadline,
-												color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption
+												text = displayName ?: "",
+												style = JellyfinTheme.typography.listHeadline.copy(
+													fontWeight = if (isCurrentlyPlaying) FontWeight.Bold else FontWeight.Normal
+												),
+												color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listHeadline,
+												maxLines = 1,
+												overflow = TextOverflow.Ellipsis,
+												softWrap = false,
+												modifier = if (isFocused) Modifier.basicMarquee() else Modifier
 											)
+
+											if (!artistName.isNullOrBlank()) {
+												Text(
+													text = artistName,
+													style = JellyfinTheme.typography.listCaption,
+													color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
+													maxLines = 1,
+													overflow = TextOverflow.Ellipsis,
+													softWrap = false,
+													modifier = if (isFocused) Modifier.basicMarquee() else Modifier
+												)
+											}
+										}
+
+										Spacer(modifier = Modifier.width(16.dp))
+
+										// Track Runtime
+										Text(
+											text = formattedRunTime,
+											style = JellyfinTheme.typography.listHeadline,
+											color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
+											modifier = Modifier.width(dynamicDurationWidth)
+										)
+
+										Spacer(modifier = Modifier.width(12.dp))
+
+										// Favorite Icon Column (Fixed width)
+										Box(
+											modifier = Modifier.size(24.dp),
+											contentAlignment = Alignment.Center
+										) {
+											if (isTrackFavorite) {
+												Icon(
+													painter = painterResource(id = R.drawable.ic_heart),
+													contentDescription = stringResource(id = R.string.lbl_favorite),
+													tint = Color.Red,
+													modifier = Modifier.size(18.dp)
+												)
+											}
 										}
 									}
 								}
 
-								Spacer(modifier = Modifier.width(16.dp))
-
-								// Track Name & Artist
-								Column(
-									modifier = Modifier.width(dynamicTitleWidth),
-									horizontalAlignment = Alignment.Start
-								) {
-									Text(
-										text = displayName ?: "",
-										style = JellyfinTheme.typography.listHeadline.copy(
-											fontWeight = if (isCurrentlyPlaying) FontWeight.Bold else FontWeight.Normal
-										),
-										color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listHeadline,
-										maxLines = 1,
-										overflow = TextOverflow.Ellipsis,
-										softWrap = false,
-										modifier = if (isFocused) Modifier.basicMarquee() else Modifier
+								if (showContextMenu) {
+									val rowItem = remember(item) { BaseItemDtoBaseRowItem(item) }
+									ItemContextMenu(
+										item = rowItem,
+										expanded = showContextMenu,
+										onDismissRequest = { showContextMenu = false },
+										focusRequester = itemFocusRequester,
+										onItemUpdated = { updatedItem ->
+											updatedItem.baseItem?.let { updatedBaseItem ->
+												onItemUpdated?.invoke(index, updatedBaseItem)
+											}
+										}
 									)
-
-									if (!artistName.isNullOrBlank()) {
-										Text(
-											text = artistName,
-											style = JellyfinTheme.typography.listCaption,
-											color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
-											maxLines = 1,
-											overflow = TextOverflow.Ellipsis,
-											softWrap = false,
-											modifier = if (isFocused) Modifier.basicMarquee() else Modifier
-										)
-									}
-								}
-
-								Spacer(modifier = Modifier.width(16.dp))
-
-								// Track Runtime
-								Text(
-									text = formattedRunTime,
-									style = JellyfinTheme.typography.listHeadline,
-									color = if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.listCaption,
-									modifier = Modifier.width(dynamicDurationWidth)
-								)
-
-								Spacer(modifier = Modifier.width(12.dp))
-
-								// Favorite Icon Column (Fixed width)
-								Box(
-									modifier = Modifier.size(24.dp),
-									contentAlignment = Alignment.Center
-								) {
-									if (isTrackFavorite) {
-										Icon(
-											painter = painterResource(id = R.drawable.ic_heart),
-											contentDescription = stringResource(id = R.string.lbl_favorite),
-											tint = Color.Red,
-											modifier = Modifier.size(18.dp)
-										)
-									}
 								}
 							}
-						}
-
-						if (showContextMenu) {
-							val rowItem = remember(item) { BaseItemDtoBaseRowItem(item) }
-							ItemContextMenu(
-								item = rowItem,
-								expanded = showContextMenu,
-								onDismissRequest = { showContextMenu = false },
-								focusRequester = itemFocusRequester,
-								onItemUpdated = { updatedItem ->
-									updatedItem.baseItem?.let { updatedBaseItem ->
-										onItemUpdated?.invoke(index, updatedBaseItem)
-									}
-								}
-							)
 						}
 					}
 				}
