@@ -627,7 +627,8 @@ private fun SubtitleButton(
 							selected = track.isSelected,
 							focusRequester = if (track.isSelected) selectedFocusRequester else null,
 							onClick = {
-								if (track.isSelected || (activeSubIndex != null && activeSubIndex >= 0 && track.mediaStreamIndex == activeSubIndex)) {
+								val isActivelyPlaying = track.isSelected && rawSubTracks.any { it.mediaStreamIndex == track.mediaStreamIndex && it.isSelected }
+								if (isActivelyPlaying) {
 									Timber.d("VideoPlayerControls: skipping subtitle switch, already set to ${track.mediaStreamIndex}")
 									expanded = false
 									return@PopoverMenuCheckboxItem
@@ -776,7 +777,8 @@ private fun AudioButton(
 							selected = track.isSelected,
 							focusRequester = if (track.isSelected) selectedFocusRequester else null,
 							onClick = {
-								if (track.isSelected || (activeAudioIndex != null && activeAudioIndex >= 0 && track.mediaStreamIndex == activeAudioIndex)) {
+								val isActivelyPlaying = track.isSelected && rawAudioTracks.any { it.mediaStreamIndex == track.mediaStreamIndex && it.isSelected }
+								if (isActivelyPlaying) {
 									Timber.d("VideoPlayerControls: skipping audio switch, already set to ${track.mediaStreamIndex}")
 									expanded = false
 									return@PopoverMenuCheckboxItem
@@ -930,7 +932,8 @@ private fun VideoButton(
 							selected = track.isSelected,
 							focusRequester = if (track.isSelected) selectedFocusRequester else null,
 							onClick = {
-								if (track.isSelected || (activeVideoIndex != null && activeVideoIndex >= 0 && track.mediaStreamIndex == activeVideoIndex)) {
+								val isActivelyPlaying = track.isSelected && rawVideoTracks.any { it.mediaStreamIndex == track.mediaStreamIndex && it.isSelected }
+								if (isActivelyPlaying) {
 									Timber.d("VideoPlayerControls: skipping video switch, already set to ${track.mediaStreamIndex}")
 									expanded = false
 									return@PopoverMenuCheckboxItem

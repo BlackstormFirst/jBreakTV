@@ -866,11 +866,11 @@ class ExoPlayerBackend(
 			val matchedTrackIndex = exoMatch?.trackIndex ?: 0
 
 			val isTrackSelected = when {
+				exoMatch != null -> exoMatch.isSelected
 				trackType == C.TRACK_TYPE_AUDIO && prefAudio != null -> index == prefAudio
 				trackType == C.TRACK_TYPE_TEXT && prefSub == -1 -> false
 				trackType == C.TRACK_TYPE_TEXT && prefSub != null -> index == prefSub
 				trackType == C.TRACK_TYPE_VIDEO && prefVideo != null -> index == prefVideo
-				exoMatch != null -> exoMatch.isSelected
 				mediaTrack is MediaStreamAudioTrack -> mediaTrack.isDefault && trackList.none { it.isSelected }
 				mediaTrack is MediaStreamSubtitleTrack -> mediaTrack.isDefault && trackList.none { it.isSelected }
 				mediaTrack is MediaStreamVideoTrack -> index == 0 && trackList.none { it.isSelected }
@@ -904,30 +904,38 @@ class ExoPlayerBackend(
 		val activeGroups = exoPlayer.currentTracks.groups.filter { it.type == trackType }
 		if (activeGroups.isEmpty()) return null
 
-		// 1. Try matching by format ID or group ID
-		for (groupInfo in activeGroups) {
-			val group = groupInfo.mediaTrackGroup
-			for (i in 0 until group.length) {
-				val format = group.getFormat(i)
-				val formatId = format.id
-				if (group.id.endsWith(":$targetMediaStreamIndex") ||
-					group.id == targetMediaStreamIndex.toString() ||
-					formatId?.endsWith(":$targetMediaStreamIndex") == true ||
-					formatId?.endsWith("JF_EXTERNAL:$targetMediaStreamIndex") == true ||
-					formatId == targetMediaStreamIndex.toString()
-				) {
-					return ExoTrackMatch(group, i, groupInfo.isTrackSelected(i))
+		// 1. Try matching external subtitles explicitly (for text tracks with JF_EXTERNAL prefix)
+		if (trackType == C.TRACK_TYPE_TEXT) {
+			for (groupInfo in activeGroups) {
+				val group = groupInfo.mediaTrackGroup
+				for (i in 0 until group.length) {
+					val formatId = group.getFormat(i).id
+					if (formatId == "JF_EXTERNAL:$targetMediaStreamIndex" || formatId?.endsWith("JF_EXTERNAL:$targetMediaStreamIndex") == true) {
+						return ExoTrackMatch(group, i, groupInfo.isTrackSelected(i))
+					}
 				}
 			}
 		}
 
-		// 2. Map by indexInType using flat list of all tracks across activeGroups
+		// 2. Map by relative index in embedded tracks list (excluding external subtitles)
 		val stream = currentStream
 		val tracksForType = when (trackType) {
 			C.TRACK_TYPE_AUDIO -> stream?.tracks?.filterIsInstance<MediaStreamAudioTrack>()
-			C.TRACK_TYPE_TEXT -> stream?.tracks?.filterIsInstance<MediaStreamSubtitleTrack>()
+			C.TRACK_TYPE_TEXT -> stream?.tracks?.filterIsInstance<MediaStreamSubtitleTrack>()?.filter { !it.isExternal }
 			C.TRACK_TYPE_VIDEO -> stream?.tracks?.filterIsInstance<MediaStreamVideoTrack>()
 			else -> null
+		}
+
+		val embeddedGroups = if (trackType == C.TRACK_TYPE_TEXT) {
+			activeGroups.filter { groupInfo ->
+				val group = groupInfo.mediaTrackGroup
+				(0 until group.length).none { i ->
+					val fid = group.getFormat(i).id
+					fid?.contains("JF_EXTERNAL") == true
+				}
+			}
+		} else {
+			activeGroups
 		}
 
 		if (!tracksForType.isNullOrEmpty()) {
@@ -941,16 +949,16 @@ class ExoPlayerBackend(
 				idx == targetMediaStreamIndex
 			}
 			if (targetMediaTrack != null) {
-				val indexInType = tracksForType.indexOf(targetMediaTrack)
+				val indexInEmbeddedType = tracksForType.indexOf(targetMediaTrack)
 
 				val flatTracks = mutableListOf<Pair<Tracks.Group, Int>>()
-				for (groupInfo in activeGroups) {
+				for (groupInfo in embeddedGroups) {
 					for (i in 0 until groupInfo.length) {
 						flatTracks.add(Pair(groupInfo, i))
 					}
 				}
 
-				val matchedPair = flatTracks.getOrNull(indexInType)
+				val matchedPair = flatTracks.getOrNull(indexInEmbeddedType)
 				if (matchedPair != null) {
 					val (groupInfo, trackIdx) = matchedPair
 					return ExoTrackMatch(groupInfo.mediaTrackGroup, trackIdx, groupInfo.isTrackSelected(trackIdx))
@@ -958,7 +966,21 @@ class ExoPlayerBackend(
 			}
 		}
 
-		// 3. Fallback: match by language
+		// 3. Fallback: match by format ID or group ID for non-standard containers
+		for (groupInfo in activeGroups) {
+			val group = groupInfo.mediaTrackGroup
+			for (i in 0 until group.length) {
+				val format = group.getFormat(i)
+				val formatId = format.id
+				if (formatId?.endsWith(":$targetMediaStreamIndex") == true ||
+					formatId == targetMediaStreamIndex.toString()
+				) {
+					return ExoTrackMatch(group, i, groupInfo.isTrackSelected(i))
+				}
+			}
+		}
+
+		// 4. Fallback: match by language
 		val targetLang = when (trackType) {
 			C.TRACK_TYPE_AUDIO -> stream?.tracks?.filterIsInstance<MediaStreamAudioTrack>()?.firstOrNull { it.index == targetMediaStreamIndex }?.language
 			C.TRACK_TYPE_TEXT -> stream?.tracks?.filterIsInstance<MediaStreamSubtitleTrack>()?.firstOrNull { it.index == targetMediaStreamIndex }?.language
@@ -1055,8 +1077,7 @@ class ExoPlayerBackend(
 		return !isPreparingItem &&
 			!exoPlayer.currentTimeline.isEmpty &&
 			exoPlayer.currentMediaItem != null &&
-			!exoPlayer.currentTracks.groups.isEmpty() &&
-			exoPlayer.playbackState == Player.STATE_READY
+			!exoPlayer.currentTracks.groups.isEmpty()
 	}
 
 	private fun safeSetTrackSelectionParameters(params: TrackSelectionParameters) {
