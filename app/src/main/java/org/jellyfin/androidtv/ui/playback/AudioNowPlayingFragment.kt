@@ -77,6 +77,9 @@ import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.queue.queue
+import androidx.compose.runtime.CompositionLocalProvider
+import org.jellyfin.androidtv.ui.navigation.focus.FocusPersistManager
+import org.jellyfin.androidtv.ui.navigation.focus.LocalFocusPersistManager
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.baseItemFlow
 import org.koin.compose.koinInject
@@ -92,14 +95,17 @@ class AudioNowPlayingFragment : Fragment() {
 		val playbackManager = koinInject<PlaybackManager>()
 		val backgroundService = koinInject<BackgroundService>()
 		val navigationRepository = koinInject<NavigationRepository>()
+		val focusPersistManager = remember { FocusPersistManager() }
 
 		JellyfinTheme {
-			AudioNowPlayingScreen(
-				mediaManager = mediaManager,
-				playbackManager = playbackManager,
-				backgroundService = backgroundService,
-				navigationRepository = navigationRepository,
-			)
+			CompositionLocalProvider(LocalFocusPersistManager provides focusPersistManager) {
+				AudioNowPlayingScreen(
+					mediaManager = mediaManager,
+					playbackManager = playbackManager,
+					backgroundService = backgroundService,
+					navigationRepository = navigationRepository,
+				)
+			}
 		}
 	}
 }

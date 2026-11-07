@@ -83,6 +83,8 @@ class ServerConnectionMonitorService(
 		})
 	}
 
+	private var failedCheckCount = 0
+
 	private fun startMonitoring() {
 		if (activeMonitoringJob?.isActive == true) return
 
@@ -95,7 +97,8 @@ class ServerConnectionMonitorService(
 
 				val connected = checkServerConnection()
 				if (!connected) {
-					if (isServerConnected) {
+					failedCheckCount++
+					if (failedCheckCount >= 2 && isServerConnected) {
 						Timber.w("Server disconnection detected during active playback.")
 						isServerConnected = false
 					}
@@ -104,6 +107,7 @@ class ServerConnectionMonitorService(
 						onBufferEndedUnderDisconnection()
 					}
 				} else {
+					failedCheckCount = 0
 					if (!isServerConnected) {
 						Timber.i("Server connection restored.")
 						isServerConnected = true
@@ -122,6 +126,7 @@ class ServerConnectionMonitorService(
 	private fun resetDisconnectionState() {
 		timeoutJob?.cancel()
 		timeoutJob = null
+		failedCheckCount = 0
 		isServerConnected = true
 		bufferEndedState = false
 		wasPlayingBeforeDisconnect = false

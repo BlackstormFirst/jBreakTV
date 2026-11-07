@@ -154,7 +154,7 @@ internal class MediaSessionPlayer(
 
 	override fun handleStop(): ListenableFuture<*> {
 		Timber.d("handleStop()")
-		state.stop()
+		state.pause()
 		return Futures.immediateVoidFuture()
 	}
 

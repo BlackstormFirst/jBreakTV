@@ -46,6 +46,7 @@ import org.jellyfin.androidtv.preference.PreferencesRepository
 
 import org.jellyfin.androidtv.constant.Extras
 import org.jellyfin.androidtv.ui.navigation.Destinations
+import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.queue.queue
 
@@ -58,6 +59,7 @@ class MainActivity : FragmentActivity() {
 	private val userPreferences by inject<UserPreferences>()
 	private val preferencesRepository by inject<PreferencesRepository>()
 	private val playbackManager by inject<PlaybackManager>()
+	private val mediaManager by inject<MediaManager>()
 	private var hasCheckUpdateThisSession = false
 
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -224,7 +226,7 @@ class MainActivity : FragmentActivity() {
 		if (intent == null) return
 		val isOpenNowPlaying = intent.getBooleanExtra(Extras.OpenNowPlaying, false) || intent.action == Extras.ActionShowNowPlaying
 		if (isOpenNowPlaying) {
-			val hasActiveEntry = runCatching { playbackManager.queue.entry.value != null }.getOrDefault(false)
+			val hasActiveEntry = mediaManager.hasAudioQueueItems() || runCatching { playbackManager.queue.entry.value != null }.getOrDefault(false)
 			if (hasActiveEntry) {
 				navigationRepository.navigate(Destinations.nowPlaying)
 			}

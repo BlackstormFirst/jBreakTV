@@ -82,7 +82,7 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 	val activityIntent = Intent(get(), MainActivity::class.java).apply {
 		action = org.jellyfin.androidtv.constant.Extras.ActionShowNowPlaying
 		putExtra(org.jellyfin.androidtv.constant.Extras.OpenNowPlaying, true)
-		flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+		flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
 	}
 	val pendingIntent = PendingIntent.getActivity(
 		get(),

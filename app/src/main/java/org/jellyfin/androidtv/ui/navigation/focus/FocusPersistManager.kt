@@ -49,6 +49,6 @@ class FocusPersistManager {
 	}
 }
 
-val LocalFocusPersistManager = compositionLocalOf<FocusPersistManager> {
-	error("No FocusPersistManager provided")
+val LocalFocusPersistManager = compositionLocalOf {
+	FocusPersistManager()
 }

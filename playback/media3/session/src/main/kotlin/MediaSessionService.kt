@@ -37,16 +37,55 @@ class MediaSessionService(
 			manager = manager,
 		).also { sessionPlayer = it }
 
+		val callback = object : MediaSession.Callback {
+			@Deprecated("Deprecated in Java")
+			@Suppress("DEPRECATION")
+			override fun onPlayerCommandRequest(
+				session: MediaSession,
+				controller: MediaSession.ControllerInfo,
+				playerCommand: Int,
+			): Int {
+				if (playerCommand == androidx.media3.common.Player.COMMAND_STOP) {
+					state.pause()
+				}
+				return super.onPlayerCommandRequest(session, controller, playerCommand)
+			}
+
+			@OptIn(UnstableApi::class)
+			override fun onMediaButtonEvent(
+				session: MediaSession,
+				controllerInfo: MediaSession.ControllerInfo,
+				intent: android.content.Intent,
+			): Boolean {
+				@Suppress("DEPRECATION")
+				val keyEvent = intent.getParcelableExtra<android.view.KeyEvent>(android.content.Intent.EXTRA_KEY_EVENT)
+				if (keyEvent?.action == android.view.KeyEvent.ACTION_DOWN) {
+					if (keyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_STOP) {
+						state.pause()
+						return true
+					}
+				}
+				return super.onMediaButtonEvent(session, controllerInfo, intent)
+			}
+		}
+
 		val session = MediaSession.Builder(androidContext, player).apply {
 			setId(options.notificationId.toString())
 			setSessionActivity(options.openIntent)
+			setCallback(callback)
 		}.build().also { mediaSession = it }
 
+		AndroidMediaService.start(androidContext, session)
+
 		manager.queue.entry.onEach { item ->
-			if (item != null) updateNotification(session, item)
-			else if (notifiedNotificationId != null) {
-				notificationManager.cancel(notifiedNotificationId!!)
-				notifiedNotificationId = null
+			if (item != null) {
+				updateNotification(session, item)
+			} else {
+				if (notifiedNotificationId != null) {
+					notificationManager.cancel(notifiedNotificationId!!)
+					notifiedNotificationId = null
+				}
+				AndroidMediaService.stop(androidContext)
 			}
 		}.launchIn(coroutineScope)
 	}
@@ -54,6 +93,7 @@ class MediaSessionService(
 	@OptIn(UnstableApi::class)
 	fun releaseSession() {
 		runCatching {
+			mediaSession?.let { AndroidMediaService.stop(androidContext) }
 			mediaSession?.release()
 			sessionPlayer?.release()
 		}

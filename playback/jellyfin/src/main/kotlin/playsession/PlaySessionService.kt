@@ -362,14 +362,6 @@ class PlaySessionService(
 					return@onFailure
 				}
 
-				if (state.playState.value == PlayState.PLAYING && !isConnectionWarningShown) {
-					isConnectionWarningShown = true
-					coroutineScope.launch(Dispatchers.Main) {
-						state.pause()
-					}
-					showToast("Impossible de se connecter au serveur")
-				}
-
 				Timber.w("Failed to send playback update event: ${error.message}")
 			}
 		}
