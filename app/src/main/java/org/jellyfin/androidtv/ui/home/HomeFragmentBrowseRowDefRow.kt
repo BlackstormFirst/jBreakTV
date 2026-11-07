@@ -31,13 +31,23 @@ class HomeFragmentBrowseRowDefRow(
 				QueryType.Resume -> {
 					val response = api.itemsApi.getResumeItems(browseRowDef.resumeQuery!!).content
 					response.items.filter { it.isRealAvailableMedia() }.map { item ->
-						BaseItemDtoBaseRowItem(item, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight)
+						BaseItemDtoBaseRowItem(
+							item = item,
+							preferParentThumb = browseRowDef.preferParentThumb,
+							staticHeight = browseRowDef.isStaticHeight,
+							showParentTitle = true,
+						)
 					}
 				}
 				QueryType.NextUp -> {
 					val response = api.tvShowsApi.getNextUp(browseRowDef.nextUpQuery!!).content
 					response.items.filter { it.isRealAvailableMedia() }.map { item ->
-						BaseItemDtoBaseRowItem(item, preferParentThumb, browseRowDef.isStaticHeight)
+						BaseItemDtoBaseRowItem(
+							item = item,
+							preferParentThumb = preferParentThumb,
+							staticHeight = browseRowDef.isStaticHeight,
+							showParentTitle = true,
+						)
 					}
 				}
 				QueryType.LatestItems -> {
@@ -49,19 +59,20 @@ class HomeFragmentBrowseRowDefRow(
 							staticHeight = browseRowDef.isStaticHeight,
 							selectAction = BaseRowItemSelectAction.ShowDetails,
 							preferSeriesPoster = true,
+							showParentTitle = true,
 						)
 					}
 				}
 				QueryType.LiveTvRecording -> {
 					val response = api.liveTvApi.getRecordings(browseRowDef.recordingQuery!!).content
 					response.items.filter { it.isRealAvailableMedia() }.map { item ->
-						BaseItemDtoBaseRowItem(item, false, false)
+						BaseItemDtoBaseRowItem(item, false, false, showParentTitle = true)
 					}
 				}
 				QueryType.LiveTvProgram -> {
 					val response = api.liveTvApi.getRecommendedPrograms(browseRowDef.programQuery!!).content
 					response.items.map { item ->
-						BaseItemDtoBaseRowItem(item, false, false)
+						BaseItemDtoBaseRowItem(item, false, false, showParentTitle = true)
 					}
 				}
 				else -> {
@@ -69,7 +80,12 @@ class HomeFragmentBrowseRowDefRow(
 					if (query != null) {
 						val response = api.itemsApi.getItems(query).content
 						response.items.filter { it.isRealAvailableMedia() }.map { item ->
-							BaseItemDtoBaseRowItem(item, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight)
+							BaseItemDtoBaseRowItem(
+								item = item,
+								preferParentThumb = browseRowDef.preferParentThumb,
+								staticHeight = browseRowDef.isStaticHeight,
+								showParentTitle = true,
+							)
 						}
 					} else emptyList()
 				}
