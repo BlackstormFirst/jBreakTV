@@ -321,6 +321,8 @@
     <string name="lbl_episode_number">E%1$d</string>
     <string name="lbl_season_number">S%1$d</string>
     <string name="lbl_disc_number">Disque %1$d</string>
+    <string name="lbl_genre_single">Genre : %1$s</string>
+    <string name="lbl_genre_plural">Genres : %1$s</string>
     <string name="lbl_special">Spécial</string>
     <string name="help">Aide</string>
     <string name="add_user">Ajouter un compte</string>

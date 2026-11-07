@@ -66,6 +66,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -295,8 +296,36 @@ fun ItemListScreen(
 		} else null
 	}
 
-	val genresText = remember(baseItem) {
-		baseItem?.genres?.joinToString(" / ")
+	val albumArtistName = remember(baseItem) {
+		baseItem?.albumArtist?.takeIf { it.isNotBlank() }
+			?: baseItem?.albumArtists?.mapNotNull { it.name }?.filter { it.isNotBlank() }?.joinToString(", ")?.takeIf { it.isNotBlank() }
+			?: baseItem?.artists?.filter { it.isNotBlank() }?.joinToString(", ")?.takeIf { it.isNotBlank() }
+	}
+
+	val albumDurationFormatted = remember(baseItem, items) {
+		val totalTicks = baseItem?.runTimeTicks
+			?: baseItem?.cumulativeRunTimeTicks
+			?: items.sumOf { it.runTimeTicks ?: 0L }
+
+		if (totalTicks > 0) {
+			val totalMillis = totalTicks / 10000L
+			val totalMinutes = totalMillis / (1000 * 60)
+			val hours = totalMinutes / 60
+			val minutes = totalMinutes % 60
+			when {
+				hours > 0 && minutes > 0 -> "$hours h $minutes min"
+				hours > 0 -> "$hours h"
+				minutes > 0 -> "$minutes min"
+				else -> null
+			}
+		} else null
+	}
+
+	val albumYearText = remember(baseItem) {
+		val year = baseItem?.productionYear
+			?: baseItem?.premiereDate?.year
+			?: baseItem?.startDate?.year
+		if (year != null && year > 0) year.toString() else null
 	}
 
 	val isFavorite = baseItem?.userData?.isFavorite == true
@@ -486,11 +515,12 @@ fun ItemListScreen(
 							}
 						}
 
-						// Title, Genres, Summary & Buttons
+						// Title, Performers, Metadata, Genres, Summary & Buttons
 						Column(
 							modifier = Modifier.weight(1f),
-							verticalArrangement = Arrangement.spacedBy(8.dp)
+							verticalArrangement = Arrangement.spacedBy(6.dp)
 						) {
+							// 1. Album Title
 							Text(
 								text = baseItem?.name ?: stringResource(id = R.string.loading),
 								style = JellyfinTheme.typography.default.copy(
@@ -503,9 +533,29 @@ fun ItemListScreen(
 								overflow = TextOverflow.Ellipsis
 							)
 
-							if (!genresText.isNullOrBlank()) {
+							// 2. Performers / Artists Name(s)
+							if (!albumArtistName.isNullOrBlank()) {
 								Text(
-									text = genresText,
+									text = albumArtistName,
+									style = JellyfinTheme.typography.listHeadline.copy(
+										fontSize = 18.sp,
+										fontWeight = FontWeight.SemiBold
+									),
+									color = JellyfinTheme.colorScheme.onBackground,
+									maxLines = 1,
+									overflow = TextOverflow.Ellipsis
+								)
+							}
+
+							// 3. Album Meta Line (Track count • Total runtime • Release year)
+							val trackCount = baseItem?.childCount ?: baseItem?.songCount ?: displayItems.size
+							val trackCountText = if (trackCount > 0) pluralStringResource(R.plurals.tracks, trackCount, trackCount) else null
+							val metaLine = remember(trackCountText, albumDurationFormatted, albumYearText) {
+								listOfNotNull(trackCountText, albumDurationFormatted, albumYearText).joinToString(" • ")
+							}
+							if (metaLine.isNotBlank()) {
+								Text(
+									text = metaLine,
 									style = JellyfinTheme.typography.listCaption,
 									color = JellyfinTheme.colorScheme.listCaption,
 									maxLines = 1,
@@ -513,6 +563,24 @@ fun ItemListScreen(
 								)
 							}
 
+							// 4. Genres Line ("Genre: ..." / "Genres: ...")
+							val genresList = baseItem?.genres
+							val formattedGenresText = if (!genresList.isNullOrEmpty()) {
+								if (genresList.size == 1) stringResource(R.string.lbl_genre_single, genresList.first())
+								else stringResource(R.string.lbl_genre_plural, genresList.joinToString(", "))
+							} else null
+
+							if (!formattedGenresText.isNullOrBlank()) {
+								Text(
+									text = formattedGenresText,
+									style = JellyfinTheme.typography.listCaption,
+									color = JellyfinTheme.colorScheme.listCaption,
+									maxLines = 1,
+									overflow = TextOverflow.Ellipsis
+								)
+							}
+
+							// 5. Expandable Overview Description
 							val overview = baseItem?.overview
 							val isMusicAlbum = baseItem == null || baseItem.type == BaseItemKind.MUSIC_ALBUM
 							if (isMusicAlbum || !overview.isNullOrBlank()) {
