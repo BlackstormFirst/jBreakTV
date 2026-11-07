@@ -772,4 +772,29 @@
     <string name="bitstream_truehd">Flux binaire Dolby TrueHD</string>
     <string name="tv_provider_enabled">Intégrer à l\'écran d\'accueil d\'Android TV</string>
     <string name="tv_provider_enabled_description">Afficher les chaînes et les recommandations Jellyfin sur l\'écran d\'accueil d\'Android TV</string>
+
+    <!-- Custom Labels & Messages -->
+    <string name="lbl_language">Langue</string>
+    <string name="lbl_codec">Codec</string>
+    <string name="lbl_title">Titre</string>
+    <string name="lbl_profile">Profil</string>
+    <string name="lbl_video_range">La plage vidéo</string>
+    <string name="lbl_resolution">Résolution</string>
+    <string name="lbl_framerate">Fréquence d\'images</string>
+    <string name="lbl_aspect_ratio">Aspect</string>
+    <string name="lbl_audio_layout">Disposition</string>
+    <string name="lbl_bitrate">Débit</string>
+    <string name="indicator_forced">Forcé</string>
+    <string name="indicator_external">Externe</string>
+    <string name="lbl_director">RÉALISATEUR</string>
+    <string name="lbl_writer">SCÉNARISTE</string>
+    <string name="lbl_end_time">HEURE DE FIN</string>
+    <string name="lbl_options">Options</string>
+    <string name="series_status_continuing">En production</string>
+    <string name="msg_usb_disconnected">Périphérique USB déconnecté</string>
+    <string name="lbl_usb_volume_free_space">%1$s libres sur %2$s</string>
+    <string name="msg_usb_permission_required">Autorisation d\'accès au stockage requise</string>
+    <string name="msg_no_usb_drive">Aucun lecteur USB détecté</string>
+    <string name="msg_file_unreadable">Fichier illisible ou non trouvé</string>
+    <string name="msg_no_media_in_folder">Aucun média valide dans le dossier</string>
 </resources>

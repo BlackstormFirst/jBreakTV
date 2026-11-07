@@ -470,7 +470,7 @@ class VideoPlayerFragment : Fragment() {
 				val file = File(path)
 				if (!file.exists() || !file.canRead()) {
 					Timber.w("UsbDebug: Local file inaccessible on error (%s). Closing player.", path)
-					Toast.makeText(requireContext(), "Périphérique USB déconnecté", Toast.LENGTH_SHORT).show()
+					Toast.makeText(requireContext(), getString(R.string.msg_usb_disconnected), Toast.LENGTH_SHORT).show()
 					playbackManager.state.stop()
 					navigationRepository.goBack()
 					return

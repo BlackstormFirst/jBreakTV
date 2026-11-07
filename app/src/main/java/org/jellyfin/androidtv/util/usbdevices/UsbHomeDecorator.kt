@@ -3,6 +3,7 @@ package org.jellyfin.androidtv.util.usbdevices
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.koin.java.KoinJavaComponent.get
@@ -18,7 +19,7 @@ object UsbHomeDecorator {
         try {
             Timber.d("UsbDebug: handleUsbTileClick invoked")
             if (!UsbEnvironmentInspector.hasStoragePermissions(context)) {
-                Toast.makeText(context, "Storage permission required", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.msg_usb_permission_required), Toast.LENGTH_LONG).show()
                 val intent = UsbEnvironmentInspector.getManageStorageIntent(context).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -29,7 +30,7 @@ object UsbHomeDecorator {
             val volumes = UsbStorageManager.getMountedVolumes(context)
             Timber.d("UsbDebug: handleUsbTileClick mountedVolumes count=${volumes.size}")
             if (volumes.isEmpty()) {
-                Toast.makeText(context, "No USB drive detected", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.msg_no_usb_drive), Toast.LENGTH_SHORT).show()
                 UsbStorageManager.updateVolumes(context)
                 return
             }

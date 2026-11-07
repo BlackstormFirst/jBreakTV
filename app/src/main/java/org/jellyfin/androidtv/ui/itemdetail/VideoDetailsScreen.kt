@@ -482,7 +482,7 @@ fun MediaStreamCard(
                 // Language
                 if (!stream.language.isNullOrBlank() && stream.type != MediaStreamType.VIDEO) {
                     MediaInfoRowText(
-                        label = "Langue",
+                        label = stringResource(R.string.lbl_language),
                         value = stream.language?.uppercase(Locale.ROOT) ?: "",
                         isFocused = isFocused
                     )
@@ -491,7 +491,7 @@ fun MediaStreamCard(
                 // Codec
                 if (!stream.codec.isNullOrBlank()) {
                     MediaInfoRowText(
-                        label = "Codec",
+                        label = stringResource(R.string.lbl_codec),
                         value = stream.codec?.uppercase(Locale.ROOT) ?: "",
                         isFocused = isFocused
                     )
@@ -500,7 +500,7 @@ fun MediaStreamCard(
                 // Subtitle Titre (below Codec for subtitles)
                 if (stream.type == MediaStreamType.SUBTITLE && streamTitle != null) {
                     MediaInfoRowText(
-                        label = "Titre",
+                        label = stringResource(R.string.lbl_title),
                         value = streamTitle,
                         isMarquee = true,
                         isFocused = isFocused
@@ -510,7 +510,7 @@ fun MediaStreamCard(
                 // Profile / Level
                 if (!stream.profile.isNullOrBlank()) {
                     MediaInfoRowText(
-                        label = "Profile",
+                        label = stringResource(R.string.lbl_profile),
                         value = stream.profile ?: "",
                         isFocused = isFocused
                     )
@@ -522,7 +522,7 @@ fun MediaStreamCard(
                         stream.videoRangeType != VideoRangeType.SDR
                     val videoRangeStr = if (isHdr) "HDR" else "SDR"
                     MediaInfoRowText(
-                        label = "La plage vidéo",
+                        label = stringResource(R.string.lbl_video_range),
                         value = videoRangeStr,
                         isFocused = isFocused
                     )
@@ -533,21 +533,21 @@ fun MediaStreamCard(
                     MediaStreamType.VIDEO -> {
                         if (stream.width != null && stream.height != null) {
                             MediaInfoRowText(
-                                label = "Resolution",
+                                label = stringResource(R.string.lbl_resolution),
                                 value = "${stream.width}x${stream.height}",
                                 isFocused = isFocused
                             )
                         }
                         if (stream.realFrameRate != null && stream.realFrameRate!! > 0f) {
                             MediaInfoRowText(
-                                label = "Framerate",
+                                label = stringResource(R.string.lbl_framerate),
                                 value = "%.3f fps".format(Locale.US, stream.realFrameRate),
                                 isFocused = isFocused
                             )
                         }
                         if (stream.aspectRatio != null) {
                             MediaInfoRowText(
-                                label = "Aspect",
+                                label = stringResource(R.string.lbl_aspect_ratio),
                                 value = stream.aspectRatio ?: "",
                                 isFocused = isFocused
                             )
@@ -557,13 +557,13 @@ fun MediaStreamCard(
                     MediaStreamType.AUDIO -> {
                         if (!stream.channelLayout.isNullOrBlank()) {
                             MediaInfoRowText(
-                                label = "Layout",
+                                label = stringResource(R.string.lbl_audio_layout),
                                 value = stream.channelLayout?.uppercase(Locale.ROOT) ?: "",
                                 isFocused = isFocused
                             )
                         } else if (stream.channels != null) {
                             MediaInfoRowText(
-                                label = "Chaînes",
+                                label = stringResource(R.string.channels),
                                 value = "${stream.channels} ch",
                                 isFocused = isFocused
                             )
@@ -582,7 +582,7 @@ fun MediaStreamCard(
                         "$kbps kbps"
                     }
                     MediaInfoRowText(
-                        label = "Bitrate",
+                        label = stringResource(R.string.lbl_bitrate),
                         value = bitrateStr,
                         isFocused = isFocused
                     )
@@ -591,7 +591,7 @@ fun MediaStreamCard(
                 // Video and Audio Titre (below Bitrate for video and audio streams)
                 if ((stream.type == MediaStreamType.VIDEO || stream.type == MediaStreamType.AUDIO) && streamTitle != null) {
                     MediaInfoRowText(
-                        label = "Titre",
+                        label = stringResource(R.string.lbl_title),
                         value = streamTitle,
                         isMarquee = true,
                         isFocused = isFocused
@@ -601,10 +601,10 @@ fun MediaStreamCard(
 
             // Flags at bottom of card (Default, Forced, External, SDH)
             val flags = mutableListOf<String>()
-            if (stream.isDefault == true) flags.add("Par défaut")
-            if (stream.isForced == true) flags.add("Forcé")
-            if (stream.isExternal == true) flags.add("Externe")
-            if (stream.isHearingImpaired == true) flags.add("SDH")
+            if (stream.isDefault == true) flags.add(stringResource(R.string.indicator_default))
+            if (stream.isForced == true) flags.add(stringResource(R.string.indicator_forced))
+            if (stream.isExternal == true) flags.add(stringResource(R.string.indicator_external))
+            if (stream.isHearingImpaired == true) flags.add(stringResource(R.string.indicator_subtitles_hearing_impaired))
 
             if (flags.isNotEmpty()) {
                 Text(
@@ -985,7 +985,7 @@ fun VideoDetailsScreen(
                                     if (!isPerson) {
                                         if (!state.directorText.isNullOrBlank()) {
                                             Text(
-                                                text = "RÉALISATEUR",
+                                                text = stringResource(R.string.lbl_director),
                                                 style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                             )
                                             Text(
@@ -1000,7 +1000,7 @@ fun VideoDetailsScreen(
 
                                         if (!state.writerText.isNullOrBlank()) {
                                             Text(
-                                                text = "SCÉNARISTE",
+                                                text = stringResource(R.string.lbl_writer),
                                                 style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                             )
                                             Text(
@@ -1015,7 +1015,7 @@ fun VideoDetailsScreen(
 
                                         if (!state.endTimeText.isNullOrBlank()) {
                                             Text(
-                                                text = "HEURE DE FIN",
+                                                text = stringResource(R.string.lbl_end_time),
                                                 style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                             )
                                             Text(

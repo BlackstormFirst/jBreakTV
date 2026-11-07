@@ -763,4 +763,29 @@
     <string name="lbl_failed">failed</string>
     <string name="lbl_completed">completed</string>
 
+    <!-- Custom Labels & Messages -->
+    <string name="lbl_language">Language</string>
+    <string name="lbl_codec">Codec</string>
+    <string name="lbl_title">Title</string>
+    <string name="lbl_profile">Profile</string>
+    <string name="lbl_video_range">Video range</string>
+    <string name="lbl_resolution">Resolution</string>
+    <string name="lbl_framerate">Framerate</string>
+    <string name="lbl_aspect_ratio">Aspect ratio</string>
+    <string name="lbl_audio_layout">Layout</string>
+    <string name="lbl_bitrate">Bitrate</string>
+    <string name="indicator_forced">Forced</string>
+    <string name="indicator_external">External</string>
+    <string name="lbl_director">DIRECTOR</string>
+    <string name="lbl_writer">WRITER</string>
+    <string name="lbl_end_time">END TIME</string>
+    <string name="lbl_options">Options</string>
+    <string name="series_status_continuing">In production</string>
+    <string name="msg_usb_disconnected">USB drive disconnected</string>
+    <string name="lbl_usb_volume_free_space">%1$s free of %2$s</string>
+    <string name="msg_usb_permission_required">Storage permission required</string>
+    <string name="msg_no_usb_drive">No USB drive detected</string>
+    <string name="msg_file_unreadable">File unreadable or not found</string>
+    <string name="msg_no_media_in_folder">No valid media in folder</string>
+
 </resources>

@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -67,10 +68,10 @@ fun LiveTvGuideScreen(
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                 ) {
                     androidx.tv.material3.Button(onClick = onFiltersClicked) {
-                        androidx.tv.material3.Text(text = "Filters", fontSize = 10.sp)
+                        androidx.tv.material3.Text(text = stringResource(R.string.filters), fontSize = 10.sp)
                     }
                     androidx.tv.material3.Button(onClick = onOptionsClicked) {
-                        androidx.tv.material3.Text(text = "Options", fontSize = 10.sp)
+                        androidx.tv.material3.Text(text = stringResource(R.string.lbl_options), fontSize = 10.sp)
                     }
                 }
 

@@ -136,11 +136,11 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 				null
 			} else {
 				when (statusEnum) {
-					SeriesStatus.CONTINUING -> "En production"
-					SeriesStatus.UNRELEASED -> "Non sortie"
+					SeriesStatus.CONTINUING -> context.getString(R.string.series_status_continuing)
+					SeriesStatus.UNRELEASED -> context.getString(R.string.unreleased)
 					else -> when {
-						baseItem.status?.equals("Continuing", ignoreCase = true) == true -> "En production"
-						baseItem.status?.equals("Unreleased", ignoreCase = true) == true -> "Non sortie"
+						baseItem.status?.equals("Continuing", ignoreCase = true) == true -> context.getString(R.string.series_status_continuing)
+						baseItem.status?.equals("Unreleased", ignoreCase = true) == true -> context.getString(R.string.unreleased)
 						else -> baseItem.status
 					}
 				}

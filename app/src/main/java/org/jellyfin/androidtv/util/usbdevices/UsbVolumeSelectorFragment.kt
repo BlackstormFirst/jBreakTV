@@ -178,7 +178,7 @@ fun UsbVolumeSelectorScreen(
                         val freeFormatted = Formatter.formatFileSize(context, volume.freeBytes)
                         val totalFormatted = Formatter.formatFileSize(context, volume.totalBytes)
                         Text(
-                            text = "$freeFormatted free of $totalFormatted",
+                            text = stringResource(R.string.lbl_usb_volume_free_space, freeFormatted, totalFormatted),
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

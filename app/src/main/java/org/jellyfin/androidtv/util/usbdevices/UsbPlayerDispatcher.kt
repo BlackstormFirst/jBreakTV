@@ -7,6 +7,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.koin.java.KoinJavaComponent.get
 import timber.log.Timber
@@ -16,7 +17,7 @@ object UsbPlayerDispatcher {
 
 	fun playMedia(context: Context, clickedFile: File, mediaFiles: List<File>) {
 		if (!clickedFile.exists() || !clickedFile.canRead()) {
-			Toast.makeText(context, "File unreadable or not found", Toast.LENGTH_SHORT).show()
+			Toast.makeText(context, context.getString(R.string.msg_file_unreadable), Toast.LENGTH_SHORT).show()
 			return
 		}
 
@@ -46,7 +47,7 @@ object UsbPlayerDispatcher {
 				Timber.d("UsbDebug: Active item enriched: name=${activeItem.name}, runTimeTicks=${activeItem.runTimeTicks}, streamsCount=$streamsCount")
 
 				if (localItems.isEmpty()) {
-					Toast.makeText(context, "No valid media in folder", Toast.LENGTH_SHORT).show()
+					Toast.makeText(context, context.getString(R.string.msg_no_media_in_folder), Toast.LENGTH_SHORT).show()
 					return@launch
 				}
 
