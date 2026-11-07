@@ -160,9 +160,10 @@ fun ItemRowAdapter.retrieveResumeItems(api: ApiClient, query: GetResumeItemsRequ
 				items = filteredItems,
 				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
-						item,
-						preferParentThumb,
-						isStaticHeight
+						item = item,
+						preferParentThumb = preferParentThumb,
+						staticHeight = isStaticHeight,
+						preferMovieThumb = true,
 					)
 				}
 			)
@@ -254,13 +255,19 @@ fun ItemRowAdapter.retrieveLatestMedia(api: ApiClient, query: GetLatestMediaRequ
 			setInitialItems(
 				items = filteredItems,
 				transform = { item, _ ->
+					val isRecordingItem = item.type == org.jellyfin.sdk.model.api.BaseItemKind.RECORDING ||
+						item.channelId != null ||
+						item.timerId != null ||
+						item.seriesTimerId != null
+
 					BaseItemDtoBaseRowItem(
-						item,
-						preferParentThumb,
-						isStaticHeight,
-						BaseRowItemSelectAction.ShowDetails,
-						preferSeriesPoster = true,
+						item = item,
+						preferParentThumb = preferParentThumb,
+						staticHeight = isStaticHeight,
+						selectAction = BaseRowItemSelectAction.ShowDetails,
+						preferSeriesPoster = !isRecordingItem,
 						showParentTitle = true,
+						isRecording = isRecordingItem,
 					)
 				}
 			)

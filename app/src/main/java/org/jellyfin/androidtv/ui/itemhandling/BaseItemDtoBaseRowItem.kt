@@ -5,7 +5,9 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.apiclient.JellyfinImage
 import org.jellyfin.androidtv.util.apiclient.albumPrimaryImage
+import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.itemImages
+import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
 import org.jellyfin.androidtv.util.apiclient.parentImages
 import org.jellyfin.androidtv.util.apiclient.seriesPrimaryImage
 import org.jellyfin.androidtv.util.apiclient.seriesThumbImage
@@ -29,6 +31,8 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 	selectAction: BaseRowItemSelectAction = BaseRowItemSelectAction.ShowDetails,
 	val preferSeriesPoster: Boolean = false,
 	private val showParentTitle: Boolean = false,
+	val preferMovieThumb: Boolean = false,
+	val isRecording: Boolean = false,
 ) : BaseRowItem(
 	baseRowType = when (item.type) {
 		BaseItemKind.TV_CHANNEL,
@@ -205,25 +209,52 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 		else -> baseItem?.getSubName(context)
 	}
 
+	val isRecordingItem: Boolean
+		get() = isRecording ||
+			baseItem?.type == BaseItemKind.RECORDING ||
+			baseRowType == BaseRowType.LiveTvRecording ||
+			baseItem?.channelId != null ||
+			baseItem?.timerId != null ||
+			baseItem?.seriesTimerId != null
+
 	override fun getImage(imageType: BaseRowImageType): JellyfinImage? {
+		val movieThumb = if (preferMovieThumb && (baseItem?.type == BaseItemKind.MOVIE || baseItem?.type == BaseItemKind.VIDEO)) {
+			baseItem?.itemImages?.get(ImageType.THUMB)
+				?: baseItem?.itemImages?.get(ImageType.BACKDROP)
+				?: baseItem?.itemBackdropImages?.firstOrNull()
+		} else null
+
+		val recordingThumb = if (isRecordingItem) {
+			baseItem?.itemImages?.get(ImageType.THUMB)
+				?: baseItem?.parentImages?.get(ImageType.THUMB)
+				?: baseItem?.seriesThumbImage
+				?: baseItem?.itemImages?.get(ImageType.BACKDROP)
+				?: baseItem?.itemBackdropImages?.firstOrNull()
+				?: baseItem?.parentBackdropImages?.firstOrNull()
+				?: baseItem?.itemImages?.get(ImageType.PRIMARY)
+		} else null
+
 		val primaryImage = when {
-			preferSeriesPoster && baseItem?.type == BaseItemKind.EPISODE -> baseItem.parentImages[ImageType.PRIMARY]
-				?: baseItem.seriesPrimaryImage
+			preferSeriesPoster && baseItem?.type == BaseItemKind.EPISODE && !isRecordingItem -> baseItem?.parentImages?.get(ImageType.PRIMARY)
+				?: baseItem?.seriesPrimaryImage
 
-			preferParentThumb && baseItem?.type == BaseItemKind.EPISODE -> baseItem.parentImages[ImageType.THUMB]
-				?: baseItem.seriesThumbImage
+			preferParentThumb && baseItem?.type == BaseItemKind.EPISODE -> baseItem?.parentImages?.get(ImageType.THUMB)
+				?: baseItem?.seriesThumbImage
 
-			baseItem?.type == BaseItemKind.SEASON -> baseItem.itemImages[ImageType.PRIMARY]
-				?: baseItem.seriesPrimaryImage
+			(baseItem?.type == BaseItemKind.MOVIE || baseItem?.type == BaseItemKind.VIDEO) && movieThumb != null -> movieThumb
+			isRecordingItem && recordingThumb != null -> recordingThumb
 
-			baseItem?.type == BaseItemKind.PROGRAM -> baseItem.itemImages[ImageType.THUMB]
-			baseItem?.type == BaseItemKind.AUDIO -> baseItem.itemImages[ImageType.PRIMARY] ?: baseItem.albumPrimaryImage ?: baseItem.parentImages[ImageType.PRIMARY]
+			baseItem?.type == BaseItemKind.SEASON -> baseItem?.itemImages?.get(ImageType.PRIMARY)
+				?: baseItem?.seriesPrimaryImage
+
+			baseItem?.type == BaseItemKind.PROGRAM -> baseItem?.itemImages?.get(ImageType.THUMB)
+			baseItem?.type == BaseItemKind.AUDIO -> baseItem?.itemImages?.get(ImageType.PRIMARY) ?: baseItem?.albumPrimaryImage ?: baseItem?.parentImages?.get(ImageType.PRIMARY)
 			else -> null
-		} ?: baseItem?.itemImages[ImageType.PRIMARY] ?: baseItem?.albumPrimaryImage ?: baseItem?.parentImages[ImageType.PRIMARY]
+		} ?: baseItem?.itemImages?.get(ImageType.PRIMARY) ?: baseItem?.albumPrimaryImage ?: baseItem?.parentImages?.get(ImageType.PRIMARY)
 
 		return when (imageType) {
-			BaseRowImageType.BANNER -> baseItem?.itemImages[ImageType.BANNER] ?: primaryImage
-			BaseRowImageType.THUMB -> baseItem?.itemImages[ImageType.THUMB] ?: primaryImage
+			BaseRowImageType.BANNER -> baseItem?.itemImages?.get(ImageType.BANNER) ?: primaryImage
+			BaseRowImageType.THUMB -> baseItem?.itemImages?.get(ImageType.THUMB) ?: movieThumb ?: recordingThumb ?: primaryImage
 			else -> primaryImage
 		}
 	}

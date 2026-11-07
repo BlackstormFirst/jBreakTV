@@ -55,6 +55,9 @@ class BrowseRowDef {
         private set
     var preferParentThumb: Boolean = false
         private set
+    var preferSeriesPoster: Boolean = true
+        private set
+    var isRecordingRow: Boolean = false
 
     var changeTriggers: Array<ChangeTriggerType>? = null
         private set
@@ -118,11 +121,14 @@ class BrowseRowDef {
         this.changeTriggers = changeTriggers
     }
 
-    constructor(header: String, query: GetLatestMediaRequest, changeTriggers: Array<ChangeTriggerType>?) {
+    constructor(header: String, query: GetLatestMediaRequest, changeTriggers: Array<ChangeTriggerType>?) : this(header, query, true, changeTriggers)
+
+    constructor(header: String, query: GetLatestMediaRequest, preferSeriesPoster: Boolean, changeTriggers: Array<ChangeTriggerType>?) {
         this.headerText = header
         this.latestItemsQuery = query
         this.queryType = QueryType.LatestItems
         this.isStaticHeight = true
+        this.preferSeriesPoster = preferSeriesPoster
         this.changeTriggers = changeTriggers
     }
 

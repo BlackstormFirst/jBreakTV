@@ -36,6 +36,7 @@ class HomeFragmentBrowseRowDefRow(
 							preferParentThumb = browseRowDef.preferParentThumb,
 							staticHeight = browseRowDef.isStaticHeight,
 							showParentTitle = true,
+							preferMovieThumb = true,
 						)
 					}
 				}
@@ -52,21 +53,37 @@ class HomeFragmentBrowseRowDefRow(
 				}
 				QueryType.LatestItems -> {
 					val response = api.userLibraryApi.getLatestMedia(browseRowDef.latestItemsQuery!!).content
+					val isRecordingRow = browseRowDef.isRecordingRow
 					response.filter { it.isRealAvailableMedia() }.map { item ->
+						val isRecordingItem = isRecordingRow ||
+							item.type == org.jellyfin.sdk.model.api.BaseItemKind.RECORDING ||
+							item.channelId != null ||
+							item.timerId != null ||
+							item.seriesTimerId != null
+
 						BaseItemDtoBaseRowItem(
 							item = item,
-							preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled],
+							preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled] || isRecordingItem,
 							staticHeight = browseRowDef.isStaticHeight,
 							selectAction = BaseRowItemSelectAction.ShowDetails,
-							preferSeriesPoster = true,
+							preferSeriesPoster = if (isRecordingItem) false else browseRowDef.preferSeriesPoster,
 							showParentTitle = true,
+							isRecording = isRecordingItem,
 						)
 					}
 				}
 				QueryType.LiveTvRecording -> {
 					val response = api.liveTvApi.getRecordings(browseRowDef.recordingQuery!!).content
 					response.items.filter { it.isRealAvailableMedia() }.map { item ->
-						BaseItemDtoBaseRowItem(item, false, false, showParentTitle = true)
+						BaseItemDtoBaseRowItem(
+							item = item,
+							preferParentThumb = true,
+							staticHeight = false,
+							selectAction = BaseRowItemSelectAction.ShowDetails,
+							preferSeriesPoster = false,
+							showParentTitle = true,
+							isRecording = true,
+						)
 					}
 				}
 				QueryType.LiveTvProgram -> {

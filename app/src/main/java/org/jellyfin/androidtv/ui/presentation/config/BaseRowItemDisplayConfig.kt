@@ -21,8 +21,21 @@ data class BaseRowItemDisplayConfig(
 
 fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean, displayCirclePersonCards: Boolean): BaseRowItemDisplayConfig = when (baseRowType) {
 	BaseRowType.BaseItem -> {
-		val preferSeriesPoster = this is BaseItemDtoBaseRowItem && preferSeriesPoster
-		val primaryAspectRatio = baseItem?.primaryImageAspectRatio?.toFloat()
+		val isRecording = this is BaseItemDtoBaseRowItem && isRecordingItem
+		if (isRecording) {
+			val image = getImage(imageType)
+			BaseRowItemDisplayConfig(
+				aspectRatio = when (imageType) {
+					ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
+					else -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
+				},
+				image = image,
+				iconRes = R.drawable.ic_tv,
+				overrideShowInfo = true,
+			)
+		} else {
+			val preferSeriesPoster = this is BaseItemDtoBaseRowItem && preferSeriesPoster
+			val primaryAspectRatio = baseItem?.primaryImageAspectRatio?.toFloat()
 		val defaultAspectRatio = when {
 			preferParentThumb && (baseItem?.parentThumbItemId != null || baseItem?.seriesThumbImageTag != null) -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
 			baseItem?.type == BaseItemKind.EPISODE && primaryAspectRatio != null -> primaryAspectRatio
@@ -92,18 +105,25 @@ fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean, d
 				iconRes = R.drawable.ic_folder
 			)
 
-			BaseItemKind.MOVIE, BaseItemKind.VIDEO -> base.copy(
-				aspectRatio = when (imageType) {
-					ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
-					ImageType.THUMB -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
-					else -> ImageHelper.ASPECT_RATIO_2_3.toFloat()
-				},
-				iconRes = R.drawable.ic_clapperboard,
-			)
+			BaseItemKind.MOVIE, BaseItemKind.VIDEO -> {
+				val image = getImage(imageType)
+				val hasThumbImage = (this is BaseItemDtoBaseRowItem && preferMovieThumb) &&
+					(image?.type == org.jellyfin.sdk.model.api.ImageType.THUMB || image?.type == org.jellyfin.sdk.model.api.ImageType.BACKDROP)
+				base.copy(
+					image = image,
+					aspectRatio = when {
+						imageType == ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
+						imageType == ImageType.THUMB || hasThumbImage -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
+						else -> ImageHelper.ASPECT_RATIO_2_3.toFloat()
+					},
+					iconRes = R.drawable.ic_clapperboard,
+				)
+			}
 
 			else -> base
 		}
 	}
+}
 
 	BaseRowType.LiveTvChannel -> BaseRowItemDisplayConfig(
 		aspectRatio = when (imageType) {
@@ -120,22 +140,25 @@ fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Boolean, d
 		aspectRatio = when (imageType) {
 			ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
 			ImageType.THUMB -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
-			else -> baseItem?.primaryImageAspectRatio?.toFloat() ?: ImageHelper.ASPECT_RATIO_7_9.toFloat()
+			else -> baseItem?.primaryImageAspectRatio?.toFloat() ?: ImageHelper.ASPECT_RATIO_16_9.toFloat()
 		},
 		image = getImage(imageType),
 		iconRes = R.drawable.ic_tv,
 		overrideShowInfo = true,
 	)
 
-	BaseRowType.LiveTvRecording -> BaseRowItemDisplayConfig(
-		aspectRatio = when (imageType) {
-			ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
-			ImageType.THUMB -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
-			else -> baseItem?.primaryImageAspectRatio?.toFloat() ?: ImageHelper.ASPECT_RATIO_7_9.toFloat()
-		},
-		image = getImage(imageType),
-		iconRes = R.drawable.ic_tv,
-	)
+	BaseRowType.LiveTvRecording -> {
+		val image = getImage(imageType)
+		BaseRowItemDisplayConfig(
+			aspectRatio = when (imageType) {
+				ImageType.BANNER -> ImageHelper.ASPECT_RATIO_BANNER.toFloat()
+				else -> ImageHelper.ASPECT_RATIO_16_9.toFloat()
+			},
+			image = image,
+			iconRes = R.drawable.ic_tv,
+			overrideShowInfo = true,
+		)
+	}
 
 	BaseRowType.SeriesTimer -> BaseRowItemDisplayConfig(
 		aspectRatio = ImageHelper.ASPECT_RATIO_16_9.toFloat(),

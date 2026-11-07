@@ -39,8 +39,17 @@ class HomeFragmentLatestRow(
 					groupItems = true,
 					limit = ITEM_LIMIT,
 				)
+				val isRecordingsLibrary = item.collectionType == CollectionType.LIVETV ||
+					item.name?.contains("recording", ignoreCase = true) == true ||
+					item.name?.contains("enregistrement", ignoreCase = true) == true ||
+					item.name?.contains("rec", ignoreCase = true) == true
+
 				val title = context.getString(R.string.lbl_latest_in, item.name)
-				val rowDef = BrowseRowDef(title, request, arrayOf(ChangeTriggerType.LibraryUpdated))
+				val rowDef = BrowseRowDef(title, request, arrayOf(ChangeTriggerType.LibraryUpdated)).apply {
+					if (isRecordingsLibrary) {
+						isRecordingRow = true
+					}
+				}
 				HomeFragmentBrowseRowDefRow(rowDef).prepareRowState(context, api)
 			}
 		}.awaitAll().filterNotNull()
