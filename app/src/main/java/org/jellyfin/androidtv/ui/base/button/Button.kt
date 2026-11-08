@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -68,7 +67,6 @@ fun Button(
 		ButtonRow(
 			contentPadding = contentPadding,
 			horizontalArrangement = horizontalArrangement,
-			modifier = Modifier.fillMaxWidth(),
 			content = content,
 		)
 	}
@@ -103,7 +101,6 @@ fun ProgressButton(
 		ButtonRow(
 			contentPadding = contentPadding,
 			horizontalArrangement = horizontalArrangement,
-			modifier = Modifier.fillMaxWidth(),
 			content = content,
 		)
 	}
