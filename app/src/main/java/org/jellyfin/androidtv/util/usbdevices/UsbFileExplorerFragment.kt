@@ -368,6 +368,7 @@ fun UsbFileExplorerScreen(
                 itemsIndexed(allItems, key = { _, item -> item.absolutePath }) { index, item ->
                     val isFirst = index == 0
                     val itemFocusRequester = getFocusRequester(item.absolutePath)
+                    var isFocused by remember { mutableStateOf(false) }
 
                     val iconRes = if (item.isDirectory) {
                         R.drawable.ic_folder
@@ -382,6 +383,24 @@ fun UsbFileExplorerScreen(
                         if (count <= 1) "$count élément" else "$count éléments"
                     } else {
                         Formatter.formatFileSize(context, item.length())
+                    }
+
+                    val headlineColor = if (isFocused) {
+                        JellyfinTheme.colorScheme.onButtonFocused
+                    } else {
+                        JellyfinTheme.colorScheme.onButton
+                    }
+
+                    val subtitleColor = if (isFocused) {
+                        androidx.compose.ui.graphics.Color(0xFF555555)
+                    } else {
+                        androidx.compose.ui.graphics.Color(0xFFAAAAAA)
+                    }
+
+                    val iconTint = if (item.isDirectory) {
+                        androidx.compose.ui.graphics.Color(0xFFFFC107)
+                    } else {
+                        if (isFocused) JellyfinTheme.colorScheme.onButtonFocused else JellyfinTheme.colorScheme.onButton
                     }
 
                     ListButton(
@@ -400,12 +419,13 @@ fun UsbFileExplorerScreen(
                             Icon(
                                 imageVector = ImageVector.vectorResource(id = iconRes),
                                 contentDescription = null,
-                                tint = if (item.isDirectory) androidx.compose.ui.graphics.Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurface
+                                tint = iconTint
                             )
                         },
                         headingContent = {
                             Text(
                                 text = item.name,
+                                color = headlineColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -414,17 +434,18 @@ fun UsbFileExplorerScreen(
                             Text(
                                 text = subtitle,
                                 style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = androidx.compose.ui.graphics.Color(0xFFAAAAAA)
+                                    color = subtitleColor
                                 )
                             )
                         },
                         colors = org.jellyfin.androidtv.ui.base.list.ListControlDefaults.colors(
-                            containerColor = androidx.compose.ui.graphics.Color(0xB3747474),
-                            focusedContainerColor = androidx.compose.ui.graphics.Color(0xE6CCCCCC)
+                            containerColor = JellyfinTheme.colorScheme.button,
+                            focusedContainerColor = JellyfinTheme.colorScheme.buttonFocused
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .onFocusChanged { focusState ->
+                                isFocused = focusState.isFocused
                                 if (focusState.isFocused) {
                                     isFirstItemFocused = isFirst
                                 }

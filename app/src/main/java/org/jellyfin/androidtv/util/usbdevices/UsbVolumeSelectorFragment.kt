@@ -155,6 +155,14 @@ fun UsbVolumeSelectorScreen(
         ) {
             itemsIndexed(volumes, key = { _, volume -> volume.path.absolutePath }) { index, volume ->
                 val isFirst = index == 0
+                var isFocused by remember { androidx.compose.runtime.mutableStateOf(false) }
+
+                val subtitleColor = if (isFocused) {
+                    androidx.compose.ui.graphics.Color(0xFF555555)
+                } else {
+                    androidx.compose.ui.graphics.Color(0xFFAAAAAA)
+                }
+
                 ClassicCard(
                     onClick = {
                         val destination = Destinations.usbExplorer(
@@ -179,22 +187,23 @@ fun UsbVolumeSelectorScreen(
                         val totalFormatted = Formatter.formatFileSize(context, volume.totalBytes)
                         Text(
                             text = stringResource(R.string.lbl_usb_volume_free_space, freeFormatted, totalFormatted),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium.copy(color = subtitleColor),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     },
                     colors = CardDefaults.colors(
-                        containerColor = androidx.compose.ui.graphics.Color(0xB3747474),
-                        focusedContainerColor = androidx.compose.ui.graphics.Color(0xE6CCCCCC),
-                        contentColor = androidx.compose.ui.graphics.Color(0xFFDDDDDD),
-                        focusedContentColor = androidx.compose.ui.graphics.Color(0xFF444444)
+                        containerColor = JellyfinTheme.colorScheme.button,
+                        focusedContainerColor = JellyfinTheme.colorScheme.buttonFocused,
+                        contentColor = JellyfinTheme.colorScheme.onButton,
+                        focusedContentColor = JellyfinTheme.colorScheme.onButtonFocused
                     ),
                     scale = CardDefaults.scale(focusedScale = 1.1f),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(120.dp)
                         .onFocusChanged { focusState ->
+                            isFocused = focusState.isFocused
                             if (focusState.isFocused) {
                                 isFirstItemFocused = isFirst
                             }
