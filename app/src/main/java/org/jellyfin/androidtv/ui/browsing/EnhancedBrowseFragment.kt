@@ -354,6 +354,7 @@ fun EnhancedBrowseScreen(
 	var displayedSelectedItem by remember { mutableStateOf<BaseRowItem?>(null) }
 	var selectedRowIndex by remember { mutableStateOf<Int?>(null) }
 	var userHasInteracted by remember { mutableStateOf(false) }
+	var hasRequestedFocus by remember { mutableStateOf(false) }
 	val selectedItemFocusRequester = remember { FocusRequester() }
 
 	val currentItem = displayedSelectedItem?.baseItem ?: folder
@@ -410,7 +411,13 @@ fun EnhancedBrowseScreen(
 		val observer = LifecycleEventObserver { _, event ->
 			if (event == Lifecycle.Event.ON_RESUME) {
 				if (selectedItem != null) {
-					selectedItemFocusRequester.safeRequestFocus()
+					coroutineScope.launch {
+						if (focusedRowIndex > 0) {
+							try { listState.scrollToItem(focusedRowIndex) } catch (_: Exception) {}
+						}
+						delay(50)
+						selectedItemFocusRequester.safeRequestFocus()
+					}
 				}
 			}
 		}
@@ -579,8 +586,10 @@ fun EnhancedBrowseScreen(
 													Modifier
 														.focusRequester(selectedItemFocusRequester)
 														.onGloballyPositioned {
-															if (!userHasInteracted) {
-																selectedItemFocusRequester.safeRequestFocus()
+															if (!hasRequestedFocus) {
+																if (selectedItemFocusRequester.safeRequestFocus()) {
+																	hasRequestedFocus = true
+																}
 															}
 														}
 												} else Modifier)

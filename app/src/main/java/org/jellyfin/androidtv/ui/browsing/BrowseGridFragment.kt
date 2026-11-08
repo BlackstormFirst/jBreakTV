@@ -327,6 +327,21 @@ fun BrowseGridScreen(
 	var userHasInteracted by rememberSaveable { mutableStateOf(false) }
 	val selectedItemFocusRequester = remember { FocusRequester() }
 
+	val lifecycleOwner = LocalLifecycleOwner.current
+	DisposableEffect(lifecycleOwner) {
+		val observer = LifecycleEventObserver { _, event ->
+			if (event == Lifecycle.Event.ON_RESUME) {
+				if (selectedItem != null) {
+					selectedItemFocusRequester.safeRequestFocus()
+				}
+			}
+		}
+		lifecycleOwner.lifecycle.addObserver(observer)
+		onDispose {
+			lifecycleOwner.lifecycle.removeObserver(observer)
+		}
+	}
+
 	LaunchedEffect(selectedItem) {
 		if (selectedItem != null && !userHasInteracted) {
 			selectedItemFocusRequester.safeRequestFocus()
@@ -391,8 +406,6 @@ fun BrowseGridScreen(
 
 	val imageType = libraryPreferences?.get(LibraryPreferences.imageType) ?: ImageType.POSTER
 	val gridDirection = libraryPreferences?.get(LibraryPreferences.gridDirection) ?: GridDirection.VERTICAL
-
-	val lifecycleOwner = LocalLifecycleOwner.current
 
 	LaunchedEffect(Unit) {
 		customMessageRepository.message.collect { message ->
@@ -965,8 +978,10 @@ fun BrowseGridScreen(
 												isSelectedItem -> Modifier
 													.focusRequester(selectedItemFocusRequester)
 													.onGloballyPositioned {
-														if (!userHasInteracted) {
-															selectedItemFocusRequester.safeRequestFocus()
+														if (!hasRequestedFocus) {
+															if (selectedItemFocusRequester.safeRequestFocus()) {
+																hasRequestedFocus = true
+															}
 														}
 													}
 												isFirstCard -> Modifier
@@ -1068,8 +1083,10 @@ fun BrowseGridScreen(
 												isSelectedItem -> Modifier
 													.focusRequester(selectedItemFocusRequester)
 													.onGloballyPositioned {
-														if (!userHasInteracted) {
-															selectedItemFocusRequester.safeRequestFocus()
+														if (!hasRequestedFocus) {
+															if (selectedItemFocusRequester.safeRequestFocus()) {
+																hasRequestedFocus = true
+															}
 														}
 													}
 												isFirstCard -> Modifier
