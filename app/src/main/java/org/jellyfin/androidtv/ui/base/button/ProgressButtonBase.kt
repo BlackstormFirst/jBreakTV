@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.colorResource
 import org.jellyfin.androidtv.R
 
+import androidx.compose.ui.Alignment
+
 @Composable
 fun ProgressButtonBase(
 	progress: Float,
@@ -21,6 +23,7 @@ fun ProgressButtonBase(
 	enabled: Boolean = true,
 	shape: Shape = ButtonDefaults.Shape,
 	colors: ButtonColors = ButtonDefaults.colors(),
+	contentAlignment: Alignment = Alignment.Center,
 	interactionSource: MutableInteractionSource? = null,
 	content: @Composable BoxScope.() -> Unit
 ) {
@@ -33,6 +36,7 @@ fun ProgressButtonBase(
 		enabled = enabled,
 		shape = shape,
 		colors = colors,
+		contentAlignment = contentAlignment,
 		interactionSource = interactionSource,
 	) {
 		Box(Modifier.matchParentSize()) {

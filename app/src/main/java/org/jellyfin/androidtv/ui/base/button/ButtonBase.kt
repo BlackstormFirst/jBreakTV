@@ -29,6 +29,7 @@ fun ButtonBase(
 	enabled: Boolean = true,
 	shape: Shape = ButtonDefaults.Shape,
 	colors: ButtonColors = ButtonDefaults.colors(),
+	contentAlignment: Alignment = Alignment.Center,
 	interactionSource: MutableInteractionSource? = null,
 	content: @Composable BoxScope.() -> Unit
 ) {
@@ -46,7 +47,7 @@ fun ButtonBase(
 
 	ProvideTextStyle(value = JellyfinTheme.typography.default.copy(fontSize = 14.sp, color = colors.second)) {
 		Box(
-			contentAlignment = Alignment.Center,
+			contentAlignment = contentAlignment,
 			modifier = modifier
 				.combinedClickable(
 					interactionSource = interactionSource,

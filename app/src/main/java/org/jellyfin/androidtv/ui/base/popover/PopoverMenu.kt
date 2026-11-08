@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.ui.base.popover
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
@@ -59,6 +61,8 @@ fun PopoverMenuItem(
 	enabled: Boolean = true,
 	shape: Shape = RoundedCornerShape(3.dp),
 	focusRequester: FocusRequester? = null,
+	contentAlignment: Alignment = Alignment.CenterStart,
+	horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
 	content: @Composable RowScope.() -> Unit,
 ) = Button(
 	onClick = onClick,
@@ -73,6 +77,8 @@ fun PopoverMenuItem(
 		disabledContainerColor = Color.Transparent,
 		disabledContentColor = Color.Gray,
 	),
+	contentAlignment = contentAlignment,
+	horizontalArrangement = horizontalArrangement,
 ) {
 	content()
 }
@@ -84,12 +90,16 @@ fun PopoverMenuCheckboxItem(
 	modifier: Modifier = Modifier,
 	enabled: Boolean = true,
 	focusRequester: FocusRequester? = null,
+	contentAlignment: Alignment = Alignment.CenterStart,
+	horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
 	content: @Composable RowScope.() -> Unit,
 ) = PopoverMenuItem(
 	onClick = onClick,
 	modifier = modifier,
 	enabled = enabled,
 	focusRequester = focusRequester,
+	contentAlignment = contentAlignment,
+	horizontalArrangement = horizontalArrangement,
 ) {
 
 	val alpha by animateFloatAsState(

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -49,6 +50,8 @@ fun Button(
 	shape: Shape = ButtonDefaults.Shape,
 	colors: ButtonColors = ButtonDefaults.colors(),
 	contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+	horizontalArrangement: Arrangement.Horizontal = Arrangement.Center,
+	contentAlignment: Alignment = Alignment.Center,
 	interactionSource: MutableInteractionSource? = null,
 	content: @Composable RowScope.() -> Unit
 ) {
@@ -59,10 +62,13 @@ fun Button(
 		enabled = enabled,
 		shape = shape,
 		colors = colors,
+		contentAlignment = contentAlignment,
 		interactionSource = interactionSource,
 	) {
 		ButtonRow(
 			contentPadding = contentPadding,
+			horizontalArrangement = horizontalArrangement,
+			modifier = Modifier.fillMaxWidth(),
 			content = content,
 		)
 	}
@@ -78,6 +84,8 @@ fun ProgressButton(
 	shape: Shape = ButtonDefaults.Shape,
 	colors: ButtonColors = ButtonDefaults.colors(),
 	contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+	horizontalArrangement: Arrangement.Horizontal = Arrangement.Center,
+	contentAlignment: Alignment = Alignment.Center,
 	interactionSource: MutableInteractionSource? = null,
 	content: @Composable RowScope.() -> Unit
 ) {
@@ -89,10 +97,13 @@ fun ProgressButton(
 		enabled = enabled,
 		shape = shape,
 		colors = colors,
+		contentAlignment = contentAlignment,
 		interactionSource = interactionSource,
 	) {
 		ButtonRow(
 			contentPadding = contentPadding,
+			horizontalArrangement = horizontalArrangement,
+			modifier = Modifier.fillMaxWidth(),
 			content = content,
 		)
 	}
@@ -101,15 +112,17 @@ fun ProgressButton(
 @Composable
 private fun ButtonRow(
 	contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+	horizontalArrangement: Arrangement.Horizontal = Arrangement.Center,
+	modifier: Modifier = Modifier,
 	content: @Composable RowScope.() -> Unit,
 ) = Row(
-	modifier = Modifier
+	modifier = modifier
 		.defaultMinSize(
 			minWidth = 58.dp,
 			minHeight = 40.dp
 		)
 		.padding(contentPadding),
-	horizontalArrangement = Arrangement.Center,
+	horizontalArrangement = horizontalArrangement,
 	verticalAlignment = Alignment.CenterVertically,
 	content = content
 )
