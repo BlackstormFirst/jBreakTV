@@ -68,13 +68,15 @@ class HomeFragment : Fragment() {
                                 HomeComposeScreen(
                                     rows = state.rows,
                                     initialFocusedItemKey = viewModel.lastFocusedItemKey,
+                                    initialFocusedRowId = viewModel.lastFocusedRowId,
                                     initialFocusedRowIndex = viewModel.lastFocusedRowIndex,
+                                    initialFocusedItemIndex = viewModel.lastFocusedItemIndex,
                                     focusTrigger = focusTrigger,
                                     onItemClick = { item, rowIndex ->
                                         viewModel.onItemClicked(item, rowIndex)
                                     },
-                                    onItemFocus = { item, rowIndex ->
-                                        viewModel.onItemSelected(item, rowIndex)
+                                    onItemFocus = { item, rowId, rowIndex, itemIndex ->
+                                        viewModel.onItemSelected(item, rowId, rowIndex, itemIndex)
                                     }
                                 )
                             }

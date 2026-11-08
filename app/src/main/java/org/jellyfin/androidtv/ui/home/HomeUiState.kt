@@ -29,3 +29,5 @@ fun getItemKey(item: Any): String = when (item) {
     is AppNotification -> "notification_${item.message}"
     else -> item.hashCode().toString()
 }
+
+fun getRowItemKey(rowId: String, item: Any): String = "$rowId:${getItemKey(item)}"

@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import org.jellyfin.androidtv.ui.InteractionTrackerViewModel
 import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
@@ -95,40 +96,53 @@ private fun rememberPivotBringIntoViewSpec(): BringIntoViewSpec {
 fun HomeComposeScreen(
     rows: List<HomeRowState>,
     initialFocusedItemKey: String? = null,
+    initialFocusedRowId: String? = null,
     initialFocusedRowIndex: Int = 0,
+    initialFocusedItemIndex: Int = 0,
     focusTrigger: Long = 0L,
     onItemClick: (item: Any, rowIndex: Int) -> Unit,
-    onItemFocus: (item: Any?, rowIndex: Int) -> Unit
+    onItemFocus: (item: Any?, rowId: String, rowIndex: Int, itemIndex: Int) -> Unit
 ) {
     val listState = rememberLazyListState()
     val pivotBringIntoViewSpec = rememberPivotBringIntoViewSpec()
     val horizontalBringIntoViewSpec = rememberHorizontalBringIntoViewSpec()
 
-    val (targetItemKey, targetRowIndex) = remember(rows, initialFocusedItemKey, initialFocusedRowIndex) {
+    val (targetItemKey, targetRowIndex) = remember(
+        rows,
+        initialFocusedItemKey,
+        initialFocusedRowId,
+        initialFocusedRowIndex,
+        initialFocusedItemIndex
+    ) {
+        if (rows.isEmpty()) return@remember null to 0
+
         if (!initialFocusedItemKey.isNullOrBlank()) {
-            var foundRowIdx = -1
-            var foundKey: String? = null
-            for ((rIdx, row) in rows.withIndex()) {
-                for (item in row.items) {
-                    if (getItemKey(item) == initialFocusedItemKey) {
-                        foundRowIdx = rIdx
-                        foundKey = initialFocusedItemKey
-                        break
-                    }
+            val targetRow = rows.find { it.id == initialFocusedRowId }
+                ?: rows.getOrNull(initialFocusedRowIndex)
+
+            if (targetRow != null) {
+                val targetRowIdx = rows.indexOf(targetRow)
+                val itemMatch = targetRow.items.find { getItemKey(it) == initialFocusedItemKey }
+                if (itemMatch != null) {
+                    return@remember getRowItemKey(targetRow.id, itemMatch) to targetRowIdx
                 }
-                if (foundKey != null) break
+
+                if (targetRow.items.isNotEmpty()) {
+                    val fallbackItemIndex = initialFocusedItemIndex.coerceIn(0, targetRow.items.lastIndex)
+                    val fallbackItem = targetRow.items[fallbackItemIndex]
+                    return@remember getRowItemKey(targetRow.id, fallbackItem) to targetRowIdx
+                }
             }
-            if (foundKey != null) {
-                foundKey to foundRowIdx
-            } else if (initialFocusedRowIndex in rows.indices && rows[initialFocusedRowIndex].items.isNotEmpty()) {
-                val firstInRow = rows[initialFocusedRowIndex].items.first()
-                getItemKey(firstInRow) to initialFocusedRowIndex
-            } else {
-                findFirstLibraryItemKey(rows)
+
+            for ((rIdx, row) in rows.withIndex()) {
+                val itemMatch = row.items.find { getItemKey(it) == initialFocusedItemKey }
+                if (itemMatch != null) {
+                    return@remember getRowItemKey(row.id, itemMatch) to rIdx
+                }
             }
-        } else {
-            findFirstLibraryItemKey(rows)
         }
+
+        findFirstLibraryItemKey(rows)
     }
 
     var selectedItem by remember { mutableStateOf<Any?>(null) }
@@ -145,7 +159,7 @@ fun HomeComposeScreen(
             }
             delay(100)
             var attempts = 0
-            while (attempts < 5) {
+            while (attempts < 10) {
                 val requester = focusRequesters[targetItemKey]
                 if (requester != null && requester.safeRequestFocus()) {
                     Timber.d("HomeComposeScreen: focus set on $targetItemKey (trigger=$focusTrigger)")
@@ -195,17 +209,18 @@ fun HomeComposeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     itemsIndexed(items, key = { _, item ->
-                                        getItemKey(item)
+                                        getRowItemKey(rowState.id, item)
                                     }) { index, item ->
                                         val interactionSource = remember { MutableInteractionSource() }
                                         val isFocusedState by interactionSource.collectIsFocusedAsState()
                                         var isFocusedInternal by remember { mutableStateOf(false) }
                                         val isFocused = isFocusedState || isFocusedInternal
                                         var showContextMenu by remember { mutableStateOf(false) }
-                                        val itemKey = remember(item) { getItemKey(item) }
+                                        val itemKey = remember(item, rowState.id) { getRowItemKey(rowState.id, item) }
 
-                                        val focusRequester = remember(itemKey) {
-                                            focusRequesters.getOrPut(itemKey) { FocusRequester() }
+                                        val focusRequester = remember(itemKey) { FocusRequester() }
+                                        SideEffect {
+                                            focusRequesters[itemKey] = focusRequester
                                         }
 
                                         val isViewOrUsbOrGridItem = item is GridButton ||
@@ -228,7 +243,7 @@ fun HomeComposeScreen(
                                                         if (focusedRowIndex != rowIndex) {
                                                             focusedRowIndex = rowIndex
                                                         }
-                                                        onItemFocus(item, rowIndex)
+                                                        onItemFocus(item, rowState.id, rowIndex, index)
                                                     }
                                                 }
                                                 .itemCardClickable(
@@ -301,13 +316,13 @@ private fun findFirstLibraryItemKey(rows: List<HomeRowState>): Pair<String?, Int
         val libraryRow = rows[libraryRowIndex]
         val firstItem = libraryRow.items.firstOrNull()
         if (firstItem != null) {
-            return getItemKey(firstItem) to libraryRowIndex
+            return getRowItemKey(libraryRow.id, firstItem) to libraryRowIndex
         }
     }
     for ((rIdx, row) in rows.withIndex()) {
         val firstItem = row.items.firstOrNull()
         if (firstItem != null) {
-            return getItemKey(firstItem) to rIdx
+            return getRowItemKey(row.id, firstItem) to rIdx
         }
     }
     return null to 0

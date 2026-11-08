@@ -464,18 +464,26 @@ class HomeViewModel(
 
     var lastFocusedItemKey: String? = null
         private set
+    var lastFocusedRowId: String? = null
+        private set
     var lastFocusedRowIndex: Int = 0
+        private set
+    var lastFocusedItemIndex: Int = 0
         private set
 
     fun resetLastFocusedItem() {
         lastFocusedItemKey = null
+        lastFocusedRowId = null
         lastFocusedRowIndex = 0
+        lastFocusedItemIndex = 0
     }
 
-    fun onItemSelected(item: Any?, rowIndex: Int) {
+    fun onItemSelected(item: Any?, rowId: String?, rowIndex: Int, itemIndex: Int) {
         if (item != null) {
             lastFocusedItemKey = getItemKey(item)
+            lastFocusedRowId = rowId
             lastFocusedRowIndex = rowIndex
+            lastFocusedItemIndex = itemIndex
         }
         currentItem = item
 
