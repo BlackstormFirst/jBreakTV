@@ -78,8 +78,14 @@ import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.queue.queue
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import org.jellyfin.androidtv.data.repository.CustomMessageRepository
+import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.ui.navigation.focus.FocusPersistManager
 import org.jellyfin.androidtv.ui.navigation.focus.LocalFocusPersistManager
+import org.jellyfin.androidtv.util.toggleFavorite
+import org.jellyfin.androidtv.util.togglePlayed
+import org.jellyfin.design.Tokens
 import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.jellyfin.queue.baseItemFlow
 import org.koin.compose.koinInject
@@ -117,6 +123,10 @@ fun AudioNowPlayingScreen(
 	backgroundService: BackgroundService,
 	navigationRepository: NavigationRepository,
 ) {
+	val itemMutationRepository = koinInject<ItemMutationRepository>()
+	val customMessageRepository = koinInject<CustomMessageRepository>()
+	val lifecycleOwner = LocalLifecycleOwner.current
+
 	val playState by playbackManager.state.playState.collectAsState()
 	val isPlaying = playState == PlayState.PLAYING
 
@@ -310,6 +320,56 @@ fun AudioNowPlayingScreen(
 										tint = if (isShuffleMode) JellyfinTheme.colorScheme.buttonActive else Color.White
 									)
 								}
+								val isCurrentFavorite = currentItem.userData?.isFavorite == true
+								IconButton(
+									onClick = {
+										toggleFavorite(
+											lifecycleOwner = lifecycleOwner,
+											itemMutationRepository = itemMutationRepository,
+											customMessageRepository = customMessageRepository,
+											itemId = currentItem.id,
+											favorite = !isCurrentFavorite
+										) { updatedUserData ->
+											val currentUserData = currentItem.userData
+											val mergedUserData = currentUserData?.copy(
+												isFavorite = updatedUserData.isFavorite,
+												played = currentUserData.played
+											) ?: updatedUserData
+											queueEntry?.baseItem = currentItem.copy(userData = mergedUserData)
+										}
+									}
+								) {
+									Icon(
+										painter = painterResource(R.drawable.ic_heart),
+										contentDescription = stringResource(if (isCurrentFavorite) R.string.lbl_remove_favorite else R.string.lbl_add_favorite),
+										tint = if (isCurrentFavorite) Tokens.Color.colorRed500 else Color.White
+									)
+								}
+								val isCurrentPlayed = currentItem.userData?.played == true
+								IconButton(
+									onClick = {
+										togglePlayed(
+											lifecycleOwner = lifecycleOwner,
+											itemMutationRepository = itemMutationRepository,
+											customMessageRepository = customMessageRepository,
+											itemId = currentItem.id,
+											played = !isCurrentPlayed
+										) { updatedUserData ->
+											val currentUserData = currentItem.userData
+											val mergedUserData = currentUserData?.copy(
+												played = updatedUserData.played,
+												isFavorite = currentUserData.isFavorite
+											) ?: updatedUserData
+											queueEntry?.baseItem = currentItem.copy(userData = mergedUserData)
+										}
+									}
+								) {
+									Icon(
+										painter = painterResource(if (isCurrentPlayed) R.drawable.ic_watch else R.drawable.ic_unwatch),
+										contentDescription = stringResource(if (isCurrentPlayed) R.string.lbl_mark_unplayed else R.string.lbl_mark_played),
+										tint = if (isCurrentPlayed) JellyfinTheme.colorScheme.buttonActive else Color.White
+									)
+								}
 								if (currentItem.albumId != null) {
 									IconButton(onClick = {
 										navigationRepository.navigate(Destinations.itemList(currentItem.albumId!!))
@@ -382,35 +442,41 @@ fun AudioNowPlayingScreen(
 						items = validQueueEntries,
 						key = { index, entry -> "${entry.baseItem?.id ?: index}_$index" }
 					) { index, entry ->
-						val rowItem = remember(entry) { AudioQueueBaseRowItem(entry) }
-						val interactionSource = remember { MutableInteractionSource() }
-						val isFocusedState by interactionSource.collectIsFocusedAsState()
-						var isFocusedInternal by remember { mutableStateOf(false) }
-						val isFocused = isFocusedState || isFocusedInternal
-						val cardFocusRequester = remember { FocusRequester() }
+						val baseItem by entry.baseItemFlow.collectAsState(entry.baseItem)
+						val rowItem = remember(entry, baseItem) {
+							if (baseItem != null) AudioQueueBaseRowItem(entry) else null
+						}
 
-						Box(
-							modifier = Modifier
-								.focusRequester(cardFocusRequester)
-								.zIndex(if (isFocused) 10f else 1f)
-								.onFocusChanged { focusState ->
-									isFocusedInternal = focusState.isFocused
-								}
-								.itemCardClickable(
-									interactionSource = interactionSource,
-									onClick = {
-										mediaManager.playFrom(entry)
-									},
-									onLongClick = {
-										selectedQueueItem = rowItem
-										showContextMenu = true
+						if (rowItem != null) {
+							val interactionSource = remember { MutableInteractionSource() }
+							val isFocusedState by interactionSource.collectIsFocusedAsState()
+							var isFocusedInternal by remember { mutableStateOf(false) }
+							val isFocused = isFocusedState || isFocusedInternal
+							val cardFocusRequester = remember { FocusRequester() }
+
+							Box(
+								modifier = Modifier
+									.focusRequester(cardFocusRequester)
+									.zIndex(if (isFocused) 10f else 1f)
+									.onFocusChanged { focusState ->
+										isFocusedInternal = focusState.isFocused
 									}
+									.itemCardClickable(
+										interactionSource = interactionSource,
+										onClick = {
+											mediaManager.playFrom(entry)
+										},
+										onLongClick = {
+											selectedQueueItem = rowItem
+											showContextMenu = true
+										}
+									)
+							) {
+								BaseRowItemCard(
+									item = rowItem,
+									focused = isFocused
 								)
-						) {
-							BaseRowItemCard(
-								item = rowItem,
-								focused = isFocused
-							)
+							}
 						}
 					}
 				}
@@ -422,6 +488,11 @@ fun AudioNowPlayingScreen(
 						onDismissRequest = {
 							showContextMenu = false
 							selectedQueueItem = null
+						},
+						onItemUpdated = { updatedItem ->
+							if (updatedItem is AudioQueueBaseRowItem) {
+								selectedQueueItem = updatedItem
+							}
 						}
 					)
 				}

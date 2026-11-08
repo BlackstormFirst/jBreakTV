@@ -101,7 +101,8 @@ fun HomeComposeScreen(
     initialFocusedItemIndex: Int = 0,
     focusTrigger: Long = 0L,
     onItemClick: (item: Any, rowIndex: Int) -> Unit,
-    onItemFocus: (item: Any?, rowId: String, rowIndex: Int, itemIndex: Int) -> Unit
+    onItemFocus: (item: Any?, rowId: String, rowIndex: Int, itemIndex: Int) -> Unit,
+    onItemUpdated: ((rowId: String, itemIndex: Int, updatedItem: BaseRowItem) -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     val pivotBringIntoViewSpec = rememberPivotBringIntoViewSpec()
@@ -287,10 +288,7 @@ fun HomeComposeScreen(
                                                     onDismissRequest = { showContextMenu = false },
                                                     focusRequester = focusRequester,
                                                     onItemUpdated = { updatedItem ->
-                                                        val currentItems = rowState.items.toMutableList()
-                                                        if (index in currentItems.indices) {
-                                                            currentItems[index] = updatedItem
-                                                        }
+                                                        onItemUpdated?.invoke(rowState.id, index, updatedItem)
                                                     }
                                                 )
                                             }

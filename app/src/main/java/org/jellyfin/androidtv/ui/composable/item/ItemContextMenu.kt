@@ -32,17 +32,38 @@ import org.jellyfin.androidtv.util.sdk.canPlay
 import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
 import org.jellyfin.androidtv.util.toggleFavorite
 import org.jellyfin.androidtv.util.togglePlayed
-import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.UserItemDataDto
 import org.koin.compose.koinInject
 import org.jellyfin.androidtv.ui.navigation.focus.safeRequestFocus
 
-fun updateItemWithUserData(item: BaseRowItem, userData: UserItemDataDto): BaseRowItem {
+fun updateItemWithUserData(item: BaseRowItem, newUserData: UserItemDataDto): BaseRowItem {
 	val baseItem = item.baseItem ?: return item
-	val newBaseItem = baseItem.copy(userData = userData)
+	val currentUserData = baseItem.userData
+
+	val mergedUserData = if (currentUserData == null) {
+		newUserData
+	} else {
+		currentUserData.copy(
+			isFavorite = newUserData.isFavorite,
+			played = newUserData.played,
+			playbackPositionTicks = newUserData.playbackPositionTicks,
+			playCount = newUserData.playCount,
+			unplayedItemCount = newUserData.unplayedItemCount ?: currentUserData.unplayedItemCount,
+			playedPercentage = newUserData.playedPercentage ?: currentUserData.playedPercentage,
+		)
+	}
+
+	val newBaseItem = baseItem.copy(userData = mergedUserData)
 	return when (item) {
+		is AudioQueueBaseRowItem -> {
+			item.queueEntry.baseItem = newBaseItem
+			AudioQueueBaseRowItem(item.queueEntry).apply {
+				playing = item.playing
+			}
+		}
 		is BaseItemDtoBaseRowItem -> BaseItemDtoBaseRowItem(
 			item = newBaseItem,
 			preferParentThumb = item.preferParentThumb,
@@ -173,8 +194,26 @@ fun ItemContextMenu(
 
 				PopoverMenuItem(onClick = {
 					handleMenuAction {
+						togglePlayed(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isPlayed) { userData ->
+							val preservedUserData = (baseItem.userData ?: userData).copy(
+								played = userData.played,
+								isFavorite = baseItem.userData?.isFavorite ?: userData.isFavorite
+							)
+							onItemUpdated?.invoke(updateItemWithUserData(item, preservedUserData))
+						}
+					}
+				}) {
+					Text(stringResource(if (isPlayed) R.string.lbl_mark_unplayed else R.string.lbl_mark_played))
+				}
+
+				PopoverMenuItem(onClick = {
+					handleMenuAction {
 						toggleFavorite(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isFavorite) { userData ->
-							onItemUpdated?.invoke(updateItemWithUserData(item, userData))
+							val preservedUserData = (baseItem.userData ?: userData).copy(
+								isFavorite = userData.isFavorite,
+								played = baseItem.userData?.played ?: userData.played
+							)
+							onItemUpdated?.invoke(updateItemWithUserData(item, preservedUserData))
 						}
 					}
 				}) {
@@ -253,24 +292,32 @@ fun ItemContextMenu(
 							Text(stringResource(R.string.lbl_instant_mix))
 						}
 					}
-				} else {
-					// 3. Mark as Played / Unplayed
-					PopoverMenuItem(onClick = {
-						handleMenuAction {
-							togglePlayed(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isPlayed) { userData ->
-								onItemUpdated?.invoke(updateItemWithUserData(item, userData))
-							}
+				}
+
+				// 3. Mark as Played / Unplayed
+				PopoverMenuItem(onClick = {
+					handleMenuAction {
+						togglePlayed(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isPlayed) { userData ->
+							val preservedUserData = (baseItem.userData ?: userData).copy(
+								played = userData.played,
+								isFavorite = baseItem.userData?.isFavorite ?: userData.isFavorite
+							)
+							onItemUpdated?.invoke(updateItemWithUserData(item, preservedUserData))
 						}
-					}) {
-						Text(stringResource(if (isPlayed) R.string.lbl_mark_unplayed else R.string.lbl_mark_played))
 					}
+				}) {
+					Text(stringResource(if (isPlayed) R.string.lbl_mark_unplayed else R.string.lbl_mark_played))
 				}
 
 				// 4. Toggle Favorite
 				PopoverMenuItem(onClick = {
 					handleMenuAction {
 						toggleFavorite(lifecycleOwner, itemMutationRepository, customMessageRepository, baseItem.id, !isFavorite) { userData ->
-							onItemUpdated?.invoke(updateItemWithUserData(item, userData))
+							val preservedUserData = (baseItem.userData ?: userData).copy(
+								isFavorite = userData.isFavorite,
+								played = baseItem.userData?.played ?: userData.played
+							)
+							onItemUpdated?.invoke(updateItemWithUserData(item, preservedUserData))
 						}
 					}
 				}) {

@@ -72,17 +72,6 @@ fun ItemCardBaseItemOverlay(
 			)
 		}
 
-		if (item.userData?.isFavorite == true) {
-			Icon(
-				imageVector = ImageVector.vectorResource(R.drawable.ic_heart),
-				contentDescription = null,
-				tint = Tokens.Color.colorRed500,
-				modifier = Modifier
-					.align(Alignment.BottomEnd)
-					.size(20.dp)
-			)
-		}
-
 		Column(
 			modifier = Modifier.align(Alignment.BottomCenter),
 			verticalArrangement = Arrangement.spacedBy(Tokens.Space.spaceXs)
@@ -92,6 +81,17 @@ fun ItemCardBaseItemOverlay(
 			)
 
 			if (footer != null) footer()
+		}
+
+		if (item.userData?.isFavorite == true) {
+			Icon(
+				imageVector = ImageVector.vectorResource(R.drawable.ic_heart),
+				contentDescription = null,
+				tint = Tokens.Color.colorRed500,
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.size(20.dp)
+			)
 		}
 	}
 }

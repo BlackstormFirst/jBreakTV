@@ -130,6 +130,21 @@ class HomeViewModel(
         updateUiState()
     }
 
+    fun onItemUpdated(rowId: String, itemIndex: Int, updatedItem: BaseRowItem) {
+        synchronized(_directRowStates) {
+            val rowIndex = _directRowStates.indexOfFirst { it.id == rowId }
+            if (rowIndex >= 0) {
+                val row = _directRowStates[rowIndex]
+                val updatedItems = row.items.toMutableList()
+                if (itemIndex in updatedItems.indices) {
+                    updatedItems[itemIndex] = updatedItem
+                    _directRowStates[rowIndex] = row.copy(items = updatedItems)
+                }
+            }
+        }
+        updateUiState()
+    }
+
     init {
 
         notificationsRow.addRowStates(context,

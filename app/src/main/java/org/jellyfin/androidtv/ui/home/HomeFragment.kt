@@ -77,6 +77,9 @@ class HomeFragment : Fragment() {
                                     },
                                     onItemFocus = { item, rowId, rowIndex, itemIndex ->
                                         viewModel.onItemSelected(item, rowId, rowIndex, itemIndex)
+                                    },
+                                    onItemUpdated = { rowId, itemIndex, updatedItem ->
+                                        viewModel.onItemUpdated(rowId, itemIndex, updatedItem)
                                     }
                                 )
                             }
