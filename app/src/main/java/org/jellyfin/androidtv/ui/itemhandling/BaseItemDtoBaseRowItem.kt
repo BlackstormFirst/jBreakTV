@@ -219,9 +219,9 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 
 	override fun getImage(imageType: BaseRowImageType): JellyfinImage? {
 		val movieThumb = if (preferMovieThumb && (baseItem?.type == BaseItemKind.MOVIE || baseItem?.type == BaseItemKind.VIDEO)) {
-			baseItem?.itemImages?.get(ImageType.THUMB)
-				?: baseItem?.itemImages?.get(ImageType.BACKDROP)
-				?: baseItem?.itemBackdropImages?.firstOrNull()
+			baseItem.itemImages[ImageType.THUMB]
+				?: baseItem.itemImages[ImageType.BACKDROP]
+				?: baseItem.itemBackdropImages.firstOrNull()
 		} else null
 
 		val recordingThumb = if (isRecordingItem) {
@@ -235,20 +235,20 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 		} else null
 
 		val primaryImage = when {
-			preferSeriesPoster && baseItem?.type == BaseItemKind.EPISODE && !isRecordingItem -> baseItem?.parentImages?.get(ImageType.PRIMARY)
-				?: baseItem?.seriesPrimaryImage
+			preferSeriesPoster && baseItem?.type == BaseItemKind.EPISODE && !isRecordingItem -> baseItem.parentImages[ImageType.PRIMARY]
+				?: baseItem.seriesPrimaryImage
 
-			preferParentThumb && baseItem?.type == BaseItemKind.EPISODE -> baseItem?.parentImages?.get(ImageType.THUMB)
-				?: baseItem?.seriesThumbImage
+			preferParentThumb && baseItem?.type == BaseItemKind.EPISODE -> baseItem.parentImages[ImageType.THUMB]
+				?: baseItem.seriesThumbImage
 
 			(baseItem?.type == BaseItemKind.MOVIE || baseItem?.type == BaseItemKind.VIDEO) && movieThumb != null -> movieThumb
 			isRecordingItem && recordingThumb != null -> recordingThumb
 
-			baseItem?.type == BaseItemKind.SEASON -> baseItem?.itemImages?.get(ImageType.PRIMARY)
-				?: baseItem?.seriesPrimaryImage
+			baseItem?.type == BaseItemKind.SEASON -> baseItem.itemImages[ImageType.PRIMARY]
+				?: baseItem.seriesPrimaryImage
 
-			baseItem?.type == BaseItemKind.PROGRAM -> baseItem?.itemImages?.get(ImageType.THUMB)
-			baseItem?.type == BaseItemKind.AUDIO -> baseItem?.itemImages?.get(ImageType.PRIMARY) ?: baseItem?.albumPrimaryImage ?: baseItem?.parentImages?.get(ImageType.PRIMARY)
+			baseItem?.type == BaseItemKind.PROGRAM -> baseItem.itemImages[ImageType.THUMB]
+			baseItem?.type == BaseItemKind.AUDIO -> baseItem.itemImages[ImageType.PRIMARY] ?: baseItem.albumPrimaryImage ?: baseItem.parentImages[ImageType.PRIMARY]
 			else -> null
 		} ?: baseItem?.itemImages?.get(ImageType.PRIMARY) ?: baseItem?.albumPrimaryImage ?: baseItem?.parentImages?.get(ImageType.PRIMARY)
 
