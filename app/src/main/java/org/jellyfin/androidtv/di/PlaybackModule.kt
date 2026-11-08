@@ -33,9 +33,14 @@ import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.profile.createDeviceProfile
 import org.jellyfin.androidtv.util.usbdevices.LocalVideoManager
 import org.jellyfin.androidtv.ui.playback.ServerConnectionMonitorService
+import org.jellyfin.playback.core.PlaybackManager
+import org.jellyfin.playback.core.mediastream.mediatype.mediaType
+import org.jellyfin.playback.core.mediastream.mediatype.MediaType as PlayerMediaType
 import org.jellyfin.playback.core.playbackManager
 import org.jellyfin.playback.core.plugin.playbackPlugin
+import org.jellyfin.playback.core.queue.queue
 import org.jellyfin.playback.jellyfin.jellyfinPlugin
+import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.playback.media3.exoplayer.ExoPlayerOptions
 import org.jellyfin.playback.media3.exoplayer.exoPlayerPlugin
 import org.jellyfin.playback.media3.session.MediaSessionOptions
@@ -44,6 +49,7 @@ import org.jellyfin.sdk.api.client.HttpClientOptions
 import org.jellyfin.sdk.api.okhttp.OkHttpFactory
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaSegmentType
+import org.jellyfin.sdk.model.api.MediaType as SdkMediaType
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
@@ -247,6 +253,26 @@ fun Scope.createPlaybackManager() = playbackManager(androidContext()) {
 	// Options
 	val userSettingPreferences = get<UserSettingPreferences>()
 
-	defaultRewindAmount = { userSettingPreferences[UserSettingPreferences.skipBackLength].milliseconds }
-	defaultFastForwardAmount = { userSettingPreferences[UserSettingPreferences.skipForwardLength].milliseconds }
+	defaultRewindAmount = {
+		val entry = get<PlaybackManager>().queue.entry.value
+		val isAudio = entry?.mediaType == PlayerMediaType.Audio ||
+			entry?.baseItem?.type == BaseItemKind.AUDIO ||
+			entry?.baseItem?.mediaType == SdkMediaType.AUDIO
+		if (isAudio) {
+			userSettingPreferences[UserSettingPreferences.skipBackLengthAudio].milliseconds
+		} else {
+			userSettingPreferences[UserSettingPreferences.skipBackLength].milliseconds
+		}
+	}
+	defaultFastForwardAmount = {
+		val entry = get<PlaybackManager>().queue.entry.value
+		val isAudio = entry?.mediaType == PlayerMediaType.Audio ||
+			entry?.baseItem?.type == BaseItemKind.AUDIO ||
+			entry?.baseItem?.mediaType == SdkMediaType.AUDIO
+		if (isAudio) {
+			userSettingPreferences[UserSettingPreferences.skipForwardLengthAudio].milliseconds
+		} else {
+			userSettingPreferences[UserSettingPreferences.skipForwardLength].milliseconds
+		}
+	}
 }

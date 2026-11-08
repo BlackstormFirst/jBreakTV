@@ -14,6 +14,7 @@ import org.jellyfin.androidtv.ui.composable.rememberPlayerPositionInfo
 import org.jellyfin.androidtv.ui.composable.rememberPlayerProgress
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.playback.core.model.PlayState
+import org.jellyfin.playback.core.queue.queue
 import org.koin.compose.koinInject
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -33,8 +34,9 @@ fun PlayerSeekbar(
 		active = positionInfo.active,
 		duration = positionInfo.duration,
 	)
-	val seekForwardAmount = remember { playbackManager.options.defaultFastForwardAmount() }
-	val seekRewindAmount = remember { playbackManager.options.defaultRewindAmount() }
+	val entry by playbackManager.queue.entry.collectAsState()
+	val seekForwardAmount = remember(entry) { playbackManager.options.defaultFastForwardAmount() }
+	val seekRewindAmount = remember(entry) { playbackManager.options.defaultRewindAmount() }
 
 	var scrubbingProgress by remember { mutableStateOf<Duration?>(null) }
 

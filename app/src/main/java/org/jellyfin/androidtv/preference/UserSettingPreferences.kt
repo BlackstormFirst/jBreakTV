@@ -21,6 +21,8 @@ class UserSettingPreferences(
 	companion object {
 		val skipBackLength = intPreference("skipBackLength", 10_000)
 		val skipForwardLength = intPreference("skipForwardLength", 30_000)
+		val skipBackLengthAudio = intPreference("skipBackLengthAudio", 5_000)
+		val skipForwardLengthAudio = intPreference("skipForwardLengthAudio", 5_000)
 		var audioLangRemoteSetting = stringPreference("audioLangRemoteSettings", "")
 		var subLangRemoteSetting = stringPreference("subLangRemoteSettings", "")
 		var subMode = intPreference("subMode", R.string.subtitle_mode_none)
