@@ -83,7 +83,7 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 		baseItem?.type == BaseItemKind.MUSIC_ALBUM -> baseItem.name
 		baseItem?.type == BaseItemKind.AUDIO -> when {
 			!baseItem.artists.isNullOrEmpty() -> baseItem.artists?.joinToString(", ")
-			!baseItem.albumArtists.isNullOrEmpty() -> baseItem.albumArtists?.joinToString(", ")
+			!baseItem.albumArtists.isNullOrEmpty() -> baseItem.albumArtists?.mapNotNull { it.name }?.joinToString(", ")
 			!baseItem.albumArtist.isNullOrBlank() -> baseItem.albumArtist
 			!baseItem.album.isNullOrBlank() -> baseItem.album
 			else -> baseItem.getFullName(context)
@@ -195,7 +195,7 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 		BaseItemKind.MUSIC_ALBUM -> {
 			val artist = when {
 				!baseItem.artists.isNullOrEmpty() -> baseItem.artists?.joinToString(", ")
-				!baseItem.albumArtists.isNullOrEmpty() -> baseItem.albumArtists?.joinToString(", ")
+				!baseItem.albumArtists.isNullOrEmpty() -> baseItem.albumArtists?.mapNotNull { it.name }?.joinToString(", ")
 				!baseItem.albumArtist.isNullOrBlank() -> baseItem.albumArtist
 				else -> null
 			}

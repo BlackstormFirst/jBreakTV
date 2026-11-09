@@ -146,7 +146,7 @@ fun BaseItemDto.getFullName(context: Context): String? = when (type) {
 	// we actually want the artist name if available
 	BaseItemKind.AUDIO,
 	BaseItemKind.MUSIC_ALBUM -> listOfNotNull(
-		artists?.joinToString(", ") ?: albumArtists?.joinToString(", ") ?: albumArtist,
+		artists?.joinToString(", ") ?: albumArtists?.mapNotNull { it.name }?.joinToString(", ") ?: albumArtist,
 		name
 	).filter { it.isNotEmpty() }.joinToString(" - ")
 

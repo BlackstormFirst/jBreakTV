@@ -370,7 +370,7 @@ fun BaseItemInfoRow(
 			}
 
 			BaseItemKind.MUSIC_ALBUM -> {
-				val artist = item.albumArtist ?: item.albumArtists?.joinToString(", ")
+				val artist = item.albumArtist ?: item.albumArtists?.mapNotNull { it.name }?.joinToString(", ")
 				if (artist != null) {
 					InfoRowItem(contentDescription = null) {
 						Text(artist)

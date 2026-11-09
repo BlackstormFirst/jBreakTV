@@ -134,7 +134,7 @@ fun NowPlayingComposable(
 						) {
 							// Name
 							Text(text = item.name.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
-							val artists = item.artists ?: item.albumArtists ?: item.albumArtist?.let(::listOf)
+							val artists = item.artists ?: item.albumArtists?.mapNotNull { it.name } ?: item.albumArtist?.let(::listOf)
 							Text(text = artists?.joinToString(", ").orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
 						}
 					}
