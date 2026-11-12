@@ -272,6 +272,7 @@
     <string name="pref_clock_display">Afficher l\'horloge</string>
     <string name="login_username_field_empty">Le nom d\'utilisateur ne peut pas être vide</string>
     <string name="login_server_unavailable">Impossible de se connecter au serveur</string>
+    <string name="connection_errors_header">Erreur(s) :</string>
     <string name="login_invalid_credentials">Nom d\'utilisateur ou mot de passe incorrect</string>
     <string name="login_authenticating">Authentification…</string>
     <string name="server_field_empty">L\'adresse ne peut pas être vide</string>

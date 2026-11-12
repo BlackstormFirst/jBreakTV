@@ -69,7 +69,7 @@ class SocketHandler(
 				try {
 					subscribe(this)
 				} catch (err: Exception) {
-					Timber.e(err, "Error initializing WebSocket subscriptions")
+					Timber.w(err, "Error initializing WebSocket subscriptions")
 				}
 			}
 		}
@@ -103,9 +103,9 @@ class SocketHandler(
 				)
 			}
 		} catch (err: ApiClientException) {
-			Timber.e(err, "Unable to update capabilities")
+			Timber.w(err, "Unable to update capabilities")
 		} catch (err: Exception) {
-			Timber.e(err, "Unexpected error updating capabilities")
+			Timber.w(err, "Unexpected error updating capabilities")
 		}
 	}
 
@@ -191,7 +191,7 @@ class SocketHandler(
 					.launchIn(coroutineScope)
 			}
 		} catch (err: Exception) {
-			Timber.e(err, "Failed to subscribe to WebSocket")
+			Timber.w(err, "Failed to subscribe to WebSocket")
 		}
 	}
 

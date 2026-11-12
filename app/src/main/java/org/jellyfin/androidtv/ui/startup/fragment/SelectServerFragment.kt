@@ -60,6 +60,7 @@ import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.Button
 import org.jellyfin.androidtv.ui.shared.toolbar.StartupToolbar
 import org.jellyfin.androidtv.ui.startup.StartupViewModel
+import org.jellyfin.androidtv.util.ConnectionErrorUtils
 import org.jellyfin.androidtv.util.createBundle
 import org.jellyfin.androidtv.util.getSummary
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
@@ -269,16 +270,15 @@ class SelectServerFragment : Fragment() {
 															)
 														}
 													} else if (newState is UnableToConnectState) {
-														Toast.makeText(
-															context,
-															context.resources.getString(
-																R.string.server_connection_failed_candidates,
-																newState.addressCandidates
-																	.map { "${it.key} ${it.value.getSummary(context)}" }
-																	.joinToString(prefix = "\n", separator = "\n")
-															),
-															Toast.LENGTH_LONG,
-														).show()
+														val allIssues = newState.addressCandidates.values.flatten()
+														val errors = allIssues.flatMap { ConnectionErrorUtils.extractErrorsFromIssue(it, context) }
+														val details = ConnectionErrorUtils.formatErrorDetails(errors, context)
+														val toastMessage = if (details.isNotEmpty()) {
+															"${context.getString(R.string.server_connection_failed)}\n$details"
+														} else {
+															context.getString(R.string.server_connection_failed)
+														}
+														Toast.makeText(context, toastMessage, Toast.LENGTH_LONG).show()
 													}
 												}.launchIn(lifecycleScope)
 											}

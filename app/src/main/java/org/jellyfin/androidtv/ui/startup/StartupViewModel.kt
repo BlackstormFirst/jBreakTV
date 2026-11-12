@@ -65,7 +65,7 @@ class StartupViewModel(
 			} catch (err: CancellationException) {
 				throw err
 			} catch (err: Exception) {
-				Timber.e(err, "Error loading users for server ${server.id}")
+				Timber.w(err, "Error loading users for server ${server.id}")
 			}
 		}
 	}
@@ -93,7 +93,7 @@ class StartupViewModel(
 				} catch (err: CancellationException) {
 					throw err
 				} catch (err: Exception) {
-					Timber.e(err, "Error loading discovery servers")
+					Timber.w(err, "Error loading discovery servers")
 				}
 			}
 		}
@@ -106,7 +106,7 @@ class StartupViewModel(
 			} catch (err: CancellationException) {
 				throw err
 			} catch (err: Exception) {
-				Timber.e(err, "Error reloading stored servers")
+				Timber.w(err, "Error reloading stored servers")
 			}
 		}
 	}

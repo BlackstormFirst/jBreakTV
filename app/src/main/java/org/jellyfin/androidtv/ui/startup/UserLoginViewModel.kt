@@ -93,7 +93,7 @@ class UserLoginViewModel(
 			quickConnectSecret = response.secret
 			_quickConnectState.emit(PendingQuickConnectState(response.code))
 		} catch (err: ApiClientException) {
-			Timber.e(err, "Unable to initiate QuickConnect")
+			Timber.w(err, "Unable to initiate QuickConnect")
 			_quickConnectState.emit(UnavailableQuickConnectState)
 		}
 
@@ -133,7 +133,7 @@ class UserLoginViewModel(
 				return true
 			}
 		} catch (err: ApiClientException) {
-			Timber.e(err, "Unable to initiate QuickConnect")
+			Timber.w(err, "Unable to initiate QuickConnect")
 			_quickConnectState.emit(UnavailableQuickConnectState)
 			return false
 		}

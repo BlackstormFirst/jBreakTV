@@ -52,7 +52,7 @@ class ServerUserRepositoryImpl(
 			}
 			users.mapNotNull(UserDto::toPublicUser)
 		} catch (err: Exception) {
-			Timber.e(err, "Unable to retrieve public users")
+			Timber.w(err, "Unable to retrieve public users")
 
 			emptyList()
 		}

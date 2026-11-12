@@ -83,7 +83,7 @@ class SessionRepositoryImpl(
 					}
 				}
 			} catch (err: Exception) {
-				Timber.e(err, "Unable to restore session")
+				Timber.w(err, "Unable to restore session")
 				destroyCurrentSession()
 			} finally {
 				_state.value = SessionRepositoryState.READY
@@ -157,7 +157,7 @@ class SessionRepositoryImpl(
 				userRepository.setCurrentUser(user)
 				serverRepository.setCurrentServer(server)
 			} catch (err: Exception) {
-				Timber.e(err, "Unable to authenticate: bad response or connection failure when getting user info")
+				Timber.w(err, "Unable to authenticate: bad response or connection failure when getting user info")
 				destroyCurrentSession()
 				return false
 			}

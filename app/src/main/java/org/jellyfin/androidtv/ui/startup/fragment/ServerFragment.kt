@@ -32,6 +32,7 @@ import org.jellyfin.androidtv.data.service.BackgroundService
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.ui.startup.StartupViewModel
+import org.jellyfin.androidtv.util.ConnectionErrorUtils
 import org.jellyfin.androidtv.util.MarkdownRenderer
 import org.jellyfin.androidtv.util.createBundle
 import org.jellyfin.sdk.model.serializer.toUUIDOrNull
@@ -82,7 +83,16 @@ class ServerFragment : Fragment() {
 								putString(UserLoginFragment.ARG_SERVER_ID, server.id.toString())
 								putString(UserLoginFragment.ARG_USERNAME, user.name)
 							})
-							ServerUnavailableState, is ApiClientErrorLoginState -> Toast.makeText(context, R.string.server_connection_failed, Toast.LENGTH_LONG).show()
+							is ServerUnavailableState, is ApiClientErrorLoginState -> {
+								val errors = ConnectionErrorUtils.extractErrorsFromLoginState(state, context)
+								val details = ConnectionErrorUtils.formatErrorDetails(errors, context)
+								val toastMsg = if (details.isNotEmpty()) {
+									"${getString(R.string.server_connection_failed)}\n$details"
+								} else {
+									getString(R.string.server_connection_failed)
+								}
+								Toast.makeText(context, toastMsg, Toast.LENGTH_LONG).show()
+							}
 							is ServerVersionNotSupported -> Toast.makeText(
 								context,
 								getString(R.string.server_issue_outdated_version, state.server.version, ServerRepository.recommendedServerVersion.toString()),

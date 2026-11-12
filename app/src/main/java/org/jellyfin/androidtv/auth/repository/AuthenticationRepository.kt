@@ -86,11 +86,11 @@ class AuthenticationRepositoryImpl(
 			val response = api.userApi.authenticateUserByName(username, password)
 			response.content
 		} catch (err: TimeoutException) {
-			Timber.e(err, "Failed to connect to server trying to sign in $username")
-			emit(ServerUnavailableState)
+			Timber.w(err, "Failed to connect to server trying to sign in $username")
+			emit(ServerUnavailableState(err))
 			return@flow
 		} catch (err: ApiClientException) {
-			Timber.e(err, "Unable to sign in as $username")
+			Timber.w(err, "Unable to sign in as $username")
 			emit(ApiClientErrorLoginState(err))
 			return@flow
 		}
@@ -104,11 +104,11 @@ class AuthenticationRepositoryImpl(
 			val response = api.userApi.authenticateWithQuickConnect(secret)
 			response.content
 		} catch (err: TimeoutException) {
-			Timber.e(err, "Failed to connect to server")
-			emit(ServerUnavailableState)
+			Timber.w(err, "Failed to connect to server")
+			emit(ServerUnavailableState(err))
 			return@flow
 		} catch (err: ApiClientException) {
-			Timber.e(err, "Unable to sign in with Quick Connect secret")
+			Timber.w(err, "Unable to sign in with Quick Connect secret")
 			emit(ApiClientErrorLoginState(err))
 			return@flow
 		}
@@ -152,15 +152,15 @@ class AuthenticationRepositoryImpl(
 			authenticateFinish(server, userInfo, user.accessToken.orEmpty())
 			emit(AuthenticatedState)
 		} catch (err: TimeoutException) {
-			Timber.e(err, "Failed to connect to server")
-			emit(ServerUnavailableState)
+			Timber.w(err, "Failed to connect to server")
+			emit(ServerUnavailableState(err))
 			return@flow
 		} catch (err: ApiClientException) {
-			Timber.e(err, "Unable to get current user data")
+			Timber.w(err, "Unable to get current user data")
 			emit(ApiClientErrorLoginState(err))
 		} catch (err: Exception) {
-			Timber.e(err, "Unexpected error during token authentication")
-			emit(ServerUnavailableState)
+			Timber.w(err, "Unexpected error during token authentication")
+			emit(ServerUnavailableState(err))
 		}
 	}.flowOn(Dispatchers.IO)
 

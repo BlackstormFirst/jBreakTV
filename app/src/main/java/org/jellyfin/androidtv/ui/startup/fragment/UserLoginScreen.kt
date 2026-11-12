@@ -36,7 +36,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import org.jellyfin.androidtv.util.ConnectionErrorUtils
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -370,19 +372,35 @@ private fun CredentialsContent(
 
 @Composable
 private fun LoginErrorText(state: LoginState?, modifier: Modifier = Modifier) {
-    val errorText = when (state) {
+    val context = LocalContext.current
+    val mainErrorText = when (state) {
         is ServerVersionNotSupported -> stringResource(R.string.server_issue_outdated_version, state.server.version ?: "", ServerRepository.recommendedServerVersion.toString())
         AuthenticatingState -> stringResource(R.string.login_authenticating)
-        RequireSignInState -> stringResource(R.string.login_invalid_credentials)
-        ServerUnavailableState, is ApiClientErrorLoginState -> stringResource(R.string.login_server_unavailable)
+        RequireSignInState, is ServerUnavailableState, is ApiClientErrorLoginState -> stringResource(R.string.login_server_unavailable)
         else -> ""
     }
 
-    if (errorText.isNotEmpty()) {
-        Text(
-            text = errorText,
-            color = if (state == AuthenticatingState) JellyfinTheme.colorScheme.onBackground else Color.Red,
-            modifier = modifier
-        )
+    val errorDetails = remember(state) {
+        if (state != null && state != AuthenticatingState && state !is ServerVersionNotSupported) {
+            val errors = ConnectionErrorUtils.extractErrorsFromLoginState(state, context)
+            ConnectionErrorUtils.formatErrorDetails(errors, context)
+        } else ""
+    }
+
+    if (mainErrorText.isNotEmpty()) {
+        Column(modifier = modifier) {
+            Text(
+                text = mainErrorText,
+                color = if (state == AuthenticatingState) JellyfinTheme.colorScheme.onBackground else Color.Red
+            )
+            if (errorDetails.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = errorDetails,
+                    color = Color.Red,
+                    style = LocalTextStyle.current.copy(fontSize = 14.sp)
+                )
+            }
+        }
     }
 }

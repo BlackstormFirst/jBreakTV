@@ -93,7 +93,7 @@ class ServerRepositoryImpl(
 					_discoveredServers.emit(servers.toList())
 				}
 		} catch (err: Exception) {
-			Timber.e(err, "Error during local server discovery")
+			Timber.w(err, "Error during local server discovery")
 		}
 	}
 
@@ -191,7 +191,7 @@ class ServerRepositoryImpl(
 		} catch (err: CancellationException) {
 			throw err
 		} catch (err: Exception) {
-			Timber.e(err, "Unable to update server")
+			Timber.w(err, "Unable to update server")
 			null
 		}
 
@@ -207,7 +207,7 @@ class ServerRepositoryImpl(
 		} catch (err: CancellationException) {
 			throw err
 		} catch (err: Exception) {
-			Timber.e(err, "Unable to update server")
+			Timber.w(err, "Unable to update server")
 
 			false
 		}
@@ -242,7 +242,7 @@ class ServerRepositoryImpl(
 			} catch (err: CancellationException) {
 				throw err
 			} catch (err: Exception) {
-				Timber.e(err, "Failed to update server info")
+				Timber.w(err, "Failed to update server info")
 				null
 			}
 		} ?: return null

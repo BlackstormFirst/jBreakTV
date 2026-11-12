@@ -53,6 +53,7 @@ import org.jellyfin.androidtv.ui.base.LocalTextStyle
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.button.Button
 import org.jellyfin.androidtv.ui.shared.toolbar.StartupToolbar
+import org.jellyfin.androidtv.util.ConnectionErrorUtils
 import org.jellyfin.androidtv.util.getSummary
 
 @Composable
@@ -203,23 +204,38 @@ fun ServerAddScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             val context = LocalContext.current
-            val statusText = when (state) {
-                is ConnectingState -> stringResource(R.string.server_connecting, state.address)
-                is UnableToConnectState -> stringResource(
-                    R.string.server_connection_failed_candidates,
-                    state.addressCandidates
-                        .map { "${it.key} - ${it.value.getSummary(context)}" }
-                        .joinToString(prefix = "\n", separator = "\n")
-                )
-                is ConnectedState -> "Connected!"
-                null -> errorMessage ?: ""
+            val connectingText = (state as? ConnectingState)?.let { stringResource(R.string.server_connecting, it.address) } ?: ""
+            val serverFailedText = stringResource(R.string.server_connection_failed)
+
+            val (statusText, errorDetailsText) = remember(state, errorMessage, connectingText, serverFailedText) {
+                when (state) {
+                    is ConnectingState -> Pair(connectingText, "")
+                    is UnableToConnectState -> {
+                        val allIssues = state.addressCandidates.values.flatten()
+                        val errors = allIssues.flatMap { ConnectionErrorUtils.extractErrorsFromIssue(it, context) }
+                        val formattedDetails = ConnectionErrorUtils.formatErrorDetails(errors, context)
+                        Pair(serverFailedText, formattedDetails)
+                    }
+                    is ConnectedState -> Pair("Connected!", "")
+                    null -> Pair(errorMessage ?: "", "")
+                }
             }
 
             if (statusText.isNotEmpty()) {
-                Text(
-                    text = statusText,
-                    color = if (state is UnableToConnectState || errorMessage != null) Color.Red else JellyfinTheme.colorScheme.onBackground
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = statusText,
+                        color = if (state is UnableToConnectState || errorMessage != null) Color.Red else JellyfinTheme.colorScheme.onBackground
+                    )
+                    if (errorDetailsText.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = errorDetailsText,
+                            color = Color.Red,
+                            style = LocalTextStyle.current.copy(fontSize = 14.sp)
+                        )
+                    }
+                }
             }
         }
     }
