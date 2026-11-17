@@ -784,7 +784,7 @@
     <string name="lbl_codec">Codec</string>
     <string name="lbl_title">Titre</string>
     <string name="lbl_profile">Profil</string>
-    <string name="lbl_video_range">La plage vidéo</string>
+    <string name="lbl_video_range">Plage vidéo</string>
     <string name="lbl_resolution">Résolution</string>
     <string name="lbl_framerate">Fréquence d\'images</string>
     <string name="lbl_aspect_ratio">Aspect</string>
