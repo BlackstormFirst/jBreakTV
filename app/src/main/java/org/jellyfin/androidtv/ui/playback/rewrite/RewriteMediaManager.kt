@@ -193,7 +193,7 @@ class RewriteMediaManager(
 
 	override fun hasNextAudioItem(): Boolean {
 		val currentIndex = playbackManager.queue.entryIndex.value
-		val estimatedSize = playbackManager.queue.estimatedSize
+		val estimatedSize = maxOf(playbackManager.queue.estimatedSize, playbackManager.queue.entries.value.size)
 		return currentIndex >= 0 && currentIndex < estimatedSize - 1
 	}
 

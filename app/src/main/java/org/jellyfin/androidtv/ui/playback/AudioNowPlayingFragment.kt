@@ -209,6 +209,10 @@ fun AudioNowPlayingScreen(
 
 			if (currentItem != null) {
 				val positionInfo by rememberPlayerPositionInfo(playbackManager)
+				val entryIndex by playbackManager.queue.entryIndex.collectAsState()
+				val queueEntries by playbackManager.queue.entries.collectAsState(initial = emptyList())
+				val hasPrev = remember(entryIndex, queueEntries) { mediaManager.hasPrevAudioItem() }
+				val hasNext = remember(entryIndex, queueEntries) { mediaManager.hasNextAudioItem() }
 				val imageHelper = koinInject<ImageHelper>()
 				val albumImageUrl = remember(currentItem) {
 					imageHelper.getPrimaryImageUrl(currentItem, null, ImageHelper.MAX_PRIMARY_IMAGE_HEIGHT)
@@ -282,8 +286,13 @@ fun AudioNowPlayingScreen(
 								verticalAlignment = Alignment.CenterVertically,
 								modifier = Modifier.focusRestorer().focusGroup()
 							) {
-								IconButton(onClick = { mediaManager.prevAudioItem() }) {
-									Icon(painterResource(R.drawable.ic_previous_episode), contentDescription = stringResource(R.string.lbl_prev_item))
+								if (hasPrev) {
+									IconButton(onClick = { mediaManager.prevAudioItem() }) {
+										Icon(
+											painter = painterResource(R.drawable.ic_previous),
+											contentDescription = stringResource(R.string.lbl_prev_item)
+										)
+									}
 								}
 								IconButton(onClick = { mediaManager.rewind() }) {
 									Icon(painterResource(R.drawable.ic_rewind), contentDescription = stringResource(R.string.rewind))
@@ -300,8 +309,13 @@ fun AudioNowPlayingScreen(
 								IconButton(onClick = { mediaManager.fastForward() }) {
 									Icon(painterResource(R.drawable.ic_fast_forward), contentDescription = stringResource(R.string.fast_forward))
 								}
-								IconButton(onClick = { mediaManager.nextAudioItem() }) {
-									Icon(painterResource(R.drawable.ic_next), contentDescription = stringResource(R.string.lbl_next_item))
+								if (hasNext) {
+									IconButton(onClick = { mediaManager.nextAudioItem() }) {
+										Icon(
+											painter = painterResource(R.drawable.ic_next),
+											contentDescription = stringResource(R.string.lbl_next_item)
+										)
+									}
 								}
 								IconButton(onClick = { isRepeatMode = mediaManager.toggleRepeat() }) {
 									Icon(
@@ -423,7 +437,6 @@ fun AudioNowPlayingScreen(
 					modifier = Modifier.padding(start = 56.dp, end = 56.dp, top = 28.dp, bottom = 12.dp)
 				)
 
-				val queueEntries by playbackManager.queue.entries.collectAsState(initial = emptyList())
 				val validQueueEntries = remember(queueEntries) {
 					queueEntries.filter { it.baseItem != null }
 				}
