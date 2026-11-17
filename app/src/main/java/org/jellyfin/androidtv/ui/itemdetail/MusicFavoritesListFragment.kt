@@ -25,6 +25,7 @@ import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.util.Utils
+import org.jellyfin.androidtv.util.showAddToQueueToast
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -134,6 +135,7 @@ class MusicFavoritesListFragment : Fragment() {
 			onAddToQueueClick = {
 				if (items.isNotEmpty()) {
 					mediaManager.addToAudioQueue(items)
+					showAddToQueueToast(requireContext(), fakeHeaderItem)
 				}
 			},
 			onInstantMixClick = {},

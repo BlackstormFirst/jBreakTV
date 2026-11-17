@@ -24,6 +24,7 @@ import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.androidtv.util.Utils
+import org.jellyfin.androidtv.util.showAddToQueueToast
 import org.jellyfin.androidtv.util.sdk.TrailerUtils
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
@@ -112,6 +113,7 @@ class FullDetailsFragment : Fragment() {
                         onQueueClick = {
                             state.item?.let { item ->
                                 mediaManager.queueAudioItem(item)
+                                showAddToQueueToast(requireContext(), item)
                             }
                         },
                         onShuffleClick = {

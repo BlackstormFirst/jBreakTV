@@ -172,6 +172,8 @@
     <string name="lbl_playlists">Playlists</string>
     <string name="msg_items_added">" items added"</string>
     <string name="lbl_add_to_queue">Add to queue</string>
+    <string name="msg_song_added_to_queue">Song added to queue</string>
+    <string name="msg_album_added_to_queue">Album added to queue</string>
     <string name="lbl_open_artist">Open artist</string>
     <string name="lbl_open_album">Open album</string>
     <string name="lbl_shuffle_queue">Toggle shuffle</string>

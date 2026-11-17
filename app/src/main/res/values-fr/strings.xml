@@ -144,6 +144,8 @@
     <string name="lbl_playlists">Listes de lecture</string>
     <string name="msg_items_added">" éléments ajoutés"</string>
     <string name="lbl_add_to_queue">Ajouter à la liste de lecture</string>
+    <string name="msg_song_added_to_queue">Chanson ajoutée à la liste de lecture</string>
+    <string name="msg_album_added_to_queue">Album ajouté à la liste de lecture</string>
     <string name="lbl_open_artist">Ouvrir la fiche de l\'artiste</string>
     <string name="lbl_open_album">Ouvrir l\'album</string>
     <string name="lbl_next_item">Élément suivant</string>

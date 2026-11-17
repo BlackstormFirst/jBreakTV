@@ -5,8 +5,12 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.res.Configuration
+import android.widget.Toast
 import androidx.annotation.PluralsRes
 import androidx.core.content.getSystemService
+import org.jellyfin.androidtv.R
+import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
 
 /**
  * Get the activity hosting the current context
@@ -31,4 +35,16 @@ fun Context.isTvDevice(): Boolean {
 	return supportedUiModes.contains(uiModeManager?.currentModeType) or
 		packageManager.hasSystemFeature("android.hardware.hdmi.cec") or
 		!packageManager.hasSystemFeature("android.hardware.touchscreen")
+}
+
+fun showAddToQueueToast(context: Context, item: BaseItemDto?) {
+	if (item == null) return
+	val messageRes = when (item.type) {
+		BaseItemKind.AUDIO -> R.string.msg_song_added_to_queue
+		BaseItemKind.MUSIC_ALBUM -> R.string.msg_album_added_to_queue
+		else -> null
+	}
+	if (messageRes != null) {
+		Toast.makeText(context, messageRes, Toast.LENGTH_SHORT).show()
+	}
 }

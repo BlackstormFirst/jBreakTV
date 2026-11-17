@@ -30,6 +30,7 @@ import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher
 import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.androidtv.util.Utils
+import org.jellyfin.androidtv.util.showAddToQueueToast
 import org.jellyfin.androidtv.util.sdk.canPlay
 import org.jellyfin.androidtv.util.sdk.isNonexistentOrVirtualMedia
 import org.jellyfin.sdk.api.client.ApiClient
@@ -161,6 +162,7 @@ class ItemListFragment : Fragment() {
 			onAddToQueueClick = {
 				if (items.isNotEmpty()) {
 					mediaManager.addToAudioQueue(items)
+					showAddToQueueToast(requireContext(), baseItem ?: items.firstOrNull())
 				}
 			},
 			onInstantMixClick = {

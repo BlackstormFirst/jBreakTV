@@ -282,7 +282,10 @@ class KeyProcessor {
                         mainItem = item,
                         allowIntros = false,
                         shuffle = false,
-                        onSuccess = { response -> mediaManager.addToAudioQueue(response) },
+                        onSuccess = { response ->
+                            mediaManager.addToAudioQueue(response)
+                            showAddToQueueToast(activity, item)
+                        },
                         onError = { Toast.makeText(activity, R.string.msg_cannot_play_time, Toast.LENGTH_LONG).show() }
                     )
                     return true

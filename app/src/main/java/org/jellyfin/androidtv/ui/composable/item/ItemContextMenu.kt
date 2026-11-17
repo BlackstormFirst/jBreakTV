@@ -28,6 +28,7 @@ import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.androidtv.util.getActivity
 import org.jellyfin.androidtv.util.playFirstUnwatchedItem
+import org.jellyfin.androidtv.util.showAddToQueueToast
 import org.jellyfin.androidtv.util.sdk.canPlay
 import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
 import org.jellyfin.androidtv.util.toggleFavorite
@@ -272,7 +273,10 @@ fun ItemContextMenu(
 									mainItem = baseItem,
 									allowIntros = false,
 									shuffle = false,
-									onSuccess = { response -> mediaManager.addToAudioQueue(response) },
+									onSuccess = { response ->
+										mediaManager.addToAudioQueue(response)
+										showAddToQueueToast(activity, baseItem)
+									},
 									onError = { Toast.makeText(activity, R.string.msg_cannot_play_time, Toast.LENGTH_SHORT).show() }
 								)
 							}
