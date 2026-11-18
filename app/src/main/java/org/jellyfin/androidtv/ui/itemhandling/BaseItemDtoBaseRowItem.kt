@@ -15,6 +15,7 @@ import org.jellyfin.androidtv.util.getTimeFormatter
 import org.jellyfin.androidtv.util.locale
 import org.jellyfin.androidtv.util.sdk.getFullName
 import org.jellyfin.androidtv.util.sdk.getSubName
+import org.jellyfin.androidtv.util.sdk.isNonexistentOrVirtualMedia
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ImageType
@@ -218,6 +219,20 @@ open class BaseItemDtoBaseRowItem @JvmOverloads constructor(
 			baseItem?.seriesTimerId != null
 
 	override fun getImage(imageType: BaseRowImageType): JellyfinImage? {
+		if (baseItem?.isNonexistentOrVirtualMedia() == true && baseItem.type == BaseItemKind.EPISODE) {
+			val virtualImage = baseItem.parentImages[ImageType.THUMB]
+				?: baseItem.seriesThumbImage
+				?: baseItem.parentImages[ImageType.PRIMARY]
+				?: baseItem.seriesPrimaryImage
+
+			if (virtualImage != null) {
+				return when (imageType) {
+					BaseRowImageType.BANNER -> baseItem.itemImages[ImageType.BANNER] ?: virtualImage
+					else -> virtualImage
+				}
+			}
+		}
+
 		val movieThumb = if (preferMovieThumb && (baseItem?.type == BaseItemKind.MOVIE || baseItem?.type == BaseItemKind.VIDEO)) {
 			baseItem.itemImages[ImageType.THUMB]
 				?: baseItem.itemImages[ImageType.BACKDROP]

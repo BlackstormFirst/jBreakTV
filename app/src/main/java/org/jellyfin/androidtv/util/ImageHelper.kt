@@ -10,6 +10,7 @@ import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.androidtv.util.apiclient.parentImages
 import org.jellyfin.androidtv.util.apiclient.seriesPrimaryImage
 import org.jellyfin.androidtv.util.apiclient.seriesThumbImage
+import org.jellyfin.androidtv.util.sdk.isNonexistentOrVirtualMedia
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -47,7 +48,14 @@ class ImageHelper(
 		width: Int? = null,
 		height: Int? = null,
 	): String? {
-		val image = when (item.type) {
+		val virtualImage = if (item.isNonexistentOrVirtualMedia() && item.type == BaseItemKind.EPISODE) {
+			item.parentImages[ImageType.THUMB]
+				?: item.seriesThumbImage
+				?: item.parentImages[ImageType.PRIMARY]
+				?: item.seriesPrimaryImage
+		} else null
+
+		val image = virtualImage ?: when (item.type) {
 			BaseItemKind.AUDIO -> item.itemImages[ImageType.PRIMARY] ?: item.albumPrimaryImage ?: item.parentImages[ImageType.PRIMARY]
 			else -> item.itemImages[ImageType.PRIMARY]
 		}
@@ -60,7 +68,14 @@ class ImageHelper(
 		fillWidth: Int? = null,
 		fillHeight: Int? = null
 	): String? {
-		val image = when {
+		val virtualImage = if (item.isNonexistentOrVirtualMedia() && item.type == BaseItemKind.EPISODE) {
+			item.parentImages[ImageType.THUMB]
+				?: item.seriesThumbImage
+				?: item.parentImages[ImageType.PRIMARY]
+				?: item.seriesPrimaryImage
+		} else null
+
+		val image = virtualImage ?: when {
 			preferParentThumb && item.type == BaseItemKind.EPISODE -> item.parentImages[ImageType.THUMB] ?: item.seriesThumbImage
 			item.type == BaseItemKind.SEASON -> item.itemImages[ImageType.PRIMARY] ?: item.seriesPrimaryImage
 			item.type == BaseItemKind.PROGRAM && item.imageTags?.containsKey(ImageType.THUMB) == true -> item.itemImages[ImageType.THUMB]
