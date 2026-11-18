@@ -114,29 +114,20 @@ import java.util.UUID
 
 /**
  * BringIntoViewSpec for 10-foot TV vertical LazyColumn navigation matching Leanback VerticalGridView:
- * - Aligns focused row at fixed ideal pivot (35% from bottom of screen).
+ * - Aligns focused row at fixed ideal pivot (40% from bottom of screen = 60% from top of screen).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun rememberTvPivotBringIntoViewSpec(): BringIntoViewSpec {
-    val density = LocalDensity.current
-    val bottomMarginPx = with(density) { 48.dp.toPx() }
-
-    return remember(bottomMarginPx) {
+    return remember {
         object : BringIntoViewSpec {
             override fun calculateScrollDistance(
                 offset: Float,
                 size: Float,
                 containerSize: Float
             ): Float {
-                val targetTop = containerSize * 0.35f
-                val maxVisibleBottom = containerSize - bottomMarginPx
-
-                return when {
-                    offset + size > maxVisibleBottom -> (offset + size) - maxVisibleBottom
-                    offset < targetTop -> offset - targetTop
-                    else -> 0f
-                }
+                val targetTop = containerSize * 0.63f
+                return offset - targetTop
             }
         }
     }

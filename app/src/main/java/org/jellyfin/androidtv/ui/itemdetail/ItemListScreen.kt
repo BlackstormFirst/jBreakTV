@@ -242,14 +242,8 @@ private fun rememberPivotBringIntoViewSpec(): BringIntoViewSpec {
 	return remember {
 		object : BringIntoViewSpec {
 			override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-				val topPivot = containerSize * 0.35f
-				val bottomPivot = containerSize * 0.65f
-
-				return when {
-					offset < topPivot -> offset - topPivot
-					offset > bottomPivot -> offset - bottomPivot
-					else -> 0f
-				}
+				val targetTop = containerSize * 0.63f
+				return offset - targetTop
 			}
 		}
 	}
