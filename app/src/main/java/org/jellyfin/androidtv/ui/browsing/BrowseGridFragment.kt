@@ -344,7 +344,10 @@ fun BrowseGridScreen(
 
 	LaunchedEffect(selectedItem) {
 		if (selectedItem != null && !userHasInteracted) {
-			selectedItemFocusRequester.safeRequestFocus()
+			hasRequestedFocus = false
+			if (selectedItemFocusRequester.safeRequestFocus()) {
+				hasRequestedFocus = true
+			}
 		}
 	}
 
@@ -978,7 +981,7 @@ fun BrowseGridScreen(
 												isSelectedItem -> Modifier
 													.focusRequester(selectedItemFocusRequester)
 													.onGloballyPositioned {
-														if (!hasRequestedFocus) {
+														if (!hasRequestedFocus && !userHasInteracted) {
 															if (selectedItemFocusRequester.safeRequestFocus()) {
 																hasRequestedFocus = true
 															}
@@ -1083,7 +1086,7 @@ fun BrowseGridScreen(
 												isSelectedItem -> Modifier
 													.focusRequester(selectedItemFocusRequester)
 													.onGloballyPositioned {
-														if (!hasRequestedFocus) {
+														if (!hasRequestedFocus && !userHasInteracted) {
 															if (selectedItemFocusRequester.safeRequestFocus()) {
 																hasRequestedFocus = true
 															}
