@@ -722,8 +722,7 @@ fun VideoDetailsScreen(
     onDeleteClick: () -> Unit,
     onHomeClick: () -> Unit,
     onItemClick: (BaseRowItem) -> Unit,
-    onSelectVersion: (MediaSourceInfo) -> Unit = {},
-    onRefreshItem: () -> Unit = {}
+    onSelectVersion: (MediaSourceInfo) -> Unit = {}
 ) {
     val imageHelper = koinInject<ImageHelper>()
     val item = state.item ?: return
@@ -1337,7 +1336,6 @@ fun VideoDetailsScreen(
                                                         currentList[index] = updatedItem
                                                         rowData[rowIndex] = currentList
                                                     }
-                                                    onRefreshItem()
                                                 }
                                             )
                                         }

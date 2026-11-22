@@ -82,9 +82,6 @@ class FullDetailsFragment : Fragment() {
                         onPlayedClick = {
                             viewModel.togglePlayed()
                         },
-                        onRefreshItem = {
-                            viewModel.refresh()
-                        },
                         onTrailerClick = {
                             state.item?.let { item ->
                                 val localTrailerCount = item.localTrailerCount ?: 0
